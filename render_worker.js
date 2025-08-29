@@ -27,7 +27,7 @@ const tileDir    = process.env.VECTOR_DIR || path.resolve(DATA_DIR, 'vector');
 const outputDir  = process.env.RASTER_DIR || path.resolve(DATA_DIR, 'raster');
 
 // Style (kept same default); if you later pass -s or STYLE_PATH, use that
-const stylePathArg = getArg('-s') || process.env.STYLE_PATH || './server_vector/style.json';
+const stylePathArg = getArg('-s') || process.env.STYLE_PATH || './styles/style.json';
 const style = JSON.parse(fs.readFileSync(stylePathArg, 'utf8'));
 
 // Keep ratio if you want hi-DPI tiles; we’ll adapt to the actual buffer size.
@@ -70,7 +70,7 @@ async function renderTile(z, x, y, index, total) {
     const map = new maplibregl.Map({
       request: (req, callback) => {
         // Vector PBFs
-        const tileMatch = req.url.match(/\/tiles_vector\/(\d+)\/(\d+)\/(\d+)\.pbf/);
+        const tileMatch = req.url.match(/\/vector\/(\d+)\/(\d+)\/(\d+)\.pbf/);
         if (tileMatch) {
           const [zStr, xStr, yStr] = tileMatch.slice(1);
           const pbfPath = path.join(tileDir, zStr, xStr, `${yStr}.pbf`);
@@ -87,7 +87,7 @@ async function renderTile(z, x, y, index, total) {
         if (fontMatch) {
           const [fontstackRaw, range] = fontMatch.slice(1);
           const fontstack = decodeURIComponent(fontstackRaw);
-          const fontPath = path.join(__dirname, './server_vector/fonts', fontstack, `${range}.pbf`);
+          const fontPath = path.join(__dirname, './fonts', fontstack, `${range}.pbf`);
           return fs.readFile(fontPath, (err, data) => {
             if (err) {
               fs.appendFileSync('failed_tiles.log', `Font fetch failed: ${fontPath}\n`);
