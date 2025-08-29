@@ -1,34 +1,33 @@
 #!/usr/bin/env node
-"use strict";
 
-const maplibregl = require("@maplibre/maplibre-gl-native");
-const { createCanvas } = require("canvas");
-const fs = require("fs");
-const path = require("path");
+const maplibregl = require('@maplibre/maplibre-gl-native');
+const { createCanvas } = require('canvas');
+const fs = require('fs');
+const path = require('path');
 
 // ── CLI ──────────────────────────────────────────────────────
 const args = process.argv.slice(2);
 function getArg(flag) { const i = args.indexOf(flag); return i !== -1 ? args[i + 1] : undefined; }
 
-const z  = parseInt(getArg("-z"));
-const x1 = parseInt(getArg("-x1"));
-const x2 = parseInt(getArg("-x2"));
-const y1 = parseInt(getArg("-y1"));
-const y2 = parseInt(getArg("-y2"));
-const outPathArg = getArg("-o") ? path.resolve(getArg("-o")) : null;
-const overwrite  = args.includes("--overwrite");
+const z  = parseInt(getArg('-z'));
+const x1 = parseInt(getArg('-x1'));
+const x2 = parseInt(getArg('-x2'));
+const y1 = parseInt(getArg('-y1'));
+const y2 = parseInt(getArg('-y2'));
+const outPathArg = getArg('-o') ? path.resolve(getArg('-o')) : null;
+const overwrite = args.includes('--overwrite');
 
-const DEBUG = process.env.RENDER_DEBUG === "1" || args.includes("--debug");
+const DEBUG = process.env.RENDER_DEBUG === '1' || args.includes('--debug');
 
-// Style resolution (ENV/flag → image default)
+// Style path resolution (ENV or param, fallback to image default)
 const stylePathArg =
-  getArg("-s") ||
+  getArg('-s') ||
   process.env.STYLE_PATH ||
-  path.resolve(__dirname, "styles", "style.json");
+  path.resolve(__dirname, 'styles', 'style.json');
 
 // ── PARAM CHECKS ─────────────────────────────────────────────
 if ([z, x1, x2, y1, y2].some(v => Number.isNaN(v))) {
-  console.error("❌ Usage: -z Z -x1 X1 -x2 X2 -y1 Y1 -y2 Y2 [-o out.png] [-s style.json] [--overwrite] [--debug]");
+  console.error('❌ Usage: -z Z -x1 X1 -x2 X2 -y1 Y1 -y2 Y2 [-o out.png] [-s style.json] [--overwrite] [--debug]');
   process.exit(1);
 }
 if (!fs.existsSync(stylePathArg)) {
@@ -37,16 +36,13 @@ if (!fs.existsSync(stylePathArg)) {
 }
 
 // ── CONSTANTS ────────────────────────────────────────────────
-const DATA_DIR   = process.env.DATA_DIR   || "/data";
-const VECTOR_DIR = process.env.VECTOR_DIR || path.resolve(DATA_DIR, "vector");
-const RASTER_DIR = process.env.RASTER_DIR || path.resolve(DATA_DIR, "raster");
+const DATA_DIR   = process.env.DATA_DIR   || '/data';
+const VECTOR_DIR = process.env.VECTOR_DIR || path.resolve(DATA_DIR, 'vector');
+const RASTER_DIR = process.env.RASTER_DIR || path.resolve(DATA_DIR, 'raster');
 
-// Force vector tiles to our server route
-const VECTOR_TILES_URL = process.env.VECTOR_TILES_URL || "/vector/{z}/{x}/{y}.pbf";
-
-// Tile size & pixel ratio
-const TILE_SIZE = parseInt(getArg("--tile") || process.env.TILE_SIZE || "512");
-const RATIO     = parseFloat(getArg("--ratio") || process.env.RENDER_PIXEL_RATIO || "1") || 1;
+const VECTOR_TILES_URL = process.env.VECTOR_TILES_URL || '/vector/{z}/{x}/{y}.pbf';
+const TILE_SIZE   = parseInt(getArg('--tile') || process.env.TILE_SIZE || '512');
+const RATIO       = parseFloat(getArg('--ratio') || process.env.RENDER_PIXEL_RATIO || '1') || 1;
 
 const WIDTH = TILE_SIZE;
 const HEIGHT = TILE_SIZE;
@@ -56,7 +52,8 @@ function getTileCenter(z, x, y) {
   const n = Math.pow(2, z);
   const lng = (x / n) * 360 - 180;
   const latRad = Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n)));
-  return [lng, (latRad * 180) / Math.PI];
+  const lat = (latRad * 180) / Math.PI;
+  return [lng, lat];
 }
 
 function derivePixelSize(bufLen, w, h) {
@@ -65,50 +62,56 @@ function derivePixelSize(bufLen, w, h) {
   if (px === base) return [w, h];
   const scale = Math.sqrt(px / base);
   const W = Math.round(w * scale), H = Math.round(h * scale);
-  if (W * H * 4 !== bufLen) throw new Error(`Pixel buffer mismatch len=${bufLen}, expected=${W * H * 4}`);
+  if (W * H * 4 !== bufLen) throw new Error(`Pixel buffer mismatch len=${bufLen}, expected=${W*H*4}`);
   return [W, H];
 }
 
 function loadAndSanitizeStyle(p) {
-  const json = fs.readFileSync(p, "utf8");
+  const json = fs.readFileSync(p, 'utf8');
   let s;
   try { s = JSON.parse(json); }
-  catch (e) { console.error(`❌ Style JSON parse error in ${p}: ${e.message}`); process.exit(3); }
-
-  // Transparent background
-  const bg = (s.layers || []).find(l => l.type === "background");
-  if (!bg) {
-    s.layers = [{ id: "__bg", type: "background", paint: { "background-color": "rgba(0,0,0,0)" } }, ...(s.layers || [])];
-  } else {
-    bg.paint = bg.paint || {};
-    bg.paint["background-color"] = "rgba(0,0,0,0)";
+  catch (e) {
+    console.error(`❌ Style JSON parse error in ${p}: ${e.message}`);
+    process.exit(3);
   }
 
-  // Local glyphs
-  s.glyphs = "fonts/{fontstack}/{range}.pbf";
+  // Ensure transparent background
+  const bg = (s.layers || []).find(l => l.type === 'background');
+  if (!bg) {
+    s.layers = [{ id: '__bg', type: 'background', paint: { 'background-color': 'rgba(0,0,0,0)' } }, ...(s.layers || [])];
+  } else {
+    bg.paint = bg.paint || {};
+    bg.paint['background-color'] = 'rgba(0,0,0,0)';
+  }
 
-  // Remove sprite (native crashes often stem from remote sprites)
+  // Force glyphs to local fonts handler
+  s.glyphs = 'fonts/{fontstack}/{range}.pbf';
+
+  // Remove sprite reference (remote sprite JSON/PNG often crashes native renderer)
   if (s.sprite) {
-    if (DEBUG) console.error(`[STYLE] removing sprite: ${s.sprite}`);
+    if (DEBUG) console.error(`[STYLE] removing sprite reference: ${s.sprite}`);
     delete s.sprite;
   }
 
-  // Coerce vector sources → /vector/{z}/{x}/{y}.pbf (xyz)
+  // Coerce vector sources to our local /vector URL + xyz scheme
   const srcIds = Object.keys(s.sources || {});
-  const vecIds = srcIds.filter(id => s.sources[id]?.type === "vector");
+  const vecIds = srcIds.filter(id => s.sources[id]?.type === 'vector');
   for (const id of vecIds) {
     const src = s.sources[id];
-    if (!Array.isArray(src.tiles) || src.tiles.length === 0) src.tiles = [VECTOR_TILES_URL];
+    if (!Array.isArray(src.tiles) || src.tiles.length === 0) {
+      src.tiles = [VECTOR_TILES_URL];
+    }
+    // If not our endpoint, force it
     if (!/^\/vector\/\{z\}\/\{x\}\/\{y\}\.pbf$/.test(src.tiles[0])) {
       if (DEBUG) console.error(`[STYLE] source "${id}" tiles -> ${VECTOR_TILES_URL}`);
       src.tiles = [VECTOR_TILES_URL];
     }
-    src.scheme = "xyz";
+    src.scheme = 'xyz';
     if (src.minzoom == null) src.minzoom = 0;
     if (src.maxzoom == null) src.maxzoom = 14;
   }
 
-  // If layers point at a missing source, map to the first vector source
+  // If any layer references a non-existent source, map it to the first vector source
   if (vecIds.length > 0) {
     for (const layer of (s.layers || [])) {
       if (layer.source && !vecIds.includes(layer.source)) {
@@ -120,39 +123,42 @@ function loadAndSanitizeStyle(p) {
 
   if (DEBUG) {
     console.error(`[STYLE] using: ${p}`);
-    console.error(`[STYLE] vector sources: ${vecIds.join(", ") || "<none>"}`);
+    console.error(`[STYLE] vector sources: ${vecIds.join(', ') || '<none>'}`);
   }
+
   return s;
 }
 
-// Crash diagnostics
-process.on("uncaughtException", e => { console.error(`[FATAL] uncaught: ${e.stack || e}`); process.exit(111); });
-process.on("unhandledRejection", e => { console.error(`[FATAL] unhandledRejection: ${e.stack || e}`); process.exit(112); });
-["SIGSEGV","SIGABRT","SIGBUS","SIGILL","SIGFPE"].forEach(sig => {
+// Diagnostics for crashes/signals
+process.on('uncaughtException', e => { console.error(`[FATAL] uncaught: ${e.stack || e}`); process.exit(111); });
+process.on('unhandledRejection', e => { console.error(`[FATAL] unhandledRejection: ${e.stack || e}`); process.exit(112); });
+['SIGSEGV','SIGABRT','SIGBUS','SIGILL','SIGFPE'].forEach(sig => {
   process.on(sig, () => { console.error(`[FATAL] signal ${sig}`); process.exit(113); });
 });
 
-async function renderOne(z, x, y) {
+async function renderTile(z, x, y) {
   return new Promise((resolve) => {
     const zStr = String(z), xStr = String(x), yStr = String(y);
 
-    const outDir  = outPathArg ? path.dirname(outPathArg) : path.join(RASTER_DIR, zStr, xStr);
+    // Output path
+    const outDir = outPathArg ? path.dirname(outPathArg) : path.join(RASTER_DIR, zStr, xStr);
     const outPath = outPathArg || path.join(outDir, `${yStr}.png`);
     if (!overwrite && fs.existsSync(outPath)) return resolve(true);
 
+    // Transparent canvas
     let canvas = createCanvas(WIDTH, HEIGHT, { alpha: true });
-    let ctx = canvas.getContext("2d", { alpha: true });
+    let ctx = canvas.getContext('2d', { alpha: true });
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
+    // Style
     const style = loadAndSanitizeStyle(stylePathArg);
-    console.error(`[RENDER] style loaded`);
 
     const map = new maplibregl.Map({
       request: (req, cb) => {
-        console.error(`[REQ] ${req.url}`);
+        if (DEBUG) console.error(`[REQ] ${req.url}`);
 
-        // Accept /vector and legacy /tiles_vector (optional querystrings)
-        const tm = req.url.match(/^\/(?:(?:vector)|(?:tiles_vector))\/(\d+)\/(\d+)\/(\d+)\.pbf(?:\?.*)?$/);
+        // Accept both /vector and legacy /tiles_vector
+        const tm = req.url.match(/^\/(?:(?:vector)|(?:tiles_vector))\/(\d+)\/(\d+)\/(\d+)\.pbf$/);
         if (tm) {
           const [zS, xS, yS] = tm.slice(1);
           const pbfPath = path.join(VECTOR_DIR, zS, xS, `${yS}.pbf`);
@@ -164,20 +170,21 @@ async function renderOne(z, x, y) {
         if (fm) {
           const [fontstackRaw, range] = fm.slice(1);
           const fontstack = decodeURIComponent(fontstackRaw);
-          const fontPath = path.join(__dirname, "assets", "fonts", fontstack, `${range}.pbf`);
+          const fontPath = path.join(__dirname, 'assets', 'fonts', fontstack, `${range}.pbf`);
           return fs.readFile(fontPath, (err, data) => cb(null, err ? {} : { data }));
         }
 
-        // Unknown resources → empty body (prevents native crashes)
+        // Unknown resources: respond empty (prevents crashes)
         return cb(null, {});
       },
       ratio: RATIO,
-      mode: "tile",
+      mode: 'tile',
       width: WIDTH,
       height: HEIGHT
     });
 
     const center = getTileCenter(z, x + 0.5, y + 0.5);
+
     try {
       map.load(style);
     } catch (e) {
@@ -185,7 +192,6 @@ async function renderOne(z, x, y) {
       return resolve(false);
     }
 
-    console.error(`[RENDER] calling map.render z=${z} x=${x} y=${y}`);
     map.render({ zoom: z, center, width: WIDTH, height: HEIGHT, bearing: 0, pitch: 0, buffer: 256 }, (err, rgba) => {
       if (err) {
         console.error(`[RENDER] render error ${z}/${x}/${y}: ${err}`);
@@ -198,20 +204,17 @@ async function renderOne(z, x, y) {
       catch (e) { console.error(`[RENDER] pixel mismatch ${z}/${x}/${y}: ${e}`); map.release(); return resolve(false); }
 
       const outCanvas = createCanvas(W, H, { alpha: true });
-      const octx = outCanvas.getContext("2d", { alpha: true });
+      const octx = outCanvas.getContext('2d', { alpha: true });
       const img = octx.createImageData(W, H);
       img.data.set(rgba);
       octx.putImageData(img, 0, 0);
 
       fs.mkdirSync(outDir, { recursive: true });
       const out = fs.createWriteStream(outPath);
-      const pngStream = outCanvas.createPNGStream();
-      pngStream.on("error", e => console.error(`[RENDER] png stream error ${z}/${x}/${y}: ${e}`));
-      pngStream.on("end",   () => console.error(`[RENDER] png stream end ${z}/${x}/${y}`));
-      pngStream.pipe(out);
+      outCanvas.createPNGStream().pipe(out);
 
-      out.on("finish", () => { map.release(); resolve(true); });
-      out.on("error",  (e) => { console.error(`[RENDER] write error ${z}/${x}/${y}: ${e}`); map.release(); resolve(false); });
+      out.on('finish', () => { map.release(); resolve(true); });
+      out.on('error',  (e) => { console.error(`[RENDER] write error ${z}/${x}/${y}: ${e}`); map.release(); resolve(false); });
     });
   });
 }
@@ -226,7 +229,10 @@ async function renderOne(z, x, y) {
 
   for (let x = x1; x <= x2; x++) {
     for (let y = y1; y <= y2; y++) {
-      await renderOne(z, x, y);
+      const ok = await renderTile(z, x, y);
+      if (!ok) {
+        // keep going; server will treat failure as "render err" and serve blank
+      }
       global.gc?.();
     }
   }
