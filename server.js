@@ -248,6 +248,8 @@ app.get('/style.json', (req, res) => {
   res.sendFile(STYLE_PATH);
 });
 
+app.use('/fonts', express.static(path.join(__dirname, 'fonts')));
+
 // Optional: serve a simple viewer so you can pan around and see vector requests
 app.use('/', express.static(path.join(__dirname, 'public')));
 
@@ -307,7 +309,7 @@ app.get("/tiles_raster/:z/:x/:y.png", async (req, res) => {
 
 app.get("/", (_req, res) => {
   console.log("[INFO] Serving index.html");
-  res.sendFile(path.join(__dirname, "server_raster", "index.html"));
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 // ─────────────────────────────────────────────────────────────
