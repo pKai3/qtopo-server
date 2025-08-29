@@ -137,12 +137,7 @@ async function renderTile(z,x,y){
 // Routes
 app.get("/healthz", (_req,res)=>res.status(200).send("ok"));
 
-app.get("/tiles_raster/:z/:x/:y.png", (req,res) => { //redirect for legacy URL
-  const { z,x,y } = req.params;
-  res.redirect(301, `/${z}/${x}/${y}.png`);
-});
-
-app.get("/:z(\\d+)/:x(\\d+)/:y(\\d+)\\.png", async (req, res) => {
+app.get("/tiles_raster/:z/:x/:y.png", async (req,res)=>{
   const { z,x,y } = req.params;
   console.log(`[REQ] GET /tiles_raster/${z}/${x}/${y}.png`);
   let zStr,xStr,yStr; try { [zStr,xStr,yStr] = zxysToStrings(z,x,y); }
