@@ -56,4 +56,4 @@ COPY start.sh /usr/src/app/start.sh
 RUN chmod +x /usr/src/app/start.sh
 
 ENTRYPOINT ["/usr/src/app/start.sh"]
-# no CMD needed; entry.sh execs the exact command
+# no CMD needed; start.sh execs the exact command

@@ -137,14 +137,41 @@ async function renderTile(z,x,y){
 // Routes
 app.get("/healthz", (_req,res)=>res.status(200).send("ok"));
 
-app.get("/tiles_raster/:z/:x/:y.png", (req,res) => { //redirect for legacy URL
-  const { z,x,y } = req.params;
-  res.redirect(301, `/${z}/${x}/${y}.png`);
+// Serve vector tiles at: /:z/:x/:y.pbf  (clean root path)
+app.get("/vector/:z/:x/:y.pbf", async (req, res, next) => {
+  const { z, x, y } = req.params;
+  // only digits → otherwise let other routes handle it
+  if (!/^\d+$/.test(z) || !/^\d+$/.test(x) || !/^\d+$/.test(y)) return next();
+
+  try {
+    const pbfPath = await ensureVectorTile(z, x, y); // your existing fetch+cache
+    res.setHeader("Content-Type", "application/x-protobuf");
+    // If the file is gzipped, tell the browser
+    try {
+      const fd = fs.openSync(pbfPath, "r");
+      const sig = Buffer.alloc(2);
+      fs.readSync(fd, sig, 0, 2, 0);
+      fs.closeSync(fd);
+      if (sig[0] === 0x1f && sig[1] === 0x8b) res.setHeader("Content-Encoding", "gzip");
+    } catch {}
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    return res.sendFile(pbfPath);
+  } catch (e) {
+    console.error(`[VT] ${z}/${x}/${y} failed: ${e.message || e}`);
+    // no-content lets GL skip quietly
+    return res.status(204).end();
+  }
 });
 
-app.get("/:z/:x/:y.png", async (req, res, next) => {
+//redirect for legacy raster URL
+app.get("/tiles_raster/:z/:x/:y.png", (req,res) => { 
   const { z,x,y } = req.params;
-  console.log(`[REQ] GET /tiles_raster/${z}/${x}/${y}.png`);
+  res.redirect(301, `/raster/${z}/${x}/${y}.png`);
+});
+
+app.get("/raster/:z/:x/:y.png", async (req, res, next) => {
+  const { z,x,y } = req.params;
+  console.log(`[REQ] GET PNG /${z}/${x}/${y}.png`);
   let zStr,xStr,yStr; try { [zStr,xStr,yStr] = zxysToStrings(z,x,y); }
   catch { await ensureBlankTilePresent(); return sendTile(res, BLANK_TILE_PATH); }
 
