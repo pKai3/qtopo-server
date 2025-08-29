@@ -27,8 +27,14 @@ const tileDir    = process.env.VECTOR_DIR || path.resolve(DATA_DIR, 'vector');
 const outputDir  = process.env.RASTER_DIR || path.resolve(DATA_DIR, 'raster');
 
 // Style (kept same default); if you later pass -s or STYLE_PATH, use that
-const stylePathArg = getArg('-s') || process.env.STYLE_PATH || './styles/style.json';
-const style = JSON.parse(fs.readFileSync(stylePathArg, 'utf8'));
+const stylePathArg = getArg('-s') || process.env.STYLE_PATH;   // no './styles/...'
+if (!styleArg) { console.error('FATAL: pass -s /data/styles/style.json'); process.exit(2); }
+
+const STYLE_PATH = path.isAbsolute(styleArg) ? styleArg : path.resolve(styleArg);
+if (!fs.existsSync(STYLE_PATH)) { console.error(`FATAL: style not found at ${STYLE_PATH}`); process.exit(2); }
+console.error('[WORKER] argv:', process.argv.join(' '));
+console.error('[WORKER] STYLE=', STYLE_PATH);
+const style = JSON.parse(fs.readFileSync(STYLE_PATH, 'utf8'));
 
 // Keep ratio if you want hi-DPI tiles; we’ll adapt to the actual buffer size.
 const ratio = 2.0;

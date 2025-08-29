@@ -73,6 +73,7 @@ function fixPerms(p) {
 }
 
 fixPerms(STYLE_DIR);
+process.env.STYLE_PATH = STYLE_PATH;  // <-- export for children
 
 // Vector PBF Endpoint (QTopo 1m Official)
 const VECTOR_BASE_URL =
