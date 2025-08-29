@@ -253,7 +253,12 @@ async function renderSingleTile(z, x, y) {
       ["render_worker.js", "-z", zStr, "-x1", xStr, "-x2", xStr, "-y1", yStr, "-y2", yStr],
       {
         cwd: __dirname,
-        env: { ...process.env, PATH: `${path.dirname(nodeBin)}:${process.env.PATH || ""}` }
+        env: {
+          ...process.env,           // carries DISPLAY, DATA_DIR, etc.
+          STYLE_PATH,               // ensure the worker sees the editable style
+          PATH: `${path.dirname(nodeBin)}:${process.env.PATH || ""}`
+        },
+        stdio: "pipe"
       }
     );
 
