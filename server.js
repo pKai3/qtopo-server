@@ -20,11 +20,16 @@ const app = express();
 const PORT = Number(process.env.PORT || 8080);
 const HOST = process.env.HOST || "0.0.0.0";
 
+// ── NEW: single-mount data roots (defaults to /data/{vector,raster})
+const DATA_DIR   = process.env.DATA_DIR   || "/data";
+const RASTER_DIR = process.env.RASTER_DIR || path.join(DATA_DIR, "raster");
+const VECTOR_DIR = process.env.VECTOR_DIR || path.join(DATA_DIR, "vector");
+
 // Where raster tiles are written/read
-const rasterRoot = path.join(__dirname, "server_raster", "tiles_raster");
+const rasterRoot = RASTER_DIR;
 
 // Where vector PBFs live
-const vectorRoot = path.join(__dirname, "server_vector", "tiles_vector");
+const vectorRoot = VECTOR_DIR;
 
 // Vector endpoint
 const VECTOR_BASE_URL =
@@ -197,10 +202,14 @@ async function renderSingleTile(z, x, y) {
 
   const prom = new Promise((resolve, reject) => {
     console.log(`[RENDER] Generating tile: ${tilePath}`);
+    const nodeBin = process.execPath; // ← use the current Node binary
     const child = spawn(
-      "node",
+      nodeBin,
       ["render_worker.js", "-z", zStr, "-x1", xStr, "-x2", xStr, "-y1", yStr, "-y2", yStr],
-      { cwd: __dirname }
+      {
+        cwd: __dirname,
+        env: { ...process.env, PATH: `${path.dirname(nodeBin)}:${process.env.PATH || ""}` }
+      }
     );
 
     child.stdout.on("data", (d) => processStdout.write(`[RENDER-OUT]: ${d}`));
@@ -433,5 +442,7 @@ process.on("SIGINT",  () => { if (cleanupTimer) clearTimeout(cleanupTimer); });
 
 // ─────────────────────────────────────────────────────────────
 app.listen(PORT, HOST, () => {
+  console.log(`[INIT] VECTOR_DIR=${VECTOR_DIR}`);
+  console.log(`[INIT] RASTER_DIR=${RASTER_DIR}`);
   console.log(`Tile server running on http://${HOST}:${PORT}`);
 });

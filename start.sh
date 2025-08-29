@@ -8,6 +8,16 @@ log "uid=$(id -u) user=$(whoami) pwd=$(pwd)"
 log "PATH=$PATH"
 log "NVM_DIR=${NVM_DIR:-/root/.nvm}"
 
+# ── Single-mount data layout (no symlinks) ───────────────────
+export DATA_DIR="${DATA_DIR:-/data}"
+export VECTOR_DIR="${VECTOR_DIR:-$DATA_DIR/vector}"
+export RASTER_DIR="${RASTER_DIR:-$DATA_DIR/raster}"
+
+mkdir -p "$VECTOR_DIR" "$RASTER_DIR"
+log "DATA_DIR=$DATA_DIR"
+log "VECTOR_DIR=$VECTOR_DIR"
+log "RASTER_DIR=$RASTER_DIR"
+
 # ---- config (can override via env) ----
 NODE_BIN="${NODE_BIN:-/root/.nvm/versions/node/v18.20.8/bin/node}"
 export PATH="$(dirname "$NODE_BIN"):${PATH:-/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
