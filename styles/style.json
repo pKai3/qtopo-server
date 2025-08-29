@@ -1,10 +1,10 @@
 {
   "version": 8,
-  "glyphs": "fonts/{fontstack}/{range}.pbf",
+  "glyphs": "http://tower.csinger.com:9876/fonts/{fontstack}/{range}.pbf",
   "sources": {
     "qld": {
       "type": "vector",
-      "tiles": ["/vector/{z}/{x}/{y}.pbf"],
+      "tiles": ["http://tower.csinger.com:9876/tiles_vector/{z}/{x}/{y}.pbf"],
       "minzoom": 1,
       "maxzoom": 18
     }

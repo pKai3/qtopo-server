@@ -76,7 +76,7 @@ async function renderOne(z,x,y){
 
     const map = new maplibregl.Map({
       request: (req, cb) => {
-        const tm = req.url.match(/^\/(?:vector|tiles_vector)\/(\d+)\/(\d+)\/(\d+)\.pbf/);
+        const tm = req.url.match(/\/tiles_vector\/(\d+)\/(\d+)\/(\d+)\.pbf/);
         if (tm){
           const [zS,xS,yS] = tm.slice(1);
           const pbfPath = path.join(VECTOR_DIR, zS, xS, `${yS}.pbf`);
