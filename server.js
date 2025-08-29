@@ -25,15 +25,39 @@ const DATA_DIR   = process.env.DATA_DIR   || "/data";
 const RASTER_DIR = process.env.RASTER_DIR || path.join(DATA_DIR, "raster");
 const VECTOR_DIR = process.env.VECTOR_DIR || path.join(DATA_DIR, "vector");
 
+const STYLE_DIR = process.env.STYLE_DIR || path.join(DATA_DIR, "styles");
+const STYLE_PATH = process.env.STYLE_PATH || path.resolve(__dirname, STYLE_DIR, 'style.json');
+
+const BAKED_STYLE = path.join(__dirname, 'styles', 'style.json');
+
 // Where raster tiles are written/read
 const rasterRoot = RASTER_DIR;
-
 // Where vector PBFs live
 const vectorRoot = VECTOR_DIR;
 
-const STYLE_PATH = process.env.STYLE_PATH || path.resolve(__dirname, 'styles', 'style.json');
 
-// Vector endpoint
+// Seed editable style once, then require it
+try {
+  fs.mkdirSync(STYLE_DIR, { recursive: true });
+  if (!fs.existsSync(STYLE_PATH)) {
+    if (!fs.existsSync(BAKED_STYLE)) {
+      console.error(`[BOOT] FATAL: baked style missing at ${BAKED_STYLE}`);
+      process.exit(1);
+    }
+    fs.copyFileSync(BAKED_STYLE, STYLE_PATH);
+    console.log(`[BOOT] seeded editable style at ${STYLE_PATH}`);
+  }
+  // Hard-enforce editable path only
+  if (!fs.existsSync(STYLE_PATH)) {
+    console.error(`[BOOT] FATAL: editable style missing at ${STYLE_PATH}`);
+    process.exit(1);
+  }
+} catch (e) {
+  console.error(`[BOOT] FATAL: style seeding/validation failed: ${e.message}`);
+  process.exit(1);
+}
+
+// Vector PBF Endpoint (QTopo 1m Official)
 const VECTOR_BASE_URL =
   process.env.VECTOR_BASE_URL ||
   "https://spatial.information.qld.gov.au/arcgis/rest/services/Hosted/Basemaps_QldBase_Topographic/VectorTileServer/tile";
