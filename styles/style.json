@@ -1,6 +1,6 @@
 {
   "version": 8,
-  "glyphs": "fonts/{fontstack}/{range}.pbf",
+  "glyphs": "/fonts/{fontstack}/{range}.pbf",
   "sources": {
     "qld": {
       "type": "vector",
