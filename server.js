@@ -245,8 +245,24 @@ app.get("/healthz", (_req, res) => res.status(200).send("ok"));
 
 // Serve the active style (baked into the image)
 app.get('/style.json', (req, res) => {
-  res.type('application/json; charset=utf-8');
-  res.sendFile(STYLE_PATH);
+  const fs = require('fs');
+  const path = require('path');
+  const origin = `${req.protocol}://${req.get('host')}`;
+
+  const ensureAbs = u => /^https?:\/\//.test(u) ? u : origin + (u.startsWith('/') ? u : '/' + u);
+
+  const raw = fs.readFileSync(STYLE_PATH, 'utf8');
+  const style = JSON.parse(raw);
+
+  style.glyphs = ensureAbs(style.glyphs || '/fonts/{fontstack}/{range}.pbf');
+
+  if (style.sources) {
+    for (const src of Object.values(style.sources)) {
+      if (Array.isArray(src.tiles)) src.tiles = src.tiles.map(ensureAbs);
+    }
+  }
+
+  res.type('application/json; charset=utf-8').send(style);
 });
 
 app.use('/fonts', express.static(path.join(__dirname, 'fonts')));
