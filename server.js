@@ -31,7 +31,6 @@ const rasterRoot = RASTER_DIR;
 // Where vector PBFs live
 const vectorRoot = VECTOR_DIR;
 
-const path = require('path');
 const STYLE_PATH = process.env.STYLE_PATH || path.resolve(__dirname, 'styles', 'style.json');
 
 // Vector endpoint
