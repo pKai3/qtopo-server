@@ -21,13 +21,19 @@ if ([z, x1, x2, y1, y2].some(v => Number.isNaN(v))) {
 }
 
 // ── CONSTANTS ────────────────────────────────────────────────
+// NEW: honor single-mount /data layout (or env overrides)
+const DATA_DIR   = process.env.DATA_DIR   || '/data';
+const tileDir    = process.env.VECTOR_DIR || path.resolve(DATA_DIR, 'vector');
+const outputDir  = process.env.RASTER_DIR || path.resolve(DATA_DIR, 'raster');
+
+// Style (kept same default); if you later pass -s or STYLE_PATH, use that
+const stylePathArg = getArg('-s') || process.env.STYLE_PATH || './server_vector/style.json';
+const style = JSON.parse(fs.readFileSync(stylePathArg, 'utf8'));
+
 // Keep ratio if you want hi-DPI tiles; we’ll adapt to the actual buffer size.
-const style = JSON.parse(fs.readFileSync('./server_vector/style.json'));
 const ratio = 2.0;
 const width = 512;
 const height = 512;
-const tileDir = path.resolve(__dirname, './server_vector/tiles_vector');
-const outputDir = path.resolve(__dirname, './server_raster/tiles_raster');
 
 // ── Helpers ──────────────────────────────────────────────────
 function getTileCenter(z, x, y) {
@@ -145,7 +151,6 @@ async function renderTile(z, x, y, index, total) {
       stream.pipe(out);
 
       out.on('finish', () => {
-        // Don’t delete “small” PNGs — fully transparent tiles can be tiny and still valid
         map.release();
         resolve();
       });
