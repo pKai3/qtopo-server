@@ -32,7 +32,7 @@ const VECTOR_BASE_URL =
 const PBF_FETCH_TIMEOUT_MS = Number(process.env.PBF_FETCH_TIMEOUT_MS || 10000);
 
 // Blank PNG config
-const BLANK_TILE_PATH = process.env.BLANK_TILE_PATH || path.join(__dirname, "blank.png");
+const BLANK_TILE_PATH = process.env.BLANK_TILE_PATH || path.join(__dirname, "./assets/images/blank.png");
 const CACHE_BLANK_TILES = process.env.CACHE_BLANK_TILES !== "0";
 
 // Cleanup config
@@ -137,7 +137,7 @@ async function renderTile(z,x,y){
 // Routes
 app.get("/healthz", (_req,res)=>res.status(200).send("ok"));
 
-// Serve vector tiles at: /:z/:x/:y.pbf  (clean root path)
+// Serve vector tiles at: vector/:z/:x/:y.pbf  (clean root path)
 app.get("/vector/:z/:x/:y.pbf", async (req, res, next) => {
   const { z, x, y } = req.params;
   // only digits → otherwise let other routes handle it
