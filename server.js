@@ -37,6 +37,8 @@ const vectorRoot = VECTOR_DIR;
 
 
 // Seed editable style once, then require it
+process.umask(0o002);
+
 try {
   fs.mkdirSync(STYLE_DIR, { recursive: true });
   if (!fs.existsSync(STYLE_PATH)) {
@@ -56,6 +58,21 @@ try {
   console.error(`[BOOT] FATAL: style seeding/validation failed: ${e.message}`);
   process.exit(1);
 }
+
+const PUID = parseInt(process.env.PUID || '99', 10);   // Unraid default: nobody
+const PGID = parseInt(process.env.PGID || '100', 10);  // Unraid default: users
+
+function fixPerms(p) {
+  try { fs.chownSync(p, PUID, PGID); } catch {}
+  try {
+    const st = fs.statSync(p);
+    const mode = st.isDirectory() ? 0o775 : 0o664;
+    fs.chmodSync(p, mode);
+    if (st.isDirectory()) for (const n of fs.readdirSync(p)) fixPerms(path.join(p, n));
+  } catch {}
+}
+
+fixPerms(STYLE_DIR);
 
 // Vector PBF Endpoint (QTopo 1m Official)
 const VECTOR_BASE_URL =
