@@ -27,7 +27,7 @@ const tileDir    = process.env.VECTOR_DIR || path.resolve(DATA_DIR, 'vector');
 const outputDir  = process.env.RASTER_DIR || path.resolve(DATA_DIR, 'raster');
 
 // Style (kept same default); if you later pass -s or STYLE_PATH, use that
-const stylePathArg = getArg('-s') || process.env.STYLE_PATH || './server_vector/style.json';
+const stylePathArg = getArg('-s') || process.env.STYLE_PATH || './styles/style.json';
 const style = JSON.parse(fs.readFileSync(stylePathArg, 'utf8'));
 
 // Keep ratio if you want hi-DPI tiles; we’ll adapt to the actual buffer size.
