@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>QTopo-BC Vector Tiles Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://unpkg.com/maplibre-gl@3.3.0/dist/maplibre-gl.js"></script>
+  <link href="https://unpkg.com/maplibre-gl@3.3.0/dist/maplibre-gl.css" rel="stylesheet" />
+  <style>
+    body, html { margin: 0; height: 100%; }
+    #map { width: 100%; height: 100%; }
+    #menu {
+      position: absolute;
+      background: white;
+      padding: 8px;
+      top: 10px;
+      left: 10px;
+      z-index: 1;
+      font-family: sans-serif;
+      font-size: 14px;
+      max-height: 90%;
+      overflow-y: auto;
+    }
+    #zoom-display,
+    #pointer-coords,
+    #bounds-display {
+      position: absolute;
+      left: 10px;
+      background: rgba(255,255,255,0.9);
+      padding: 4px 8px;
+      font-family: monospace;
+      z-index: 1;
+    }
+    #zoom-display { bottom: 10px; }
+    #pointer-coords { bottom: 40px; }
+    #bounds-display { bottom: 70px; white-space: pre; }
+    #tile-coords {
+      bottom: 140px;
+      left: 10px;
+      background: rgba(255,255,255,0.9);
+      padding: 4px 8px;
+      position: absolute;
+      font-family: monospace;
+      z-index: 1;
+    }
+  </style>
+</head>
+<body>
+<div id="map"></div>
+<div id="menu">
+  <label><input type="checkbox" id="contours" checked> Contours</label><br/>
+  <label><input type="checkbox" id="watercourses" checked> Watercourses</label><br/>
+  <label><input type="checkbox" id="watercourse-areas" checked> Watercourse Areas</label><br/>
+  <label><input type="checkbox" id="shoreline" checked> Shoreline</label><br/>
+  <label><input type="checkbox" id="coastline" checked> Coastline</label><br/>
+  <label><input type="checkbox" id="seas" checked> Seas</label><br/>
+  <label><input type="checkbox" id="sand" checked> Sand</label><br/>
+  <label><input type="checkbox" id="reefs" checked> Reefs</label><br/>
+  <label><input type="checkbox" id="saline" checked> Saline Coastal Flat</label><br/>
+  <label><input type="checkbox" id="paths" checked> Paths</label><br/>
+  <label><input type="checkbox" id="trails" checked> Trails</label><br/>
+  <label><input type="checkbox" id="urban-areas" checked> Urban Areas</label><br/>
+  <label><input type="checkbox" id="buildings" checked> Buildings</label><br/>
+  <label><input type="checkbox" id="roads" checked> Roads</label><br/>
+  <label><input type="checkbox" id="national-park" checked> National Park</label><br/>
+  <label><input type="checkbox" id="rainforest" checked> Rainforest</label><br/>
+  <label><input type="checkbox" id="vegetation" checked> Vegetation</label><br/>
+  <label><input type="checkbox" id="mangrove" checked> Mangrove</label><br/>
+  <label><input type="checkbox" id="lakes" checked> Lakes</label><br/>
+  <label><input type="checkbox" id="mountains" checked> Mountains</label><br/>
+
+  <label><input type="checkbox" id="regions" checked> Regions of Interest</label><br/>
+
+</div>
+
+<div id="tile-coords">z: –, x: –, y: –</div>
+
+<div id="zoom-display">Zoom:  </div>
+<div id="pointer-coords">Lat: –, Lng: –</div>
+<div id="bounds-display">Bounds: –</div>
+
+<script>
+  const map = new maplibregl.Map({
+    container: 'map',
+    style: 'style.json',
+    center: [153.0, -27.5],
+    zoom: 12,
+    minZoom: 4,
+    maxZoom: 19,
+    // maxBounds: [ [152.5, -28.5], [153.5, -26.5] ] // Limit Extents
+  });
+
+  // Add scale bar to bottom-left
+  map.addControl(
+    new maplibregl.ScaleControl({
+      maxWidth: 250,
+      unit: 'metric' // or 'imperial'
+    }),
+    'bottom-right'
+  );
+
+  map.on('load', () => {
+    // 👇 Inject your regions here
+    map.addSource('regions', {
+      type: 'geojson',
+      data: 'http://tower.csinger.com:9876/regions.geojson'
+    });
+
+    map.addLayer({
+      id: 'regions-fill',
+      type: 'fill',
+      source: 'regions',
+      paint: {
+        'fill-color': '#FF0000',
+        'fill-opacity': 0.1
+      }
+    });
+
+    map.addLayer({
+      id: 'regions-outline',
+      type: 'line',
+      source: 'regions',
+      paint: {
+        'line-color': '#FF0000',
+        'line-width': 2,
+        'line-opacity': 0.7
+      }
+    });
+
+    map.addLayer({
+      id: 'regions-labels',
+      type: 'symbol',
+      source: 'regions',
+      layout: {
+        'text-field': ['get', 'name'],
+        'text-size': 12
+      },
+      paint: {
+        'text-color': '#FF0000',
+        'text-halo-color': '#FFFFFF',
+        'text-halo-width': 1
+      }
+    });
+
+    updateBoundsDisplay();
+    
+  });
+
+  map.on('error', function (e) {
+    console.error('Maplibre error:', e.error);
+  });
+
+  map.addControl(new maplibregl.GeolocateControl({
+    positionOptions: { enableHighAccuracy: true },
+    trackUserLocation: true,
+    showAccuracyCircle: false
+  }));
+
+  // map.fitBounds([[153.1, -28.253], [153.11, -28.25]]); //Razorback Zoom
+  // map.fitBounds([[151.8606, -28.9447], [155.4287, -27.1886]]); // SE QLD Zoom
+
+  map.fitBounds([[151.7234, -26.4456], [152.1567, -26.2291]]); // Wondai SF Zoom
+
+
+  const groupedLayers = {
+    'contours': ['contours-large', 'contours-medium', 'contours-small', 'contour-labels-large', 'contour-labels-medium', 'contour-labels-small', 'aux-contours-large', 'aux-contours-medium', 'aux-contours-small', 'aux-contour-labels-small'],
+    'roads': ['roads-low', 'roads-medium', 'roads-high', 'roads-bridge/overpass', 'roads-medium-labels', 'roads-high-labels'],
+    
+    'watercourses': ['watercourses-large', 'watercourses-small', 'watercourses-small-labels', 'watercourses-large-labels'],
+    'watercourse-areas': ['watercourse-areas', 'watercourse-areas-labels'],
+
+    'lakes': ['lakes-large', 'lakes-small', 'lakes-large-labels', 'lakes-small-labels'],
+    'mountains': ['mountains', 'mountain-labels'],
+    'shoreline': ['shoreline'],
+    'coastline': ['coastline'],
+    'seas': ['seas'],
+    'sand': ['sand'],
+    'reefs': ['reefs'],
+    'saline': ['saline'],
+    'paths': ['paths'],
+    'trails': ['trails', 'trails-labels'],
+
+    'urban-areas': ['urban-areas'],
+    'buildings': ['buildings'],
+    'national-park': ['national-park', 'national-park-labels'],
+    'rainforest': ['rainforest'],
+    'vegetation': ['vegetation'],
+    'mangrove': ['mangrove'],
+    'regions': ['regions-outline', 'regions-fill', 'regions-labels']
+  };
+
+  Object.keys(groupedLayers).forEach(group => {
+    document.getElementById(group).addEventListener('change', (e) => {
+      groupedLayers[group].forEach(id =>
+        map.setLayoutProperty(id, 'visibility', e.target.checked ? 'visible' : 'none')
+      );
+    });
+  });
+
+  map.on('zoom', () => {
+    document.getElementById('zoom-display').innerText = `Zoom: ${map.getZoom().toFixed(2)}`;
+  });
+
+  map.on('mousemove', (e) => {
+    const { lng, lat } = e.lngLat;
+    document.getElementById('pointer-coords').innerText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+  });
+
+  const tileDisplay = document.getElementById('tile-coords');
+
+  map.on('mousemove', (e) => {
+    const zoom = Math.floor(map.getZoom());
+    const tileX = Math.floor((e.lngLat.lng + 180) / 360 * Math.pow(2, zoom));
+    const tileY = Math.floor(
+      (1 - Math.log(Math.tan(e.lngLat.lat * Math.PI / 180) + 1 / Math.cos(e.lngLat.lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom)
+    );
+    tileDisplay.textContent = `z: ${zoom}, x: ${tileX}, y: ${tileY}`;
+  });
+
+  function updateBoundsDisplay() {
+    const b = map.getBounds();
+    const sw = b.getSouthWest();
+    const ne = b.getNorthEast();
+    document.getElementById('bounds-display').innerText =
+      `Bounds:\nSW: ${sw.lat.toFixed(4)}, ${sw.lng.toFixed(4)}\nNE: ${ne.lat.toFixed(4)}, ${ne.lng.toFixed(4)}`;
+  }
+
+  map.on('moveend', updateBoundsDisplay);
+  
+</script>
+</body>
+</html>

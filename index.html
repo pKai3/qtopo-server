@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>QTopo-BC Raster Tiles Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    .zoom-display {
+      background: white;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-family: sans-serif;
+      font-size: 14px;
+      box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map', {
+      //center: [-28.2615, 153.105], //Lamington
+      center: [-27.5, 153.0],
+      zoom: 12 // Leaflet display zoom (corresponds to raster tile zoom 14)
+    });
+
+    // Add tile layer (512px tiles)
+    const tileLayer = L.tileLayer('http://tower.csinger.com:9878/server_raster/tiles_raster/{z}/{x}/{y}.png', {
+      tileSize: 512,
+      zoomOffset: -1, // Adjusts Leaflet zoom to match tile zoom
+      minZoom: 6,     // 
+      maxZoom: 19,     // 
+      errorTileUrl: 'https://cdn1.iconfinder.com/data/icons/pixel-perfect-at-16px-volume-1/16/5082-512.png'
+    }).addTo(map);
+
+    // Display actual raster tile zoom level
+    const zoomControl = L.control({ position: 'bottomleft' });
+
+    zoomControl.onAdd = function () {
+      const div = L.DomUtil.create('div', 'zoom-display');
+      const update = () => {
+        const tileZoom = map.getZoom() - 1;
+        div.textContent = `Zoom: ${tileZoom}`;
+      };
+      map.on('zoomend', update);
+      update();
+      return div;
+    };
+
+    zoomControl.addTo(map);
+  </script>
+</body>
+</html>

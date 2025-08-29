@@ -1,0 +1,66 @@
+[
+  {
+    "name": "Queensland",
+    "lat_min": -29.5,
+    "lon_min": 138.0,
+    "lat_max": -9.0,
+    "lon_max": 155.0,
+    "zoom_levels": "1:12"
+  },
+  {
+    "name": "SE QLD",
+    "lat_min": -28.9447,
+    "lon_min": 151.8606,
+    "lat_max": -27.1886,
+    "lon_max": 153.6000,
+    "zoom_levels": "1:15"
+  },
+  {
+    "name": "Main Range",
+    "lat_min": -28.2895,
+    "lon_min": 152.1217,
+    "lat_max": -27.8022,
+    "lon_max": 152.5373,
+    "zoom_levels": "1:18"
+  },
+  {
+    "name": "Greater Brisbane",
+    "lat_min": -27.5558,
+    "lon_min": 152.8715,
+    "lat_max": -27.3917,
+    "lon_max": 153.2031,
+    "zoom_levels": "1:18"
+  },
+  {
+    "name": "Brisbane DT",
+    "lat_min": -27.5150,
+    "lon_min": 152.9533,
+    "lat_max": -27.4498,
+    "lon_max": 153.0850,
+    "zoom_levels": "1:18"
+  },
+  {
+    "name": "Lamington",
+    "lat_min": -28.2761,
+    "lon_min": 153.0422,
+    "lat_max": -28.2040,
+    "lon_max": 153.1890,
+    "zoom_levels": "1:18"
+  },
+  {
+    "name": "Barney",
+    "lat_min": -28.3009,
+    "lon_min": 152.5981,
+    "lat_max": -28.1894,
+    "lon_max": 152.7519,
+    "zoom_levels": "1:18"
+  },
+  {
+    "name": "Wondai",
+    "lat_min": -26.4360,
+    "lon_min": 151.8125,
+    "lat_max": -26.2542,
+    "lon_max": 152.0569,
+    "zoom_levels": "1:18"
+  }
+]
