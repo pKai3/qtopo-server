@@ -8,15 +8,33 @@ log "uid=$(id -u) user=$(whoami) pwd=$(pwd)"
 log "PATH=$PATH"
 log "NVM_DIR=${NVM_DIR:-/root/.nvm}"
 
-# ── Single-mount data layout (no symlinks) ───────────────────
+# === Single-mount data layout (no symlinks) ===
 export DATA_DIR="${DATA_DIR:-/data}"
 export VECTOR_DIR="${VECTOR_DIR:-$DATA_DIR/vector}"
 export RASTER_DIR="${RASTER_DIR:-$DATA_DIR/raster}"
-
 mkdir -p "$VECTOR_DIR" "$RASTER_DIR"
-log "DATA_DIR=$DATA_DIR"
-log "VECTOR_DIR=$VECTOR_DIR"
-log "RASTER_DIR=$RASTER_DIR"
+
+# === Styles bootstrap into /data ===
+STYLE_DIR="${STYLE_DIR:-$DATA_DIR/styles}"
+mkdir -p "$STYLE_DIR"
+# The style file the app will use:
+export STYLE_PATH="${STYLE_PATH:-$STYLE_DIR/style.json}"
+
+# First-run copy: seed styles from the image without overwriting user edits later
+if [ ! -s "$STYLE_PATH" ]; then
+  if [ -f /usr/src/app/styles/style.json ]; then
+    cp /usr/src/app/styles/style.json "$STYLE_PATH"
+  fi
+  if ls /usr/src/app/styles/*.json >/dev/null 2>&1; then
+    cp -n /usr/src/app/styles/*.json "$STYLE_DIR"/ 2>/dev/null || true
+  fi
+fi
+
+echo "[BOOT] DATA_DIR=$DATA_DIR"
+echo "[BOOT] VECTOR_DIR=$VECTOR_DIR"
+echo "[BOOT] RASTER_DIR=$RASTER_DIR"
+echo "[BOOT] STYLE_DIR=$STYLE_DIR"
+echo "[BOOT] STYLE_PATH=$STYLE_PATH"
 
 # ---- config (can override via env) ----
 NODE_BIN="${NODE_BIN:-/root/.nvm/versions/node/v18.20.8/bin/node}"
