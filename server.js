@@ -41,8 +41,9 @@ const VECTOR_BASE_URL =
 // Networking
 const PBF_FETCH_TIMEOUT_MS = Number(process.env.PBF_FETCH_TIMEOUT_MS || 10000);
 
-// Transparent blank PNG (you said ./blank.png)
-const BLANK_TILE_PATH = process.env.BLANK_TILE_PATH || path.join(__dirname, "blank.png");
+// Transparent blank PNG 
+const BLANK_TILE_PATH = process.env.BLANK_TILE_PATH || path.join(__dirname, "assets", "images", "blank.png");
+const ERROR_TILE_PATH = process.env.ERROR_TILE_PATH || path.join(__dirname, "assets", "images", "error.png");
 const CACHE_BLANK_TILES = process.env.CACHE_BLANK_TILES !== "0";
 
 // ─────────────────────────────────────────────────────────────
@@ -93,7 +94,7 @@ function sendTileFile(res, absPath) {
   return res.sendFile(absPath);
 }
 
-// 1×1 transparent PNG fallback if ./blank.png missing
+// 1×1 transparent PNG fallback if blank.png missing
 const FALLBACK_BLANK_TILE_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==";
 
@@ -250,12 +251,16 @@ app.get('/style.json', (req, res) => {
 
 app.use('/fonts', express.static(path.join(__dirname, 'fonts')));
 
-// Optional: serve a simple viewer so you can pan around and see vector requests
-app.use('/', express.static(path.join(__dirname, 'public')));
-
-app.get("/tiles_raster/:z/:x/:y.png", async (req, res) => {
+//legacy redirect
+app.get('/tiles_raster/:z/:x/:y.png', (req, res) => {
   const { z, x, y } = req.params;
-  console.log(`[REQ] GET /tiles_raster/${z}/${x}/${y}.png`);
+  const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+  return res.redirect(308, `/raster/${z}/${x}/${y}.png${qs}`);
+});
+
+app.get("/raster/:z/:x/:y.png", async (req, res) => {
+  const { z, x, y } = req.params;
+  console.log(`[REQ] GET /raster/${z}/${x}/${y}.png`);
 
   let zStr, xStr, yStr;
   try {
@@ -296,21 +301,63 @@ app.get("/tiles_raster/:z/:x/:y.png", async (req, res) => {
     return sendTileFile(res, out);
   } catch (e) {
     console.error(`[FAIL] Rendering failed for ${zStr}/${xStr}/${yStr}: ${e.message || e}`);
-    // Serve blank on render errors as well (prevents client hangs)
-    if (CACHE_BLANK_TILES) {
-      await writeBlankTile(tilePath, "RENDER ERR");
-      return sendTileFile(res, tilePath);
-    } else {
-      await ensureBlankTilePresent();
-      return sendTileFile(res, BLANK_TILE_PATH);
-    }
+    // Serve error.png on render errors
+    
+    return sendTileFile(res, ERROR_TILE_PATH);
   }
 });
 
-app.get("/", (_req, res) => {
-  console.log("[INFO] Serving index.html");
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+// Serve vector tiles with download-on-miss: /vector/:z/:x/:y.pbf
+app.get("/vector/:z/:x/:y.pbf", async (req, res) => {
+  const { z, x, y } = req.params;
+  console.log(`[REQ] GET /vector/${z}/${x}/${y}.pbf`);
+
+  let zStr, xStr, yStr;
+  try {
+    [zStr, xStr, yStr] = zxysToStrings(z, x, y);
+  } catch (e) {
+    console.error(`[REQ-ERR] Bad z/x/y: ${e.message}`);
+    return res.status(400).send('bad z/x/y');
+  }
+
+  const pbfPath = path.join(vectorRoot, zStr, xStr, `${yStr}.pbf`);
+
+  // ensure cached (download if missing)
+  try {
+    await ensureVectorTile(zStr, xStr, yStr);
+  } catch (e) {
+    const status = e?.code === 'EMPTY_PBF' ? 204 : (e?.status || 502);
+    console.error(`[PBF-ERR] ${zStr}/${xStr}/${yStr}: ${e?.message || e}`);
+    return res.status(status).end();
+  }
+
+  // send from disk with proper headers
+  try {
+    // peek first 2 bytes for gzip magic 1F 8B
+    let first2 = Buffer.alloc(2);
+    try {
+      const fd = fs.openSync(pbfPath, 'r');
+      fs.readSync(fd, first2, 0, 2, 0);
+      fs.closeSync(fd);
+    } catch {}
+
+    res.setHeader('Content-Type', 'application/x-protobuf');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    if (first2[0] === 0x1f && first2[1] === 0x8b) {
+      res.setHeader('Content-Encoding', 'gzip');
+    }
+    return res.sendFile(pbfPath);
+  } catch (e) {
+    console.error(`[PBF-SEND-ERR] ${pbfPath}: ${e.message || e}`);
+    return res.status(500).end();
+  }
 });
+
+// Optional tiny logger for the root
+app.use((req, _res, next) => { if (req.path === '/') console.log('[INFO] Serving index.html'); next(); });
+
+// Serve the viewer and assets from /public (handles /, /index.html, /main.js, etc.)
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ─────────────────────────────────────────────────────────────
 // Cleanup helpers

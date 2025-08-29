@@ -82,7 +82,7 @@
 <script>
   const map = new maplibregl.Map({
     container: 'map',
-    style: 'style.json',
+    style: '/style.json',
     center: [153.0, -27.5],
     zoom: 12,
     minZoom: 4,
@@ -103,7 +103,7 @@
     // 👇 Inject your regions here
     map.addSource('regions', {
       type: 'geojson',
-      data: 'http://tower.csinger.com:9876/regions.geojson'
+      data: '/regions.geojson'
     });
 
     map.addLayer({
