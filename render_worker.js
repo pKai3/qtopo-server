@@ -20,7 +20,7 @@ const overwrite  = args.includes("--overwrite");
 
 const DEBUG = process.env.RENDER_DEBUG === "1" || args.includes("--debug");
 
-// Style resolution: use exactly what you provide
+// Style resolution (ENV/flag → image default)
 const stylePathArg =
   getArg("-s") ||
   process.env.STYLE_PATH ||
@@ -41,8 +41,12 @@ const DATA_DIR   = process.env.DATA_DIR   || "/data";
 const VECTOR_DIR = process.env.VECTOR_DIR || path.resolve(DATA_DIR, "vector");
 const RASTER_DIR = process.env.RASTER_DIR || path.resolve(DATA_DIR, "raster");
 
-const TILE_SIZE  = parseInt(getArg("--tile") || process.env.TILE_SIZE || "512");
-const RATIO      = parseFloat(getArg("--ratio") || process.env.RENDER_PIXEL_RATIO || "1") || 1;
+// Force vector tiles to our server route
+const VECTOR_TILES_URL = process.env.VECTOR_TILES_URL || "/vector/{z}/{x}/{y}.pbf";
+
+// Tile size & pixel ratio
+const TILE_SIZE = parseInt(getArg("--tile") || process.env.TILE_SIZE || "512");
+const RATIO     = parseFloat(getArg("--ratio") || process.env.RENDER_PIXEL_RATIO || "1") || 1;
 
 const WIDTH = TILE_SIZE;
 const HEIGHT = TILE_SIZE;
@@ -65,13 +69,13 @@ function derivePixelSize(bufLen, w, h) {
   return [W, H];
 }
 
-function loadStyleWithTransparentBg(p) {
+function loadAndSanitizeStyle(p) {
   const json = fs.readFileSync(p, "utf8");
   let s;
   try { s = JSON.parse(json); }
   catch (e) { console.error(`❌ Style JSON parse error in ${p}: ${e.message}`); process.exit(3); }
 
-  // Ensure transparent background ONLY (leave everything else untouched)
+  // Transparent background
   const bg = (s.layers || []).find(l => l.type === "background");
   if (!bg) {
     s.layers = [{ id: "__bg", type: "background", paint: { "background-color": "rgba(0,0,0,0)" } }, ...(s.layers || [])];
@@ -79,12 +83,55 @@ function loadStyleWithTransparentBg(p) {
     bg.paint = bg.paint || {};
     bg.paint["background-color"] = "rgba(0,0,0,0)";
   }
+
+  // Local glyphs
+  s.glyphs = "fonts/{fontstack}/{range}.pbf";
+
+  // Remove sprite (native crashes often stem from remote sprites)
+  if (s.sprite) {
+    if (DEBUG) console.error(`[STYLE] removing sprite: ${s.sprite}`);
+    delete s.sprite;
+  }
+
+  // Coerce vector sources → /vector/{z}/{x}/{y}.pbf (xyz)
+  const srcIds = Object.keys(s.sources || {});
+  const vecIds = srcIds.filter(id => s.sources[id]?.type === "vector");
+  for (const id of vecIds) {
+    const src = s.sources[id];
+    if (!Array.isArray(src.tiles) || src.tiles.length === 0) src.tiles = [VECTOR_TILES_URL];
+    if (!/^\/vector\/\{z\}\/\{x\}\/\{y\}\.pbf$/.test(src.tiles[0])) {
+      if (DEBUG) console.error(`[STYLE] source "${id}" tiles -> ${VECTOR_TILES_URL}`);
+      src.tiles = [VECTOR_TILES_URL];
+    }
+    src.scheme = "xyz";
+    if (src.minzoom == null) src.minzoom = 0;
+    if (src.maxzoom == null) src.maxzoom = 14;
+  }
+
+  // If layers point at a missing source, map to the first vector source
+  if (vecIds.length > 0) {
+    for (const layer of (s.layers || [])) {
+      if (layer.source && !vecIds.includes(layer.source)) {
+        if (DEBUG) console.error(`[STYLE] layer "${layer.id}" source "${layer.source}" → "${vecIds[0]}"`);
+        layer.source = vecIds[0];
+      }
+    }
+  }
+
+  if (DEBUG) {
+    console.error(`[STYLE] using: ${p}`);
+    console.error(`[STYLE] vector sources: ${vecIds.join(", ") || "<none>"}`);
+  }
   return s;
 }
 
-function log(...a){ if (DEBUG) console.error(...a); }
+// Crash diagnostics
+process.on("uncaughtException", e => { console.error(`[FATAL] uncaught: ${e.stack || e}`); process.exit(111); });
+process.on("unhandledRejection", e => { console.error(`[FATAL] unhandledRejection: ${e.stack || e}`); process.exit(112); });
+["SIGSEGV","SIGABRT","SIGBUS","SIGILL","SIGFPE"].forEach(sig => {
+  process.on(sig, () => { console.error(`[FATAL] signal ${sig}`); process.exit(113); });
+});
 
-// ── Render one tile ──────────────────────────────────────────
 async function renderOne(z, x, y) {
   return new Promise((resolve) => {
     const zStr = String(z), xStr = String(x), yStr = String(y);
@@ -97,14 +144,14 @@ async function renderOne(z, x, y) {
     let ctx = canvas.getContext("2d", { alpha: true });
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
-    const style = loadStyleWithTransparentBg(stylePathArg);
-    log(`[RENDER] style loaded`);
+    const style = loadAndSanitizeStyle(stylePathArg);
+    console.error(`[RENDER] style loaded`);
 
     const map = new maplibregl.Map({
       request: (req, cb) => {
-        log(`[REQ] ${req.url}`);
+        console.error(`[REQ] ${req.url}`);
 
-        // Accept /vector and legacy /tiles_vector (also allow optional querystring)
+        // Accept /vector and legacy /tiles_vector (optional querystrings)
         const tm = req.url.match(/^\/(?:(?:vector)|(?:tiles_vector))\/(\d+)\/(\d+)\/(\d+)\.pbf(?:\?.*)?$/);
         if (tm) {
           const [zS, xS, yS] = tm.slice(1);
@@ -112,8 +159,8 @@ async function renderOne(z, x, y) {
           return fs.readFile(pbfPath, (err, data) => cb(null, err ? {} : { data }));
         }
 
-        // Fonts: load exact fontstack/range from image assets
-        const fm = req.url.match(/^\/fonts\/([^/]+)\/(\d+-\d+)\.pbf(?:\?.*)?$/);
+        // Fonts from image assets
+        const fm = req.url.match(/^\/fonts\/([^/]+)\/(\d+-\d+)\.pbf$/);
         if (fm) {
           const [fontstackRaw, range] = fm.slice(1);
           const fontstack = decodeURIComponent(fontstackRaw);
@@ -121,7 +168,7 @@ async function renderOne(z, x, y) {
           return fs.readFile(fontPath, (err, data) => cb(null, err ? {} : { data }));
         }
 
-        // Unknown resources: return empty body (prevents native crashes)
+        // Unknown resources → empty body (prevents native crashes)
         return cb(null, {});
       },
       ratio: RATIO,
@@ -131,7 +178,6 @@ async function renderOne(z, x, y) {
     });
 
     const center = getTileCenter(z, x + 0.5, y + 0.5);
-
     try {
       map.load(style);
     } catch (e) {
@@ -139,7 +185,7 @@ async function renderOne(z, x, y) {
       return resolve(false);
     }
 
-    log(`[RENDER] calling map.render z=${z} x=${x} y=${y}`);
+    console.error(`[RENDER] calling map.render z=${z} x=${x} y=${y}`);
     map.render({ zoom: z, center, width: WIDTH, height: HEIGHT, bearing: 0, pitch: 0, buffer: 256 }, (err, rgba) => {
       if (err) {
         console.error(`[RENDER] render error ${z}/${x}/${y}: ${err}`);
@@ -161,6 +207,7 @@ async function renderOne(z, x, y) {
       const out = fs.createWriteStream(outPath);
       const pngStream = outCanvas.createPNGStream();
       pngStream.on("error", e => console.error(`[RENDER] png stream error ${z}/${x}/${y}: ${e}`));
+      pngStream.on("end",   () => console.error(`[RENDER] png stream end ${z}/${x}/${y}`));
       pngStream.pipe(out);
 
       out.on("finish", () => { map.release(); resolve(true); });
