@@ -70,7 +70,7 @@ async function renderTile(z, x, y, index, total) {
     const map = new maplibregl.Map({
       request: (req, callback) => {
         // Vector PBFs
-        const tileMatch = req.url.match(/\/tiles_vector\/(\d+)\/(\d+)\/(\d+)\.pbf/);
+        const tileMatch = req.url.match(/\/vector\/(\d+)\/(\d+)\/(\d+)\.pbf/);
         if (tileMatch) {
           const [zStr, xStr, yStr] = tileMatch.slice(1);
           const pbfPath = path.join(tileDir, zStr, xStr, `${yStr}.pbf`);
@@ -87,7 +87,7 @@ async function renderTile(z, x, y, index, total) {
         if (fontMatch) {
           const [fontstackRaw, range] = fontMatch.slice(1);
           const fontstack = decodeURIComponent(fontstackRaw);
-          const fontPath = path.join(__dirname, './server_vector/fonts', fontstack, `${range}.pbf`);
+          const fontPath = path.join(__dirname, './fonts', fontstack, `${range}.pbf`);
           return fs.readFile(fontPath, (err, data) => {
             if (err) {
               fs.appendFileSync('failed_tiles.log', `Font fetch failed: ${fontPath}\n`);
