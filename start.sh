@@ -12,11 +12,15 @@ log "NVM_DIR=${NVM_DIR:-/root/.nvm}"
 export DATA_DIR="${DATA_DIR:-/data}"
 export VECTOR_DIR="${VECTOR_DIR:-$DATA_DIR/vector}"
 export RASTER_DIR="${RASTER_DIR:-$DATA_DIR/raster}"
+export STYLE_DIR="${STYLE_DIR:-$DATA_DIR/styles}"
 
-mkdir -p "$VECTOR_DIR" "$RASTER_DIR"
+
+mkdir -p "$VECTOR_DIR" "$RASTER_DIR" "$STYLE_DIR"
 log "DATA_DIR=$DATA_DIR"
 log "VECTOR_DIR=$VECTOR_DIR"
 log "RASTER_DIR=$RASTER_DIR"
+log "STYLE_DIR=$STYLE_DIR"
+
 
 # ---- config (can override via env) ----
 NODE_BIN="${NODE_BIN:-/root/.nvm/versions/node/v18.20.8/bin/node}"
