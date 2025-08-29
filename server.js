@@ -142,7 +142,7 @@ app.get("/tiles_raster/:z/:x/:y.png", (req,res) => { //redirect for legacy URL
   res.redirect(301, `/${z}/${x}/${y}.png`);
 });
 
-app.get("/:z(\\d+)/:x(\\d+)/:y(\\d+)\\.png", async (req, res) => {
+app.get("/:z/:x/:y.png", async (req, res, next) => {
   const { z,x,y } = req.params;
   console.log(`[REQ] GET /tiles_raster/${z}/${x}/${y}.png`);
   let zStr,xStr,yStr; try { [zStr,xStr,yStr] = zxysToStrings(z,x,y); }
