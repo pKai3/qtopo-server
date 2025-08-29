@@ -31,6 +31,9 @@ const rasterRoot = RASTER_DIR;
 // Where vector PBFs live
 const vectorRoot = VECTOR_DIR;
 
+const path = require('path');
+const STYLE_PATH = process.env.STYLE_PATH || path.resolve(__dirname, 'styles', 'style.json');
+
 // Vector endpoint
 const VECTOR_BASE_URL =
   process.env.VECTOR_BASE_URL ||
@@ -239,6 +242,15 @@ async function renderSingleTile(z, x, y) {
 // Routes
 // ─────────────────────────────────────────────────────────────
 app.get("/healthz", (_req, res) => res.status(200).send("ok"));
+
+// Serve the active style (baked into the image)
+app.get('/style.json', (req, res) => {
+  res.type('application/json; charset=utf-8');
+  res.sendFile(STYLE_PATH);
+});
+
+// Optional: serve a simple viewer so you can pan around and see vector requests
+app.use('/', express.static(path.join(__dirname, 'public')));
 
 app.get("/tiles_raster/:z/:x/:y.png", async (req, res) => {
   const { z, x, y } = req.params;
