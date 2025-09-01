@@ -49,24 +49,9 @@
 <div id="map"></div>
 <div id="menu">
   <label><input type="checkbox" id="contours" checked> Contours</label><br/>
-  <label><input type="checkbox" id="watercourses" checked> Watercourses</label><br/>
-  <label><input type="checkbox" id="watercourse-areas" checked> Watercourse Areas</label><br/>
-  <label><input type="checkbox" id="shoreline" checked> Shoreline</label><br/>
-  <label><input type="checkbox" id="coastline" checked> Coastline</label><br/>
-  <label><input type="checkbox" id="seas" checked> Seas</label><br/>
-  <label><input type="checkbox" id="sand" checked> Sand</label><br/>
-  <label><input type="checkbox" id="reefs" checked> Reefs</label><br/>
-  <label><input type="checkbox" id="saline" checked> Saline Coastal Flat</label><br/>
-  <label><input type="checkbox" id="paths" checked> Paths</label><br/>
   <label><input type="checkbox" id="trails" checked> Trails</label><br/>
-  <label><input type="checkbox" id="urban-areas" checked> Urban Areas</label><br/>
-  <label><input type="checkbox" id="buildings" checked> Buildings</label><br/>
   <label><input type="checkbox" id="roads" checked> Roads</label><br/>
-  <label><input type="checkbox" id="national-park" checked> National Park</label><br/>
-  <label><input type="checkbox" id="rainforest" checked> Rainforest</label><br/>
-  <label><input type="checkbox" id="vegetation" checked> Vegetation</label><br/>
-  <label><input type="checkbox" id="mangrove" checked> Mangrove</label><br/>
-  <label><input type="checkbox" id="lakes" checked> Lakes</label><br/>
+  <label><input type="checkbox" id="parks-and-forests" checked> Parks and Forests</label><br/>
   <label><input type="checkbox" id="mountains" checked> Mountains</label><br/>
 
   <label><input type="checkbox" id="regions" checked> Regions of Interest</label><br/>
@@ -99,6 +84,7 @@
     'bottom-right'
   );
 
+  //inject regions
   map.on('load', () => {
     // 👇 Inject your regions here
     map.addSource('regions', {
@@ -128,7 +114,7 @@
     });
 
     map.addLayer({
-      id: 'regions-labels',
+      id: 'regions-label',
       type: 'symbol',
       source: 'regions',
       layout: {
@@ -143,7 +129,7 @@
     });
 
     updateBoundsDisplay();
-    
+
   });
 
   map.on('error', function (e) {
@@ -157,36 +143,20 @@
   }));
 
   // map.fitBounds([[153.1, -28.253], [153.11, -28.25]]); //Razorback Zoom
-  // map.fitBounds([[151.8606, -28.9447], [155.4287, -27.1886]]); // SE QLD Zoom
-
-  map.fitBounds([[151.7234, -26.4456], [152.1567, -26.2291]]); // Wondai SF Zoom
+  map.fitBounds([[151.8606, -28.9447], [155.4287, -27.1886]]); // SE QLD Zoom
 
 
   const groupedLayers = {
-    'contours': ['contours-large', 'contours-medium', 'contours-small', 'contour-labels-large', 'contour-labels-medium', 'contour-labels-small', 'aux-contours-large', 'aux-contours-medium', 'aux-contours-small', 'aux-contour-labels-small'],
-    'roads': ['roads-low', 'roads-medium', 'roads-high', 'roads-bridge/overpass', 'roads-medium-labels', 'roads-high-labels'],
-    
-    'watercourses': ['watercourses-large', 'watercourses-small', 'watercourses-small-labels', 'watercourses-large-labels'],
-    'watercourse-areas': ['watercourse-areas', 'watercourse-areas-labels'],
+    'contours': ['contour-large', 'contour-medium', 'contour-small', 'contour-large-label', 'contour-medium-label', 'contour-small-label', 'aux-contour-large', 'aux-contour-medium', 'aux-contour-small', 'aux-contour-small-label'],
+    'trails': ['paths', 'trails', 'paths-label', 'trails-label'],
+    'roads': ['roads-low', 'roads-medium', 'roads-high', 'road-bridge-overpass', 'roads-medium-label', 'roads-high-label', 'road-bridge-overpass-label'],
+    'parks-and-forests': ['national-park', 'state-forest', 'nature-refuge', 'conservation-area', 'forest-plantation', 'national-park-label', 'nature-refuge-label', 'conservation-area-label'],
+    'mountains': ['mountains', 'mountain-label'],
 
-    'lakes': ['lakes-large', 'lakes-small', 'lakes-large-labels', 'lakes-small-labels'],
-    'mountains': ['mountains', 'mountain-labels'],
-    'shoreline': ['shoreline'],
-    'coastline': ['coastline'],
-    'seas': ['seas'],
-    'sand': ['sand'],
-    'reefs': ['reefs'],
-    'saline': ['saline'],
-    'paths': ['paths'],
-    'trails': ['trails', 'trails-labels'],
+    'regions': ['regions-outline', 'regions-fill', 'regions-label']
+    //'watercourses': ['watercourses-large', 'watercourses-small', 'watercourses-large-label', 'watercourses-small-label', 'watercourse-areas', 'watercourse-areas-label'],
+    //'urban': ['urban-area', 'building-areas-geoscape'],
 
-    'urban-areas': ['urban-areas'],
-    'buildings': ['buildings'],
-    'national-park': ['national-park', 'national-park-labels'],
-    'rainforest': ['rainforest'],
-    'vegetation': ['vegetation'],
-    'mangrove': ['mangrove'],
-    'regions': ['regions-outline', 'regions-fill', 'regions-labels']
   };
 
   Object.keys(groupedLayers).forEach(group => {
