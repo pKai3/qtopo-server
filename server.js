@@ -366,8 +366,13 @@ app.get("/raster/:z/:x/:y.png", async (req, res) => {
   try {
     await ensureVectorTile(zStr, xStr, yStr);
   } catch (e) {
+    if (e?.code === "EMPTY_PBF") {
+      console.warn(`[PBF] ${zStr}/${xStr}/${yStr}: empty from upstream; serving blank`);
+    } else {
+      console.error(`[PBF-ERR] ${zStr}/${xStr}/${yStr}: ${e?.message || e}; serving blank`);
+    }
+
     const reason = e?.code === "EMPTY_PBF" ? "EMPTY PBF" : `PBF FAIL ${e?.status || ""}`.trim();
-    console.log(`[PBF] ${zStr}/${xStr}/${yStr} -> ${reason}; serving blank`);
     if (CACHE_BLANK_TILES) {
       await writeBlankTile(tilePath, reason);
       return sendTileFile(res, tilePath);
@@ -376,17 +381,6 @@ app.get("/raster/:z/:x/:y.png", async (req, res) => {
       return sendTileFile(res, BLANK_TILE_PATH);
     }
   }
-
-  // Render and serve
-  try {
-    const out = await renderSingleTile(zStr, xStr, yStr);
-    return sendTileFile(res, out);
-  } catch (e) {
-    console.error(`[FAIL] Rendering failed for ${zStr}/${xStr}/${yStr}: ${e.message || e}`);
-    // Serve error.png on render errors
-    return sendTileFile(res, ERROR_TILE_PATH);
-  }
-});
 
 // Serve vector tiles with download-on-miss: /vector/:z/:x/:y.pbf
 app.get("/vector/:z/:x/:y.pbf", async (req, res) => {
