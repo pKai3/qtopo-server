@@ -382,6 +382,17 @@ app.get("/raster/:z/:x/:y.png", async (req, res) => {
     }
   }
 
+  // Render and serve
+  try {
+    const out = await renderSingleTile(zStr, xStr, yStr);
+    return sendTileFile(res, out);
+  } catch (e) {
+    console.error(`[FAIL] Rendering failed for ${zStr}/${xStr}/${yStr}: ${e.message || e}`);
+    // Serve error.png on render errors
+    return sendTileFile(res, ERROR_TILE_PATH);
+  }
+});
+
 // Serve vector tiles with download-on-miss: /vector/:z/:x/:y.pbf
 app.get("/vector/:z/:x/:y.pbf", async (req, res) => {
   const { z, x, y } = req.params;
