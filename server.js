@@ -412,18 +412,25 @@ app.get("/vector/:z/:x/:y.pbf", async (req, res) => {
 
   const pbfPath = path.join(vectorRoot, zStr, xStr, `${yStr}.pbf`);
 
-  // ensure cached (download if missing)
   try {
-    await ensureVectorTile(zStr, xStr, yStr);
+    await ensureVectorTile(zStr, xStr, yStr);     // may throw with e.code = 'EMPTY_PBF'
   } catch (e) {
     const status = e?.code === 'EMPTY_PBF' ? 204 : (e?.status || 502);
-    console.error(`[PBF-ERR] ${zStr}/${xStr}/${yStr}: ${e?.message || e}`);
+
+    if (e?.code === 'EMPTY_PBF') {
+      // boundary/no-data is an expected condition → WARN (yellow) or silence
+      console.warn(`[PBF] ${zStr}/${xStr}/${yStr}: empty from upstream; returning ${status}`);
+      // If you want total silence for empty tiles, comment the line above.
+    } else {
+      // real failure → ERR (red)
+      console.error(`[PBF-ERR] ${zStr}/${xStr}/${yStr}: ${e?.message || e}; returning ${status}`);
+    }
+
     return res.status(status).end();
   }
 
-  // send from disk with proper headers
   try {
-    // peek first 2 bytes for gzip magic 1F 8B
+    // peek first 2 bytes for gzip magic 1F 8B and set headers
     let first2 = Buffer.alloc(2);
     try {
       const fd = fs.openSync(pbfPath, 'r');
