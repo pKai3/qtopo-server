@@ -230,7 +230,10 @@ async function ensureVectorTile(z, x, y) {
     const result = await prom;
     return result;
   } catch (e) {
-    console.error(`[PBF-ERR] ${key}: ${e && e.message ? e.message : e}`);
+    // Avoid double logging: let caller WARN on EMPTY_PBF; only ERROR here for real failures.
+    if (e?.code !== 'EMPTY_PBF') {
+      console.error(`[PBF-ERR] ${key}: ${e && e.message ? e.message : e}`);
+    }
     try {
       if (fs.existsSync(pbfPath) && fs.statSync(pbfPath).size === 0) fs.unlinkSync(pbfPath);
     } catch {}
@@ -333,13 +336,14 @@ app.get('/style.json', (req, res) => {
 
 app.use('/fonts', express.static(path.join(__dirname, 'fonts')));
 
-//legacy redirect
+// Legacy Redirect
 app.get('/tiles_raster/:z/:x/:y.png', (req, res) => {
   const { z, x, y } = req.params;
   const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
   return res.redirect(308, `/raster/${z}/${x}/${y}.png${qs}`);
 });
 
+// Serve Raster Tiles
 app.get("/raster/:z/:x/:y.png", async (req, res) => {
   const { z, x, y } = req.params;
   console.log(`[REQ] GET /raster/${z}/${x}/${y}.png`);
