@@ -1,10 +1,22 @@
 // ─────────────────────────────────────────────────────────────
-// Unbuffered logs (handy under Docker)
+// Unbuffered, UTC, colorized logger (logging-only changes)
 // ─────────────────────────────────────────────────────────────
 const util = require("util");
-const processStdout = process.stdout;
-console.log = (...args) => processStdout.write(util.format(...args) + "\n");
-console.error = (...args) => processStdout.write("[ERR] " + util.format(...args) + "\n");
+const out = process.stdout;
+const ANSI = { reset:"\x1b[0m", red:"\x1b[31m", yellow:"\x1b[33m" };
+const utcNow = () => new Date().toISOString();
+function fmt(level, args) {
+  const s = util.format(...args);
+  // If caller supplies a [TAG] prefix, capture it as the tag
+  const m = s.match(/^\s*\[([A-Za-z0-9\-\/]+)\]\s*:??\s*(.*)$/);
+  const tag = m ? m[1] : "SYS";
+  const body = m ? m[2] : s;
+  const color = level === "ERR" ? ANSI.red : (level === "WRN" ? ANSI.yellow : "");
+  return `${color}[${level}] [${utcNow()}] [${tag}]: ${body}${ANSI.reset}`;
+}
+console.log  = (...a) => out.write(fmt("LOG", a) + "\n");
+console.warn = (...a) => out.write(fmt("WRN", a) + "\n");
+console.error= (...a) => out.write(fmt("ERR", a) + "\n");
 
 // ─────────────────────────────────────────────────────────────
 // Imports
@@ -47,7 +59,7 @@ try {
       process.exit(1);
     }
     fs.copyFileSync(BAKED_STYLE, STYLE_PATH);
-    console.log(`[BOOT] seeded editable style at ${STYLE_PATH}`);
+    console.warn(`[SEED] missing style; seeded editable at ${STYLE_PATH}`);
   }
   // Hard-enforce editable path only
   if (!fs.existsSync(STYLE_PATH)) {
@@ -183,7 +195,7 @@ async function ensureVectorTile(z, x, y) {
 
   const prom = (async () => {
     const url = `${VECTOR_BASE_URL}/${zStr}/${yStr}/${xStr}.pbf`; // …/tile/{z}/{y}/{x}.pbf
-    console.log(`[PBF-GET] ${url}`);
+    console.log(`[PBF-GET] /${zStr}/${xStr}/${yStr}/ ${url}`);
 
     await ensureDir(path.dirname(pbfPath));
 
@@ -262,8 +274,15 @@ async function renderSingleTile(z, x, y) {
       }
     );
 
-    child.stdout.on("data", (d) => processStdout.write(`[RENDER-OUT]: ${d}`));
-    child.stderr.on("data", (d) => processStdout.write(`[RENDER-ERR]: ${d}`));
+    // Standardize child logging (no functional change)
+    child.stdout.on("data", (d) => {
+      const line = String(d).trimEnd();
+      if (line) console.log(`[RDR] ${line}`);
+    });
+    child.stderr.on("data", (d) => {
+      const line = String(d).trimEnd();
+      if (line) console.error(`[RDR] ${line}`);
+    });
 
     child.on("error", (err) => reject(err));
     child.on("close", (code) => {
@@ -365,7 +384,6 @@ app.get("/raster/:z/:x/:y.png", async (req, res) => {
   } catch (e) {
     console.error(`[FAIL] Rendering failed for ${zStr}/${xStr}/${yStr}: ${e.message || e}`);
     // Serve error.png on render errors
-    
     return sendTileFile(res, ERROR_TILE_PATH);
   }
 });
