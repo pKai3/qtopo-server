@@ -466,6 +466,19 @@ app.use((req, _res, next) => { if (req.path === '/') console.log('[INFO] Serving
 // Serve the viewer and assets from /public (handles /, /index.html, /main.js, etc.)
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Raster viewer (index) at /raster
+app.get('/raster', (req, res) => {
+  try {
+    // optional: simple log line in your standard format
+    console.log(`[LOG] [${new Date().toISOString()}] [REQ]: GET /raster (viewer)`);
+
+    res.type('html').sendFile(path.join(__dirname, 'public', 'index_raster.html'));
+  } catch (e) {
+    console.error(`[ERR] [${new Date().toISOString()}] [SYS]: Failed to serve raster viewer: ${e.message}`);
+    res.status(500).send('Raster viewer unavailable');
+  }
+});
+
 // ─────────────────────────────────────────────────────────────
 // Cleanup helpers
 // ─────────────────────────────────────────────────────────────
