@@ -256,12 +256,12 @@ async function renderSingleTile(z, x, y) {
   if (fileExistsNonEmpty(tilePath)) return tilePath;
 
   if (inflightRaster.has(key)) {
-    console.log(`[RENDER] Awaiting in-flight render: ${key}`);
+    console.log(`[RDR] Awaiting in-flight render: ${key}`);
     return inflightRaster.get(key);
   }
 
   const prom = new Promise((resolve, reject) => {
-    console.log(`[RENDER] Generating tile: ${tilePath}`);
+    console.log(`[RDR] Generating tile: ${tilePath}`);
     const nodeBin = process.execPath; // ← use the current Node binary
     const child = spawn(
       nodeBin,
@@ -280,17 +280,17 @@ async function renderSingleTile(z, x, y) {
     // Standardize child logging (no functional change)
     child.stdout.on("data", (d) => {
       const line = String(d).trimEnd();
-      if (line) console.log(`[RDR] ${line}`);
+      if (line) console.log(`[RDR-W] ${line}`);
     });
     child.stderr.on("data", (d) => {
       const line = String(d).trimEnd();
-      if (line) console.error(`[RDR] ${line}`);
+      if (line) console.error(`[RDR-W] ${line}`);
     });
 
     child.on("error", (err) => reject(err));
     child.on("close", (code) => {
       if (code === 0 && fileExistsNonEmpty(tilePath)) {
-        console.log(`[SUCCESS] Rendered: ${tilePath}`);
+        // console.log(`[RDR] Rendered: ${tilePath}`);
         resolve(tilePath);
       } else {
         reject(new Error(`render_worker exited ${code}`));
@@ -373,7 +373,7 @@ app.get("/raster/:z/:x/:y.png", async (req, res) => {
     if (e?.code === "EMPTY_PBF") {
       console.warn(`[PBF] ${zStr}/${xStr}/${yStr}: empty from upstream; serving blank`);
     } else {
-      console.error(`[PBF-ERR] ${zStr}/${xStr}/${yStr}: ${e?.message || e}; serving blank`);
+      console.error(`[PBF] ${zStr}/${xStr}/${yStr}: ${e?.message || e}; serving blank`);
     }
 
     const reason = e?.code === "EMPTY_PBF" ? "EMPTY PBF" : `PBF FAIL ${e?.status || ""}`.trim();
@@ -391,7 +391,7 @@ app.get("/raster/:z/:x/:y.png", async (req, res) => {
     const out = await renderSingleTile(zStr, xStr, yStr);
     return sendTileFile(res, out);
   } catch (e) {
-    console.error(`[FAIL] Rendering failed for ${zStr}/${xStr}/${yStr}: ${e.message || e}`);
+    console.error(`[ERR] Rendering failed for ${zStr}/${xStr}/${yStr}: ${e.message || e}`);
     // Serve error.png on render errors
     return sendTileFile(res, ERROR_TILE_PATH);
   }

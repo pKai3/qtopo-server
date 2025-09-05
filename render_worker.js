@@ -17,6 +17,7 @@ console.log  = (...a) => out.write(fmt('LOG', a) + '\n');
 console.warn = (...a) => out.write(fmt('WRN', a) + '\n');
 console.error= (...a) => out.write(fmt('ERR', a) + '\n');
 
+// ── INIT ──────────────────────────────────────────────────────
 const maplibregl = require('@maplibre/maplibre-gl-native');
 const { createCanvas } = require('canvas');
 const fs = require('fs');
@@ -33,7 +34,7 @@ const y2 = parseInt(getArg('-y2'));
 const overwrite = args.includes('--overwrite');
 
 if ([z, x1, x2, y1, y2].some(v => Number.isNaN(v))) {
-  console.error('[RDR] Usage: -z Z -x1 X1 -x2 X2 -y1 Y1 -y2 Y2 [--overwrite]');
+  console.error('Usage: -z Z -x1 X1 -x2 X2 -y1 Y1 -y2 Y2 [--overwrite]');
   process.exit(1);
 }
 
@@ -45,13 +46,10 @@ const outputDir = process.env.RASTER_DIR || path.resolve(DATA_DIR, 'raster');
 
 // ---- STYLE: require from env (preferred) or -s; no baked fallback ----
 const styleArg = process.env.STYLE_PATH || getArg('-s'); // env first
-if (!styleArg) { console.error('[RDR] FATAL: STYLE_PATH env (or -s) required'); process.exit(2); }
+if (!styleArg) { console.error('FATAL: STYLE_PATH env (or -s) required'); process.exit(2); }
 
 const STYLE_PATH = path.isAbsolute(styleArg) ? styleArg : path.resolve(styleArg);
-if (!fs.existsSync(STYLE_PATH)) { console.error(`[RDR] FATAL: style not found at ${STYLE_PATH}`); process.exit(2); }
-
-// console.log('[RDR] argv:', process.argv.join(' '));
-// console.log('[RDR] STYLE=', STYLE_PATH);
+if (!fs.existsSync(STYLE_PATH)) { console.error(`FATAL: Style Not Found at ${STYLE_PATH}`); process.exit(2); }
 
 const style = JSON.parse(fs.readFileSync(STYLE_PATH, 'utf8'));
 
@@ -77,7 +75,7 @@ function derivePixelSize(bufLen, logicalW, logicalH) {
   const scale = Math.sqrt(px / base);
   const w = Math.round(logicalW * scale);
   const h = Math.round(logicalH * scale);
-  if (w * h * 4 !== bufLen) throw new Error(`Pixel buffer mismatch (len=${bufLen})`);
+  if (w * h * 4 !== bufLen) throw new Error(`Pixel Buffer Mismatch (len=${bufLen})`);
   return [w, h];
 }
 
@@ -100,7 +98,7 @@ async function renderTile(z, x, y, index, total) {
           const [zStr, xStr, yStr] = tileMatch.slice(1);
           const pbfPath = path.join(tileDir, zStr, xStr, `${yStr}.pbf`);
           return fs.readFile(pbfPath, (err, data) => {
-            if (err) { console.warn(`[PBF] missing z${zStr} x${xStr} y${yStr}`); return callback(null, {}); }
+            if (err) { console.error(`PBF Missing z${zStr} x${xStr} y${yStr}`); return callback(null, {}); }
             callback(null, { data });
           });
         }
@@ -111,11 +109,11 @@ async function renderTile(z, x, y, index, total) {
           const fontstack = decodeURIComponent(fontstackRaw);
           const fontPath = path.join(__dirname, './fonts', fontstack, `${range}.pbf`);
           return fs.readFile(fontPath, (err, data) => {
-            if (err) { console.warn(`[FONT] fetch failed: ${fontPath}`); return callback(null, {}); }
+            if (err) { console.error(`Font Fetch Failed: ${fontPath}`); return callback(null, {}); }
             callback(null, { data });
           });
         }
-        console.warn(`[RDR] unknown request: ${req.url}`);
+        console.error(`Unknown Request: ${req.url}`);
         callback(null, {});
       },
       ratio,
@@ -139,7 +137,7 @@ async function renderTile(z, x, y, index, total) {
     const center = getTileCenter(z, x + 0.5, y + 0.5);
     map.render({ zoom: z, center, width, height, bearing: 0, pitch: 0, buffer: 256 }, (err, pixelData) => {
       if (err) {
-        console.error(`[RDR] render error: z${z} x${x} y${y}: ${err}`);
+        console.error(`Render Error: z${z} x${x} y${y}: ${err}`);
         map.release();
         return resolve();
       }
@@ -148,7 +146,7 @@ async function renderTile(z, x, y, index, total) {
       let outW, outH;
       try { [outW, outH] = derivePixelSize(pixelData.length, width, height); }
       catch (e) {
-        console.error(`[RDR] pixel mismatch: z${z} x${x} y${y}: ${e}`);
+        console.error(`Pixel Mismatch: z${z} x${x} y${y}: ${e}`);
         map.release();
         return resolve();
       }
@@ -174,7 +172,7 @@ async function renderTile(z, x, y, index, total) {
         resolve();
       });
       out.on('error', (e) => {
-        console.error(`[RDR] write error: z${z} x${x} y${y}: ${e}`);
+        console.error(`Write Error: z${z} x${x} y${y}: ${e}`);
         map.release();
         resolve();
       });
