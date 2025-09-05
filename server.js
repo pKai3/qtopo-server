@@ -37,22 +37,31 @@ const DATA_DIR   = process.env.DATA_DIR   || "/data";
 const RASTER_DIR = process.env.RASTER_DIR || path.join(DATA_DIR, "raster");
 const VECTOR_DIR = process.env.VECTOR_DIR || path.join(DATA_DIR, "vector");
 
-const STYLE_DIR = process.env.STYLE_DIR || path.join(DATA_DIR, "styles");
-const STYLE_PATH = process.env.STYLE_PATH || path.resolve(__dirname, STYLE_DIR, 'style.json');
+const STYLE_DIR  = process.env.STYLE_DIR  || path.join(DATA_DIR, "styles");
 
-const BAKED_STYLE = path.join(__dirname, 'styles', 'style.json');
+// STYLE_PATH: either explicit env override (abs or relative), or /data/styles/style.json
+const STYLE_PATH = (() => {
+  const envPath = process.env.STYLE_PATH;
+  if (envPath) return path.isAbsolute(envPath) ? envPath : path.resolve(process.cwd(), envPath);
+  return path.join(STYLE_DIR, "style.json");
+})();
+
+// Baked style bundled in the image
+const BAKED_STYLE = path.join(__dirname, "styles", "style.json");
 
 // Where raster tiles are written/read
 const rasterRoot = RASTER_DIR;
 // Where vector PBFs live
 const vectorRoot = VECTOR_DIR;
 
-
 // Seed editable style once, then require it
 process.umask(0o002);
 
 try {
+  // Ensure dirs exist (style dir and parent of STYLE_PATH, in case STYLE_PATH is custom)
   fs.mkdirSync(STYLE_DIR, { recursive: true });
+  fs.mkdirSync(path.dirname(STYLE_PATH), { recursive: true });
+
   if (!fs.existsSync(STYLE_PATH)) {
     if (!fs.existsSync(BAKED_STYLE)) {
       console.error(`[BOOT] FATAL: baked style missing at ${BAKED_STYLE}`);
@@ -61,13 +70,14 @@ try {
     fs.copyFileSync(BAKED_STYLE, STYLE_PATH);
     console.warn(`[SEED] missing style; seeded editable at ${STYLE_PATH}`);
   }
+
   // Hard-enforce editable path only
   if (!fs.existsSync(STYLE_PATH)) {
     console.error(`[BOOT] FATAL: editable style missing at ${STYLE_PATH}`);
     process.exit(1);
   }
 } catch (e) {
-  console.error(`[BOOT] FATAL: style seeding/validation failed: ${e.message}`);
+  console.error(`[BOOT] FATAL: style seeding/validation failed: ${e?.message || e}`);
   process.exit(1);
 }
 
@@ -111,13 +121,13 @@ const VECTOR_TTL_HOURS = Number(process.env.VECTOR_TTL_HOURS || 0);   // default
 // Safety: cap deletions per run (0 = unlimited)
 const CLEANUP_MAX_DELETES = Number(process.env.CLEANUP_MAX_DELETES || 0);
 
-// 0 (or negative) means Infinity (never delete)
-const toMsOrInfinity = (h) => (h > 0 ? h * 3600 * 1000 : Infinity);
-
 // ─────────────────────────────────────────────────────────────
 // Small utils
 // ─────────────────────────────────────────────────────────────
 const isNonNegInt = (v) => /^\d+$/.test(String(v));
+
+// 0 (or negative) means Infinity (never delete)
+const toMsOrInfinity = (h) => (h > 0 ? h * 3600 * 1000 : Infinity);
 
 function zxysToStrings(z, x, y) {
   if (!isNonNegInt(z) || !isNonNegInt(x) || !isNonNegInt(y)) {
@@ -496,7 +506,7 @@ async function cleanupOldFiles(rootDir, ttlMs, allowedExts, exclusions = new Set
           if (CLEANUP_MAX_DELETES > 0 && deleted >= CLEANUP_MAX_DELETES) break;
         }
       } catch (e) {
-        console.error(`[CLEANUP] Failed to delete ${p}: ${e.message}`);
+        console.error(`[CLEANUP] Failed to Delete ${p}: ${e.message}`);
       }
     }
 
@@ -601,5 +611,5 @@ process.on("SIGINT",  () => { if (cleanupTimer) clearTimeout(cleanupTimer); });
 app.listen(PORT, HOST, () => {
   console.log(`[INIT] VECTOR_DIR=${VECTOR_DIR}`);
   console.log(`[INIT] RASTER_DIR=${RASTER_DIR}`);
-  console.log(`Tile server running on http://${HOST}:${PORT}`);
+  console.log(`[INIT] Tile Server Running on http://${HOST}:${PORT}`);
 });
