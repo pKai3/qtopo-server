@@ -1,5 +1,23 @@
 #!/usr/bin/env node
 
+// ── UTC, colorized, standardized logging shim (logging-only) ─
+const util = require('util');
+const out = process.stdout;
+const ANSI = { reset:"\x1b[0m", red:"\x1b[31m", yellow:"\x1b[33m" };
+const utcNow = () => new Date().toISOString();
+const fmt = (lvl, args) => {
+  const s = util.format(...args);
+  const m = s.match(/^\s*\[([A-Za-z0-9\-\/]+)\]\s*:??\s*(.*)$/);
+  const tag = m ? m[1] : 'RDR';
+  const body = m ? m[2] : s;
+  const color = lvl==='ERR' ? ANSI.red : (lvl==='WRN' ? ANSI.yellow : '');
+  return `${color}[${lvl}] [${utcNow()}] [${tag}]: ${body}${ANSI.reset}`;
+};
+console.log  = (...a) => out.write(fmt('LOG', a) + '\n');
+console.warn = (...a) => out.write(fmt('WRN', a) + '\n');
+console.error= (...a) => out.write(fmt('ERR', a) + '\n');
+
+// ── INIT ──────────────────────────────────────────────────────
 const maplibregl = require('@maplibre/maplibre-gl-native');
 const { createCanvas } = require('canvas');
 const fs = require('fs');
@@ -16,25 +34,23 @@ const y2 = parseInt(getArg('-y2'));
 const overwrite = args.includes('--overwrite');
 
 if ([z, x1, x2, y1, y2].some(v => Number.isNaN(v))) {
-  console.error('❌ Usage: -z Z -x1 X1 -x2 X2 -y1 Y1 -y2 Y2 [--overwrite]');
+  console.error('Usage: -z Z -x1 X1 -x2 X2 -y1 Y1 -y2 Y2 [--overwrite]');
   process.exit(1);
 }
 
 // ── CONSTANTS ────────────────────────────────────────────────
 // NEW: honor single-mount /data layout (or env overrides)
 const DATA_DIR  = process.env.DATA_DIR  || '/data';
-const tileDir   = process.env.VECTOR_DIR || path.resolve(DATA_DIR, 'vector');
-const outputDir = process.env.RASTER_DIR || path.resolve(DATA_DIR, 'raster');
+const VECTOR_DIR   = process.env.VECTOR_DIR || path.resolve(DATA_DIR, 'vector');
+const RASTER_DIR = process.env.RASTER_DIR || path.resolve(DATA_DIR, 'raster');
+const FONT_DIR = process.env.FONT_DIR || path.join(__dirname, 'assets', 'fonts');
 
 // ---- STYLE: require from env (preferred) or -s; no baked fallback ----
 const styleArg = process.env.STYLE_PATH || getArg('-s'); // env first
 if (!styleArg) { console.error('FATAL: STYLE_PATH env (or -s) required'); process.exit(2); }
 
 const STYLE_PATH = path.isAbsolute(styleArg) ? styleArg : path.resolve(styleArg);
-if (!fs.existsSync(STYLE_PATH)) { console.error(`FATAL: style not found at ${STYLE_PATH}`); process.exit(2); }
-
-console.error('[WORKER] argv:', process.argv.join(' '));
-console.error('[WORKER] STYLE=', STYLE_PATH);
+if (!fs.existsSync(STYLE_PATH)) { console.error(`FATAL: Style Not Found at ${STYLE_PATH}`); process.exit(2); }
 
 const style = JSON.parse(fs.readFileSync(STYLE_PATH, 'utf8'));
 
@@ -60,13 +76,13 @@ function derivePixelSize(bufLen, logicalW, logicalH) {
   const scale = Math.sqrt(px / base);
   const w = Math.round(logicalW * scale);
   const h = Math.round(logicalH * scale);
-  if (w * h * 4 !== bufLen) throw new Error(`Pixel buffer mismatch (len=${bufLen})`);
+  if (w * h * 4 !== bufLen) throw new Error(`Pixel Buffer Mismatch (len=${bufLen})`);
   return [w, h];
 }
 
 async function renderTile(z, x, y, index, total) {
   return new Promise((resolve) => {
-    const tilePath = path.join(outputDir, String(z), String(x));
+    const tilePath = path.join(RASTER_DIR, String(z), String(x));
     const outPath = path.join(tilePath, `${y}.png`);
     if (!overwrite && fs.existsSync(outPath)) return resolve();
 
@@ -81,30 +97,32 @@ async function renderTile(z, x, y, index, total) {
         const tileMatch = req.url.match(/\/vector\/(\d+)\/(\d+)\/(\d+)\.pbf/);
         if (tileMatch) {
           const [zStr, xStr, yStr] = tileMatch.slice(1);
-          const pbfPath = path.join(tileDir, zStr, xStr, `${yStr}.pbf`);
+          const pbfPath = path.join(VECTOR_DIR, zStr, xStr, `${yStr}.pbf`);
           return fs.readFile(pbfPath, (err, data) => {
-            if (err) {
-              fs.appendFileSync('failed_tiles.log', `Missing tile: z${zStr} x${xStr} y${yStr}\n`);
-              return callback(null, {}); // let renderer handle gracefully (transparent)
-            }
+            if (err) { console.error(`PBF Missing z${zStr} x${xStr} y${yStr}`); return callback(null, {}); }
             callback(null, { data });
           });
         }
-        // Fonts
-        const fontMatch = req.url.match(/\/fonts\/([^/]+)\/(\d+-\d+)\.pbf/);
-        if (fontMatch) {
-          const [fontstackRaw, range] = fontMatch.slice(1);
-          const fontstack = decodeURIComponent(fontstackRaw);
-          const fontPath = path.join(__dirname, './fonts', fontstack, `${range}.pbf`);
+        // Accept /fonts/... or /assets/fonts/..., with or without a leading slash,
+        // full URLs, and optional query strings.
+        const fontRe = /(?:^|\/)(?:assets\/)?fonts\/([^/]+)\/(\d+-\d+)\.pbf(?:\?.*)?$/;
+        const m = req.url.match(fontRe);
+        if (m) {
+          let [ , fontstackRaw, range ] = m;
+          let fontstack;
+          try { fontstack = decodeURIComponent(fontstackRaw); }
+          catch { fontstack = fontstackRaw; }
+
+          const fontPath = path.join(FONT_DIR, fontstack, `${range}.pbf`);
           return fs.readFile(fontPath, (err, data) => {
             if (err) {
-              fs.appendFileSync('failed_tiles.log', `Font fetch failed: ${fontPath}\n`);
-              return callback(null, {});
+              console.error(`[ERROR] [${new Date().toISOString()}] [FONTS]: missing ${fontPath}`);
+              return callback(null, {}); // let MapLibre handle gracefully
             }
             callback(null, { data });
           });
         }
-        fs.appendFileSync('failed_tiles.log', `Unknown request: ${req.url}\n`);
+        console.error(`Unknown Request: ${req.url}`);
         callback(null, {});
       },
       ratio,
@@ -128,7 +146,7 @@ async function renderTile(z, x, y, index, total) {
     const center = getTileCenter(z, x + 0.5, y + 0.5);
     map.render({ zoom: z, center, width, height, bearing: 0, pitch: 0, buffer: 256 }, (err, pixelData) => {
       if (err) {
-        fs.appendFileSync('failed_tiles.log', `Render error: z${z} x${x} y${y}: ${err}\n`);
+        console.error(`Render Error: z${z} x${x} y${y}: ${err}`);
         map.release();
         return resolve();
       }
@@ -137,7 +155,7 @@ async function renderTile(z, x, y, index, total) {
       let outW, outH;
       try { [outW, outH] = derivePixelSize(pixelData.length, width, height); }
       catch (e) {
-        fs.appendFileSync('failed_tiles.log', `Pixel mismatch: z${z} x${x} y${y}: ${e}\n`);
+        console.error(`Pixel Mismatch: z${z} x${x} y${y}: ${e}`);
         map.release();
         return resolve();
       }
@@ -163,7 +181,7 @@ async function renderTile(z, x, y, index, total) {
         resolve();
       });
       out.on('error', (e) => {
-        fs.appendFileSync('failed_tiles.log', `Write error: z${z} x${x} y${y}: ${e}\n`);
+        console.error(`Write Error: z${z} x${x} y${y}: ${e}`);
         map.release();
         resolve();
       });

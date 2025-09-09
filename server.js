@@ -1,10 +1,22 @@
 // ─────────────────────────────────────────────────────────────
-// Unbuffered logs (handy under Docker)
+// Unbuffered, UTC, colorized logger (logging-only changes)
 // ─────────────────────────────────────────────────────────────
 const util = require("util");
-const processStdout = process.stdout;
-console.log = (...args) => processStdout.write(util.format(...args) + "\n");
-console.error = (...args) => processStdout.write("[ERR] " + util.format(...args) + "\n");
+const out = process.stdout;
+const ANSI = { reset:"\x1b[0m", red:"\x1b[31m", yellow:"\x1b[33m" };
+const utcNow = () => new Date().toISOString();
+function fmt(level, args) {
+  const s = util.format(...args);
+  // If caller supplies a [TAG] prefix, capture it as the tag
+  const m = s.match(/^\s*\[([A-Za-z0-9\-\/]+)\]\s*:??\s*(.*)$/);
+  const tag = m ? m[1] : "SYS";
+  const body = m ? m[2] : s;
+  const color = level === "ERR" ? ANSI.red : (level === "WRN" ? ANSI.yellow : "");
+  return `${color}[${level}] [${utcNow()}] [${tag}]: ${body}${ANSI.reset}`;
+}
+console.log  = (...a) => out.write(fmt("LOG", a) + "\n");
+console.warn = (...a) => out.write(fmt("WRN", a) + "\n");
+console.error= (...a) => out.write(fmt("ERR", a) + "\n");
 
 // ─────────────────────────────────────────────────────────────
 // Imports
@@ -25,37 +37,48 @@ const DATA_DIR   = process.env.DATA_DIR   || "/data";
 const RASTER_DIR = process.env.RASTER_DIR || path.join(DATA_DIR, "raster");
 const VECTOR_DIR = process.env.VECTOR_DIR || path.join(DATA_DIR, "vector");
 
-const STYLE_DIR = process.env.STYLE_DIR || path.join(DATA_DIR, "styles");
-const STYLE_PATH = process.env.STYLE_PATH || path.resolve(__dirname, STYLE_DIR, 'style.json');
+const STYLE_DIR  = process.env.STYLE_DIR  || path.join(DATA_DIR, "styles");
+const FONT_DIR   = process.env.FONT_DIR   || path.join(__dirname, "assets", "fonts");
 
-const BAKED_STYLE = path.join(__dirname, 'styles', 'style.json');
+// STYLE_PATH: either explicit env override (abs or relative), or /data/styles/style.json
+const STYLE_PATH = (() => {
+  const envPath = process.env.STYLE_PATH;
+  if (envPath) return path.isAbsolute(envPath) ? envPath : path.resolve(process.cwd(), envPath);
+  return path.join(STYLE_DIR, "style.json");
+})();
+
+// Baked style bundled in the image
+const BAKED_STYLE = path.join(__dirname, "styles", "style.json");
 
 // Where raster tiles are written/read
 const rasterRoot = RASTER_DIR;
 // Where vector PBFs live
 const vectorRoot = VECTOR_DIR;
 
-
 // Seed editable style once, then require it
 process.umask(0o002);
 
 try {
+  // Ensure dirs exist (style dir and parent of STYLE_PATH, in case STYLE_PATH is custom)
   fs.mkdirSync(STYLE_DIR, { recursive: true });
+  fs.mkdirSync(path.dirname(STYLE_PATH), { recursive: true });
+
   if (!fs.existsSync(STYLE_PATH)) {
     if (!fs.existsSync(BAKED_STYLE)) {
       console.error(`[BOOT] FATAL: baked style missing at ${BAKED_STYLE}`);
       process.exit(1);
     }
     fs.copyFileSync(BAKED_STYLE, STYLE_PATH);
-    console.log(`[BOOT] seeded editable style at ${STYLE_PATH}`);
+    console.warn(`[SEED] missing style; seeded editable at ${STYLE_PATH}`);
   }
+
   // Hard-enforce editable path only
   if (!fs.existsSync(STYLE_PATH)) {
     console.error(`[BOOT] FATAL: editable style missing at ${STYLE_PATH}`);
     process.exit(1);
   }
 } catch (e) {
-  console.error(`[BOOT] FATAL: style seeding/validation failed: ${e.message}`);
+  console.error(`[BOOT] FATAL: style seeding/validation failed: ${e?.message || e}`);
   process.exit(1);
 }
 
@@ -74,6 +97,7 @@ function fixPerms(p) {
 
 fixPerms(STYLE_DIR);
 process.env.STYLE_PATH = STYLE_PATH;  // <-- export for children
+process.env.FONT_DIR   = FONT_DIR;    // <-- export for children
 
 // Vector PBF Endpoint (QTopo 1m Official)
 const VECTOR_BASE_URL =
@@ -99,13 +123,13 @@ const VECTOR_TTL_HOURS = Number(process.env.VECTOR_TTL_HOURS || 0);   // default
 // Safety: cap deletions per run (0 = unlimited)
 const CLEANUP_MAX_DELETES = Number(process.env.CLEANUP_MAX_DELETES || 0);
 
-// 0 (or negative) means Infinity (never delete)
-const toMsOrInfinity = (h) => (h > 0 ? h * 3600 * 1000 : Infinity);
-
 // ─────────────────────────────────────────────────────────────
 // Small utils
 // ─────────────────────────────────────────────────────────────
 const isNonNegInt = (v) => /^\d+$/.test(String(v));
+
+// 0 (or negative) means Infinity (never delete)
+const toMsOrInfinity = (h) => (h > 0 ? h * 3600 * 1000 : Infinity);
 
 function zxysToStrings(z, x, y) {
   if (!isNonNegInt(z) || !isNonNegInt(x) || !isNonNegInt(y)) {
@@ -183,7 +207,7 @@ async function ensureVectorTile(z, x, y) {
 
   const prom = (async () => {
     const url = `${VECTOR_BASE_URL}/${zStr}/${yStr}/${xStr}.pbf`; // …/tile/{z}/{y}/{x}.pbf
-    console.log(`[PBF-GET] ${url}`);
+    console.log(`[PBF-GET] /${zStr}/${xStr}/${yStr}/ ${url}`);
 
     await ensureDir(path.dirname(pbfPath));
 
@@ -218,7 +242,10 @@ async function ensureVectorTile(z, x, y) {
     const result = await prom;
     return result;
   } catch (e) {
-    console.error(`[PBF-ERR] ${key}: ${e && e.message ? e.message : e}`);
+    // Avoid double logging: let caller WARN on EMPTY_PBF; only ERROR here for real failures.
+    if (e?.code !== 'EMPTY_PBF') {
+      console.error(`[PBF-ERR] ${key}: ${e && e.message ? e.message : e}`);
+    }
     try {
       if (fs.existsSync(pbfPath) && fs.statSync(pbfPath).size === 0) fs.unlinkSync(pbfPath);
     } catch {}
@@ -241,12 +268,12 @@ async function renderSingleTile(z, x, y) {
   if (fileExistsNonEmpty(tilePath)) return tilePath;
 
   if (inflightRaster.has(key)) {
-    console.log(`[RENDER] Awaiting in-flight render: ${key}`);
+    console.log(`[RDR] Awaiting in-flight render: ${key}`);
     return inflightRaster.get(key);
   }
 
   const prom = new Promise((resolve, reject) => {
-    console.log(`[RENDER] Generating tile: ${tilePath}`);
+    console.log(`[RDR] Generating tile: ${tilePath}`);
     const nodeBin = process.execPath; // ← use the current Node binary
     const child = spawn(
       nodeBin,
@@ -255,20 +282,27 @@ async function renderSingleTile(z, x, y) {
         cwd: __dirname,
         env: {
           ...process.env,           // carries DISPLAY, DATA_DIR, etc.
-          STYLE_PATH,               // ensure the worker sees the editable style
+          // STYLE_PATH,               // ensure the worker sees the editable style
           PATH: `${path.dirname(nodeBin)}:${process.env.PATH || ""}`
         },
         stdio: "pipe"
       }
     );
 
-    child.stdout.on("data", (d) => processStdout.write(`[RENDER-OUT]: ${d}`));
-    child.stderr.on("data", (d) => processStdout.write(`[RENDER-ERR]: ${d}`));
+    // Standardize child logging (no functional change)
+    child.stdout.on("data", (d) => {
+      const line = String(d).trimEnd();
+      if (line) console.log(`[RDR-W] ${line}`);
+    });
+    child.stderr.on("data", (d) => {
+      const line = String(d).trimEnd();
+      if (line) console.error(`[RDR-W] ${line}`);
+    });
 
     child.on("error", (err) => reject(err));
     child.on("close", (code) => {
       if (code === 0 && fileExistsNonEmpty(tilePath)) {
-        console.log(`[SUCCESS] Rendered: ${tilePath}`);
+        // console.log(`[RDR] Rendered: ${tilePath}`);
         resolve(tilePath);
       } else {
         reject(new Error(`render_worker exited ${code}`));
@@ -312,15 +346,16 @@ app.get('/style.json', (req, res) => {
   res.type('application/json; charset=utf-8').send(style);
 });
 
-app.use('/fonts', express.static(path.join(__dirname, 'fonts')));
+app.use('/fonts', express.static(FONT_DIR));
 
-//legacy redirect
+// Legacy Redirect
 app.get('/tiles_raster/:z/:x/:y.png', (req, res) => {
   const { z, x, y } = req.params;
   const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
   return res.redirect(308, `/raster/${z}/${x}/${y}.png${qs}`);
 });
 
+// Serve Raster Tiles
 app.get("/raster/:z/:x/:y.png", async (req, res) => {
   const { z, x, y } = req.params;
   console.log(`[REQ] GET /raster/${z}/${x}/${y}.png`);
@@ -347,8 +382,13 @@ app.get("/raster/:z/:x/:y.png", async (req, res) => {
   try {
     await ensureVectorTile(zStr, xStr, yStr);
   } catch (e) {
+    if (e?.code === "EMPTY_PBF") {
+      console.warn(`[PBF] ${zStr}/${xStr}/${yStr}: empty from upstream; serving blank`);
+    } else {
+      console.error(`[PBF] ${zStr}/${xStr}/${yStr}: ${e?.message || e}; serving blank`);
+    }
+
     const reason = e?.code === "EMPTY_PBF" ? "EMPTY PBF" : `PBF FAIL ${e?.status || ""}`.trim();
-    console.log(`[PBF] ${zStr}/${xStr}/${yStr} -> ${reason}; serving blank`);
     if (CACHE_BLANK_TILES) {
       await writeBlankTile(tilePath, reason);
       return sendTileFile(res, tilePath);
@@ -363,9 +403,8 @@ app.get("/raster/:z/:x/:y.png", async (req, res) => {
     const out = await renderSingleTile(zStr, xStr, yStr);
     return sendTileFile(res, out);
   } catch (e) {
-    console.error(`[FAIL] Rendering failed for ${zStr}/${xStr}/${yStr}: ${e.message || e}`);
+    console.error(`[ERR] Rendering failed for ${zStr}/${xStr}/${yStr}: ${e.message || e}`);
     // Serve error.png on render errors
-    
     return sendTileFile(res, ERROR_TILE_PATH);
   }
 });
@@ -385,18 +424,25 @@ app.get("/vector/:z/:x/:y.pbf", async (req, res) => {
 
   const pbfPath = path.join(vectorRoot, zStr, xStr, `${yStr}.pbf`);
 
-  // ensure cached (download if missing)
   try {
-    await ensureVectorTile(zStr, xStr, yStr);
+    await ensureVectorTile(zStr, xStr, yStr);     // may throw with e.code = 'EMPTY_PBF'
   } catch (e) {
     const status = e?.code === 'EMPTY_PBF' ? 204 : (e?.status || 502);
-    console.error(`[PBF-ERR] ${zStr}/${xStr}/${yStr}: ${e?.message || e}`);
+
+    if (e?.code === 'EMPTY_PBF') {
+      // boundary/no-data is an expected condition → WARN (yellow) or silence
+      console.warn(`[PBF] ${zStr}/${xStr}/${yStr}: empty from upstream; returning ${status}`);
+      // If you want total silence for empty tiles, comment the line above.
+    } else {
+      // real failure → ERR (red)
+      console.error(`[PBF-ERR] ${zStr}/${xStr}/${yStr}: ${e?.message || e}; returning ${status}`);
+    }
+
     return res.status(status).end();
   }
 
-  // send from disk with proper headers
   try {
-    // peek first 2 bytes for gzip magic 1F 8B
+    // peek first 2 bytes for gzip magic 1F 8B and set headers
     let first2 = Buffer.alloc(2);
     try {
       const fd = fs.openSync(pbfPath, 'r');
@@ -421,6 +467,19 @@ app.use((req, _res, next) => { if (req.path === '/') console.log('[INFO] Serving
 
 // Serve the viewer and assets from /public (handles /, /index.html, /main.js, etc.)
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Raster viewer (index) at /raster
+app.get('/raster', (req, res) => {
+  try {
+    // optional: simple log line in your standard format
+    console.log(`[LOG] [${new Date().toISOString()}] [REQ]: GET /raster (viewer)`);
+
+    res.type('html').sendFile(path.join(__dirname, 'public', 'index_raster.html'));
+  } catch (e) {
+    console.error(`[ERR] [${new Date().toISOString()}] [SYS]: Failed to serve raster viewer: ${e.message}`);
+    res.status(500).send('Raster viewer unavailable');
+  }
+});
 
 // ─────────────────────────────────────────────────────────────
 // Cleanup helpers
@@ -462,7 +521,7 @@ async function cleanupOldFiles(rootDir, ttlMs, allowedExts, exclusions = new Set
           if (CLEANUP_MAX_DELETES > 0 && deleted >= CLEANUP_MAX_DELETES) break;
         }
       } catch (e) {
-        console.error(`[CLEANUP] Failed to delete ${p}: ${e.message}`);
+        console.error(`[CLEANUP] Failed to Delete ${p}: ${e.message}`);
       }
     }
 
@@ -567,5 +626,5 @@ process.on("SIGINT",  () => { if (cleanupTimer) clearTimeout(cleanupTimer); });
 app.listen(PORT, HOST, () => {
   console.log(`[INIT] VECTOR_DIR=${VECTOR_DIR}`);
   console.log(`[INIT] RASTER_DIR=${RASTER_DIR}`);
-  console.log(`Tile server running on http://${HOST}:${PORT}`);
+  console.log(`[INIT] Tile Server Running on http://${HOST}:${PORT}`);
 });

@@ -1,0 +1,63 @@
+{
+  "desktop": {
+    "name": "desktop",
+    "lines": {
+      "roads":   { "low": {"mult": 1.0, "min": 1.0}, "medium": {"mult": 1.0, "min": 1.0}, "high": {"mult": 1.0, "min": 1.0}, "bridge": {"mult": 1.0, "min": 1.0} },
+      "water":   { "large": {"mult": 1.0, "min": 1.0}, "small": {"mult": 1.0, "min": 0.8} },
+      "trails":  { "mult": 1.0, "min": 1.0 },
+      "coastline": { "mult": 1.0, "min": 1.0 },
+      "shoreline": { "mult": 1.0, "min": 1.0 },
+      "rail":    { "mult": 1.0, "min": 1.0 },
+      "borders": { "mult": 1.0, "min": 1.2 },
+      "contours":{ "mult": 1.0, "min": 0.6 }
+    },
+    "text": { "sizeMult": 1.0, "minHalo": 1.0 },
+    "zoomGates": {},
+    "zoomGatePatterns": {}
+  },
+
+  "mobile": {
+    "name": "mobile",
+    "lines": {
+      "roads":   { "low": {"mult": 1.6, "min": 2.0}, "medium": {"mult": 1.6, "min": 2.0}, "high": {"mult": 1.6, "min": 2.4}, "bridge": {"mult": 1.6, "min": 2.0} },
+      "water":   { "large": {"mult": 1.6, "min": 1.6}, "small": {"mult": 1.6, "min": 1.2} },
+      "trails":  { "mult": 1.6, "min": 1.6 },
+      "coastline": { "mult": 1.6, "min": 1.8 },
+      "shoreline": { "mult": 1.6, "min": 1.8 },
+      "rail":    { "mult": 1.5, "min": 1.6 },
+      "borders": { "mult": 1.6, "min": 2.0 },
+      "contours":{ "mult": 1.4, "min": 0.8 }
+    },
+    "text": { "sizeMult": 1.35, "minHalo": 2.0 },
+
+    "zoomGates": {
+      "roads-low": 6,
+      "roads-medium": 10,
+      "roads-high": 12,
+      "trails": 12,
+      "railway-operational": 10,
+      "railway-suspended": 12,
+      "railway-proposed": 12,
+      "shoreline": 6,
+      "coastline": 5,
+      "watercourses-small": 12,
+      "contour-small": 12,
+      "contour-medium": 15,
+      "contour-large": 16,
+      "aux-contour-small": 12,
+      "aux-contour-medium": 15,
+      "aux-contour-large": 16,
+      "buildings": 15,
+      "urban-areas": 9
+    },
+
+    "zoomGatePatterns": {
+      "roads-(medium|high)-label": 12,
+      "watercourse-(large|small)-label": 12,
+      "contour-(large|medium|small)-label": 13,
+      "populated-place-label": 7,
+      "mountain-label": 9,
+      "region-label": 8
+    }
+  }
+}
