@@ -41,8 +41,9 @@ if ([z, x1, x2, y1, y2].some(v => Number.isNaN(v))) {
 // ── CONSTANTS ────────────────────────────────────────────────
 // NEW: honor single-mount /data layout (or env overrides)
 const DATA_DIR  = process.env.DATA_DIR  || '/data';
-const tileDir   = process.env.VECTOR_DIR || path.resolve(DATA_DIR, 'vector');
-const outputDir = process.env.RASTER_DIR || path.resolve(DATA_DIR, 'raster');
+const VECTOR_DIR   = process.env.VECTOR_DIR || path.resolve(DATA_DIR, 'vector');
+const RASTER_DIR = process.env.RASTER_DIR || path.resolve(DATA_DIR, 'raster');
+const FONT_DIR = process.env.FONT_DIR || path.join(__dirname, 'assets', 'fonts');
 
 // ---- STYLE: require from env (preferred) or -s; no baked fallback ----
 const styleArg = process.env.STYLE_PATH || getArg('-s'); // env first
@@ -81,7 +82,7 @@ function derivePixelSize(bufLen, logicalW, logicalH) {
 
 async function renderTile(z, x, y, index, total) {
   return new Promise((resolve) => {
-    const tilePath = path.join(outputDir, String(z), String(x));
+    const tilePath = path.join(RASTER_DIR, String(z), String(x));
     const outPath = path.join(tilePath, `${y}.png`);
     if (!overwrite && fs.existsSync(outPath)) return resolve();
 
@@ -96,20 +97,28 @@ async function renderTile(z, x, y, index, total) {
         const tileMatch = req.url.match(/\/vector\/(\d+)\/(\d+)\/(\d+)\.pbf/);
         if (tileMatch) {
           const [zStr, xStr, yStr] = tileMatch.slice(1);
-          const pbfPath = path.join(tileDir, zStr, xStr, `${yStr}.pbf`);
+          const pbfPath = path.join(VECTOR_DIR, zStr, xStr, `${yStr}.pbf`);
           return fs.readFile(pbfPath, (err, data) => {
             if (err) { console.error(`PBF Missing z${zStr} x${xStr} y${yStr}`); return callback(null, {}); }
             callback(null, { data });
           });
         }
-        // Fonts
-        const fontMatch = req.url.match(/\/fonts\/([^/]+)\/(\d+-\d+)\.pbf/);
-        if (fontMatch) {
-          const [fontstackRaw, range] = fontMatch.slice(1);
-          const fontstack = decodeURIComponent(fontstackRaw);
-          const fontPath = path.join(__dirname, './fonts', fontstack, `${range}.pbf`);
+        // Accept /fonts/... or /assets/fonts/..., with or without a leading slash,
+        // full URLs, and optional query strings.
+        const fontRe = /(?:^|\/)(?:assets\/)?fonts\/([^/]+)\/(\d+-\d+)\.pbf(?:\?.*)?$/;
+        const m = req.url.match(fontRe);
+        if (m) {
+          let [ , fontstackRaw, range ] = m;
+          let fontstack;
+          try { fontstack = decodeURIComponent(fontstackRaw); }
+          catch { fontstack = fontstackRaw; }
+
+          const fontPath = path.join(FONT_DIR, fontstack, `${range}.pbf`);
           return fs.readFile(fontPath, (err, data) => {
-            if (err) { console.error(`Font Fetch Failed: ${fontPath}`); return callback(null, {}); }
+            if (err) {
+              console.error(`[ERROR] [${new Date().toISOString()}] [FONTS]: missing ${fontPath}`);
+              return callback(null, {}); // let MapLibre handle gracefully
+            }
             callback(null, { data });
           });
         }

@@ -38,6 +38,7 @@ const RASTER_DIR = process.env.RASTER_DIR || path.join(DATA_DIR, "raster");
 const VECTOR_DIR = process.env.VECTOR_DIR || path.join(DATA_DIR, "vector");
 
 const STYLE_DIR  = process.env.STYLE_DIR  || path.join(DATA_DIR, "styles");
+const FONT_DIR   = process.env.FONT_DIR   || path.join(__dirname, "assets", "fonts");
 
 // STYLE_PATH: either explicit env override (abs or relative), or /data/styles/style.json
 const STYLE_PATH = (() => {
@@ -96,6 +97,7 @@ function fixPerms(p) {
 
 fixPerms(STYLE_DIR);
 process.env.STYLE_PATH = STYLE_PATH;  // <-- export for children
+process.env.FONT_DIR   = FONT_DIR;    // <-- export for children
 
 // Vector PBF Endpoint (QTopo 1m Official)
 const VECTOR_BASE_URL =
@@ -280,7 +282,7 @@ async function renderSingleTile(z, x, y) {
         cwd: __dirname,
         env: {
           ...process.env,           // carries DISPLAY, DATA_DIR, etc.
-          STYLE_PATH,               // ensure the worker sees the editable style
+          // STYLE_PATH,               // ensure the worker sees the editable style
           PATH: `${path.dirname(nodeBin)}:${process.env.PATH || ""}`
         },
         stdio: "pipe"
@@ -344,7 +346,7 @@ app.get('/style.json', (req, res) => {
   res.type('application/json; charset=utf-8').send(style);
 });
 
-app.use('/fonts', express.static(path.join(__dirname, 'assets', 'fonts')));
+app.use('/fonts', express.static(FONT_DIR));
 
 // Legacy Redirect
 app.get('/tiles_raster/:z/:x/:y.png', (req, res) => {
