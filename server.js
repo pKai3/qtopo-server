@@ -344,7 +344,7 @@ app.get('/style.json', (req, res) => {
   res.type('application/json; charset=utf-8').send(style);
 });
 
-app.use('/fonts', express.static(path.join(__dirname, 'fonts')));
+app.use('/fonts', express.static(path.join(__dirname, 'assets', 'fonts')));
 
 // Legacy Redirect
 app.get('/tiles_raster/:z/:x/:y.png', (req, res) => {
