@@ -102,8 +102,8 @@ app.get("/style.json", (_req, res) => {
   }
 });
 
-// ── Vector tile route: GET /vector/:z/:x/:y.pbf  (download-on-miss) ────────────
-app.get("/vector/:z(\\d+)/:x(\\d+)/:y(\\d+).pbf", async (req, res) => {
+// ── Vector tile route: GET /vector/:z/:x/:y.pbf  (download-on-miss)
+app.get("/vector/:z(\\d+)/:x(\\d+)/:y(\\d+)\\.pbf", async (req, res) => {
   const z = Number(req.params.z), x = Number(req.params.x), y = Number(req.params.y);
   try {
     const r = await ensureVectorTile(z, x, y, {
@@ -113,12 +113,9 @@ app.get("/vector/:z(\\d+)/:x(\\d+)/:y(\\d+).pbf", async (req, res) => {
     });
 
     if (r.status === "empty") {
-      // 204 to keep MapLibre quiet (no body)
-      res.status(204).end();
-      return;
+      return res.status(204).end();
     }
 
-    // OK
     res.setHeader("Content-Type", "application/x-protobuf");
     res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=600");
     fs.createReadStream(r.path).pipe(res);
@@ -128,34 +125,30 @@ app.get("/vector/:z(\\d+)/:x(\\d+)/:y(\\d+).pbf", async (req, res) => {
   }
 });
 
-// ── Raster route: GET /raster/:z/:x/:y.png  (cache-or-render) ──────────────────
-app.get("/raster/:z(\\d+)/:x(\\d+)/:y(\\d+).png", async (req, res) => {
+// ── Raster route: GET /raster/:z/:x/:y.png  (cache-or-render)
+app.get("/raster/:z(\\d+)/:x(\\d+)/:y(\\d+)\\.png", async (req, res) => {
   const z = Number(req.params.z), x = Number(req.params.x), y = Number(req.params.y);
   const outDir  = path.join(RASTER_DIR, String(z), String(x));
   const outPath = path.join(outDir, `${y}.png`);
 
   try {
-    // cache hit
     if (fileExistsNonEmpty(outPath)) {
       setTileHeaders(res);
       return fs.createReadStream(outPath).pipe(res);
     }
 
-    // ensure vector tile (download if missing)
     const pbf = await ensureVectorTile(z, x, y, {
       vectorDir: VECTOR_DIR,
       upstreamUrlBuilder: qldUpstream,
       L,
     });
 
-    // empty PBF -> write/send blank
     if (pbf.status === "empty") {
       writeBlankTile(outPath, BLANK_TILE_PATH);
       setTileHeaders(res);
       return fs.createReadStream(outPath).pipe(res);
     }
 
-    // render via worker
     const renderedPath = await renderSingleTile(z, x, y, {
       rasterDir: RASTER_DIR,
       STYLE_PATH,
@@ -167,7 +160,6 @@ app.get("/raster/:z(\\d+)/:x(\\d+)/:y(\\d+).png", async (req, res) => {
     fs.createReadStream(renderedPath).pipe(res);
   } catch (err) {
     L.err("RDR", `fail ${z}/${x}/${y}: ${err.message}`);
-    // fall back to blank
     try {
       writeBlankTile(outPath, BLANK_TILE_PATH);
       setTileHeaders(res);
@@ -178,13 +170,13 @@ app.get("/raster/:z(\\d+)/:x(\\d+)/:y(\\d+).png", async (req, res) => {
   }
 });
 
-// ── Legacy redirects (compat) ──────────────────────────────────────────────────
-app.get("/tiles_raster/:z(\\d+)/:x(\\d+)/:y(\\d+).png", (req, res) => {
+// ── Legacy redirects (compat)
+app.get("/tiles_raster/:z(\\d+)/:x(\\d+)/:y(\\d+)\\.png", (req, res) => {
   const { z, x, y } = req.params;
   const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
   res.redirect(302, `/raster/${z}/${x}/${y}.png${qs}`);
 });
-app.get("/tiles_vector/:z(\\d+)/:x(\\d+)/:y(\\d+).pbf", (req, res) => {
+app.get("/tiles_vector/:z(\\d+)/:x(\\d+)/:y(\\d+)\\.pbf", (req, res) => {
   const { z, x, y } = req.params;
   const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
   res.redirect(302, `/vector/${z}/${x}/${y}.pbf${qs}`);
