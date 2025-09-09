@@ -103,7 +103,7 @@ app.get("/style.json", (_req, res) => {
 });
 
 // ── Vector tile route: GET /vector/:z/:x/:y.pbf  (download-on-miss)
-app.get("/vector/:z(\\d+)/:x(\\d+)/:y(\\d+)\\.pbf", async (req, res) => {
+app.get("/vector/:z/:x/:y.pbf", async (req, res) => {
   const z = Number(req.params.z), x = Number(req.params.x), y = Number(req.params.y);
   try {
     const r = await ensureVectorTile(z, x, y, {
@@ -126,7 +126,7 @@ app.get("/vector/:z(\\d+)/:x(\\d+)/:y(\\d+)\\.pbf", async (req, res) => {
 });
 
 // ── Raster route: GET /raster/:z/:x/:y.png  (cache-or-render)
-app.get("/raster/:z(\\d+)/:x(\\d+)/:y(\\d+)\\.png", async (req, res) => {
+app.get("/raster/:z/:x/:y.png", async (req, res) => {
   const z = Number(req.params.z), x = Number(req.params.x), y = Number(req.params.y);
   const outDir  = path.join(RASTER_DIR, String(z), String(x));
   const outPath = path.join(outDir, `${y}.png`);
@@ -171,12 +171,12 @@ app.get("/raster/:z(\\d+)/:x(\\d+)/:y(\\d+)\\.png", async (req, res) => {
 });
 
 // ── Legacy redirects (compat)
-app.get("/tiles_raster/:z(\\d+)/:x(\\d+)/:y(\\d+)\\.png", (req, res) => {
+app.get("/tiles_raster/:z/:x/:y.png", (req, res) => {
   const { z, x, y } = req.params;
   const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
   res.redirect(302, `/raster/${z}/${x}/${y}.png${qs}`);
 });
-app.get("/tiles_vector/:z(\\d+)/:x(\\d+)/:y(\\d+)\\.pbf", (req, res) => {
+app.get("/tiles_vector/:z/:x/:y.pbf", (req, res) => {
   const { z, x, y } = req.params;
   const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
   res.redirect(302, `/vector/${z}/${x}/${y}.pbf${qs}`);
