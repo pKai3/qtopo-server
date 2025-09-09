@@ -1,630 +1,557 @@
-// ─────────────────────────────────────────────────────────────
-// Unbuffered, UTC, colorized logger (logging-only changes)
-// ─────────────────────────────────────────────────────────────
-const util = require("util");
-const out = process.stdout;
-const ANSI = { reset:"\x1b[0m", red:"\x1b[31m", yellow:"\x1b[33m" };
-const utcNow = () => new Date().toISOString();
-function fmt(level, args) {
-  const s = util.format(...args);
-  // If caller supplies a [TAG] prefix, capture it as the tag
-  const m = s.match(/^\s*\[([A-Za-z0-9\-\/]+)\]\s*:??\s*(.*)$/);
-  const tag = m ? m[1] : "SYS";
-  const body = m ? m[2] : s;
-  const color = level === "ERR" ? ANSI.red : (level === "WRN" ? ANSI.yellow : "");
-  return `${color}[${level}] [${utcNow()}] [${tag}]: ${body}${ANSI.reset}`;
-}
-console.log  = (...a) => out.write(fmt("LOG", a) + "\n");
-console.warn = (...a) => out.write(fmt("WRN", a) + "\n");
-console.error= (...a) => out.write(fmt("ERR", a) + "\n");
-
-// ─────────────────────────────────────────────────────────────
-// Imports
-// ─────────────────────────────────────────────────────────────
+#!/usr/bin/env node
+// server.js
 const express = require("express");
-const path = require("path");
 const fs = require("fs");
-const { spawn } = require("child_process");
+const path = require("path");
 
-// ─────────────────────────────────────────────────────────────
+// ── Logging (UTC, colored) ─────────────────────────────────────────────────────
+const L = require("./lib/logger");
+
+// ── Config (paths, TTLs, env export for worker) ────────────────────────────────
+const {
+  DATA_DIR, RASTER_DIR, VECTOR_DIR,
+  STYLE_DIR, STYLE_PATH,
+  FONT_DIR,
+  RASTER_TTL_HOURS, VECTOR_TTL_HOURS
+} = require("./lib/config");
+
+// ── Utilities (dirs, tiles, blank) ─────────────────────────────────────────────
+const {
+  ensureDir,
+  fileExistsNonEmpty,
+  setTileHeaders,
+  sendTileFile,
+  ensureBlankTilePresent,
+  writeBlankTile,
+} = require("./lib/utils");
+
+// ── PBF ensure + Render (worker spawn wrapper) ─────────────────────────────────
+const { ensureVectorTile } = require("./lib/pbf");
+const { renderSingleTile } = require("./lib/render");
+
+// ── Constants ──────────────────────────────────────────────────────────────────
+const PORT = Number(process.env.PORT || 8080);
 const app = express();
 
-const PORT = Number(process.env.PORT || 8080);
-const HOST = process.env.HOST || "0.0.0.0";
+// Fallback blank (1x1 transparent), ensure it exists
+const BLANK_TILE_PATH = process.env.BLANK_TILE_PATH || path.join(__dirname, "assets", "images", "blank.png");
+ensureBlankTilePresent(BLANK_TILE_PATH, L);
 
-// ── NEW: single-mount data roots (defaults to /data/{vector,raster})
-const DATA_DIR   = process.env.DATA_DIR   || "/data";
-const RASTER_DIR = process.env.RASTER_DIR || path.join(DATA_DIR, "raster");
-const VECTOR_DIR = process.env.VECTOR_DIR || path.join(DATA_DIR, "vector");
+// Ensure data dirs exist
+ensureDir(VECTOR_DIR);
+ensureDir(RASTER_DIR);
+ensureDir(STYLE_DIR);
 
-const STYLE_DIR  = process.env.STYLE_DIR  || path.join(DATA_DIR, "styles");
-const FONT_DIR   = process.env.FONT_DIR   || path.join(__dirname, "assets", "fonts");
-
-// STYLE_PATH: either explicit env override (abs or relative), or /data/styles/style.json
-const STYLE_PATH = (() => {
-  const envPath = process.env.STYLE_PATH;
-  if (envPath) return path.isAbsolute(envPath) ? envPath : path.resolve(process.cwd(), envPath);
-  return path.join(STYLE_DIR, "style.json");
-})();
-
-// Baked style bundled in the image
+// after ensureDir(VECTOR_DIR/RASTER_DIR/STYLE_DIR) in server.js
 const BAKED_STYLE = path.join(__dirname, "styles", "style.json");
-
-// Where raster tiles are written/read
-const rasterRoot = RASTER_DIR;
-// Where vector PBFs live
-const vectorRoot = VECTOR_DIR;
-
-// Seed editable style once, then require it
-process.umask(0o002);
-
 try {
-  // Ensure dirs exist (style dir and parent of STYLE_PATH, in case STYLE_PATH is custom)
-  fs.mkdirSync(STYLE_DIR, { recursive: true });
-  fs.mkdirSync(path.dirname(STYLE_PATH), { recursive: true });
-
   if (!fs.existsSync(STYLE_PATH)) {
     if (!fs.existsSync(BAKED_STYLE)) {
-      console.error(`[BOOT] FATAL: baked style missing at ${BAKED_STYLE}`);
+      L.err("SEED", `baked style missing at ${BAKED_STYLE}`);
       process.exit(1);
     }
     fs.copyFileSync(BAKED_STYLE, STYLE_PATH);
-    console.warn(`[SEED] missing style; seeded editable at ${STYLE_PATH}`);
-  }
-
-  // Hard-enforce editable path only
-  if (!fs.existsSync(STYLE_PATH)) {
-    console.error(`[BOOT] FATAL: editable style missing at ${STYLE_PATH}`);
-    process.exit(1);
+    L.warn("SEED", `missing style; seeded editable at ${STYLE_PATH}`);
   }
 } catch (e) {
-  console.error(`[BOOT] FATAL: style seeding/validation failed: ${e?.message || e}`);
+  L.err("SEED", `style seeding failed: ${e.message}`);
   process.exit(1);
 }
 
-const PUID = parseInt(process.env.PUID || '99', 10);   // Unraid default: nobody
-const PGID = parseInt(process.env.PGID || '100', 10);  // Unraid default: users
-
-function fixPerms(p) {
-  try { fs.chownSync(p, PUID, PGID); } catch {}
-  try {
-    const st = fs.statSync(p);
-    const mode = st.isDirectory() ? 0o775 : 0o664;
-    fs.chmodSync(p, mode);
-    if (st.isDirectory()) for (const n of fs.readdirSync(p)) fixPerms(path.join(p, n));
-  } catch {}
+// ── Upstream vector-tile URL builder (QLD) ─────────────────────────────────────
+// NOTE: QLD endpoint expects Z / Y / X order for vector tiles
+function qldUpstream(z, x, y) {
+  return `https://spatial.information.qld.gov.au/arcgis/rest/services/Hosted/Basemaps_QldBase_Topographic/VectorTileServer/tile/${z}/${y}/${x}.pbf`;
 }
 
-fixPerms(STYLE_DIR);
-process.env.STYLE_PATH = STYLE_PATH;  // <-- export for children
-process.env.FONT_DIR   = FONT_DIR;    // <-- export for children
-
-// Vector PBF Endpoint (QTopo 1m Official)
-const VECTOR_BASE_URL =
-  process.env.VECTOR_BASE_URL ||
-  "https://spatial.information.qld.gov.au/arcgis/rest/services/Hosted/Basemaps_QldBase_Topographic/VectorTileServer/tile";
-
-// Networking
-const PBF_FETCH_TIMEOUT_MS = Number(process.env.PBF_FETCH_TIMEOUT_MS || 10000);
-
-// Transparent blank PNG 
-const BLANK_TILE_PATH = process.env.BLANK_TILE_PATH || path.join(__dirname, "assets", "images", "blank.png");
-const ERROR_TILE_PATH = process.env.ERROR_TILE_PATH || path.join(__dirname, "assets", "images", "error.png");
-const CACHE_BLANK_TILES = process.env.CACHE_BLANK_TILES !== "0";
-
-// ─────────────────────────────────────────────────────────────
-// Cleanup settings
-// ─────────────────────────────────────────────────────────────
-// Enabled by default; set CLEANUP_ENABLED=0 to disable
-const CLEANUP_ENABLED = process.env.CLEANUP_ENABLED !== "0";
-const CLEANUP_INTERVAL_MINUTES = Number(process.env.CLEANUP_INTERVAL_MINUTES || 15);
-const RASTER_TTL_HOURS = Number(process.env.RASTER_TTL_HOURS || 1);   // default 1h
-const VECTOR_TTL_HOURS = Number(process.env.VECTOR_TTL_HOURS || 0);   // default ∞
-// Safety: cap deletions per run (0 = unlimited)
-const CLEANUP_MAX_DELETES = Number(process.env.CLEANUP_MAX_DELETES || 0);
-
-// ─────────────────────────────────────────────────────────────
-// Small utils
-// ─────────────────────────────────────────────────────────────
-const isNonNegInt = (v) => /^\d+$/.test(String(v));
-
-// 0 (or negative) means Infinity (never delete)
-const toMsOrInfinity = (h) => (h > 0 ? h * 3600 * 1000 : Infinity);
-
-function zxysToStrings(z, x, y) {
-  if (!isNonNegInt(z) || !isNonNegInt(x) || !isNonNegInt(y)) {
-    throw new Error("z/x/y must be non-negative integers");
-  }
-  return [String(z), String(x), String(y)];
-}
-
-async function ensureDir(p) {
-  await fs.promises.mkdir(p, { recursive: true });
-}
-
-function fileExistsNonEmpty(p) {
-  try {
-    const st = fs.statSync(p);
-    return st.isFile() && st.size > 0;
-  } catch {
-    return false;
-  }
-}
-
-function setTileHeaders(res) {
-  res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-}
-
-function sendTileFile(res, absPath) {
-  setTileHeaders(res);
-  return res.sendFile(absPath);
-}
-
-// 1×1 transparent PNG fallback if blank.png missing
-const FALLBACK_BLANK_TILE_BASE64 =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==";
-
-async function ensureBlankTilePresent() {
-  if (fileExistsNonEmpty(BLANK_TILE_PATH)) return;
-  await ensureDir(path.dirname(BLANK_TILE_PATH));
-  await fs.promises.writeFile(
-    BLANK_TILE_PATH,
-    Buffer.from(FALLBACK_BLANK_TILE_BASE64, "base64")
-  );
-  console.log(`[INIT] Created fallback blank tile at ${BLANK_TILE_PATH}`);
-}
-
-async function writeBlankTile(tilePath, reason = "") {
-  await ensureBlankTilePresent();
-  await ensureDir(path.dirname(tilePath));
-  try {
-    await fs.promises.copyFile(BLANK_TILE_PATH, tilePath);
-    console.log(`[BLANK-TILE] Wrote transparent tile -> ${tilePath}${reason ? " (" + reason + ")" : ""}`);
-  } catch (e) {
-    console.error(`[BLANK-TILE] Cache copy failed: ${e.message}`);
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Fetch/ensure Vector PBF (dedup inflight)
-// ─────────────────────────────────────────────────────────────
-const inflightPbf = new Map(); // key = "z/x/y"
-
-async function ensureVectorTile(z, x, y) {
-  const [zStr, xStr, yStr] = zxysToStrings(z, x, y);
-  const pbfPath = path.join(vectorRoot, zStr, xStr, `${yStr}.pbf`);
-  const key = `${zStr}/${xStr}/${yStr}`;
-
-  if (fileExistsNonEmpty(pbfPath)) {
-    console.log(`[PBF] Exists: ${pbfPath}`);
-    return pbfPath;
-  }
-
-  if (inflightPbf.has(key)) {
-    console.log(`[PBF] Awaiting in-flight download: ${key}`);
-    return inflightPbf.get(key);
-  }
-
-  const prom = (async () => {
-    const url = `${VECTOR_BASE_URL}/${zStr}/${yStr}/${xStr}.pbf`; // …/tile/{z}/{y}/{x}.pbf
-    console.log(`[PBF-GET] /${zStr}/${xStr}/${yStr}/ ${url}`);
-
-    await ensureDir(path.dirname(pbfPath));
-
-    const ac = new AbortController();
-    const tm = setTimeout(() => ac.abort(), PBF_FETCH_TIMEOUT_MS);
-    try {
-      const resp = await fetch(url, { signal: ac.signal });
-      if (!resp.ok) {
-        const err = new Error(`HTTP ${resp.status}`);
-        err.status = resp.status;
-        throw err;
-      }
-      const buf = Buffer.from(await resp.arrayBuffer());
-
-      // zero-byte PBF => treat as "no data"
-      if (!buf.length) {
-        const err = new Error("PBF empty");
-        err.code = "EMPTY_PBF";
-        throw err;
-      }
-
-      await fs.promises.writeFile(pbfPath, buf);
-      console.log(`[PBF] Saved: ${pbfPath} (${buf.length} bytes)`);
-      return pbfPath;
-    } finally {
-      clearTimeout(tm);
-    }
-  })();
-
-  inflightPbf.set(key, prom);
-  try {
-    const result = await prom;
-    return result;
-  } catch (e) {
-    // Avoid double logging: let caller WARN on EMPTY_PBF; only ERROR here for real failures.
-    if (e?.code !== 'EMPTY_PBF') {
-      console.error(`[PBF-ERR] ${key}: ${e && e.message ? e.message : e}`);
-    }
-    try {
-      if (fs.existsSync(pbfPath) && fs.statSync(pbfPath).size === 0) fs.unlinkSync(pbfPath);
-    } catch {}
-    throw e;
-  } finally {
-    inflightPbf.delete(key);
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-/** Render (dedupe inflight) */
-// ─────────────────────────────────────────────────────────────
-const inflightRaster = new Map(); // key = "z/x/y"
-
-async function renderSingleTile(z, x, y) {
-  const [zStr, xStr, yStr] = zxysToStrings(z, x, y);
-  const tilePath = path.join(rasterRoot, zStr, xStr, `${yStr}.png`);
-  const key = `${zStr}/${xStr}/${yStr}`;
-
-  if (fileExistsNonEmpty(tilePath)) return tilePath;
-
-  if (inflightRaster.has(key)) {
-    console.log(`[RDR] Awaiting in-flight render: ${key}`);
-    return inflightRaster.get(key);
-  }
-
-  const prom = new Promise((resolve, reject) => {
-    console.log(`[RDR] Generating tile: ${tilePath}`);
-    const nodeBin = process.execPath; // ← use the current Node binary
-    const child = spawn(
-      nodeBin,
-      ["render_worker.js", "-z", zStr, "-x1", xStr, "-x2", xStr, "-y1", yStr, "-y2", yStr],
-      {
-        cwd: __dirname,
-        env: {
-          ...process.env,           // carries DISPLAY, DATA_DIR, etc.
-          // STYLE_PATH,               // ensure the worker sees the editable style
-          PATH: `${path.dirname(nodeBin)}:${process.env.PATH || ""}`
-        },
-        stdio: "pipe"
-      }
-    );
-
-    // Standardize child logging (no functional change)
-    child.stdout.on("data", (d) => {
-      const line = String(d).trimEnd();
-      if (line) console.log(`[RDR-W] ${line}`);
-    });
-    child.stderr.on("data", (d) => {
-      const line = String(d).trimEnd();
-      if (line) console.error(`[RDR-W] ${line}`);
-    });
-
-    child.on("error", (err) => reject(err));
-    child.on("close", (code) => {
-      if (code === 0 && fileExistsNonEmpty(tilePath)) {
-        // console.log(`[RDR] Rendered: ${tilePath}`);
-        resolve(tilePath);
-      } else {
-        reject(new Error(`render_worker exited ${code}`));
-      }
-    });
-  });
-
-  inflightRaster.set(key, prom);
-  try {
-    const result = await prom;
-    return result;
-  } finally {
-    inflightRaster.delete(key);
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Routes
-// ─────────────────────────────────────────────────────────────
-app.get("/healthz", (_req, res) => res.status(200).send("ok"));
-
-// Serve the active style (baked into the image)
-app.get('/style.json', (req, res) => {
-  const fs = require('fs');
-  const path = require('path');
-  const origin = `${req.protocol}://${req.get('host')}`;
-
-  const ensureAbs = u => /^https?:\/\//.test(u) ? u : origin + (u.startsWith('/') ? u : '/' + u);
-
-  const raw = fs.readFileSync(STYLE_PATH, 'utf8');
-  const style = JSON.parse(raw);
-
-  style.glyphs = ensureAbs(style.glyphs || '/fonts/{fontstack}/{range}.pbf');
-
-  if (style.sources) {
-    for (const src of Object.values(style.sources)) {
-      if (Array.isArray(src.tiles)) src.tiles = src.tiles.map(ensureAbs);
-    }
-  }
-
-  res.type('application/json; charset=utf-8').send(style);
+// ── Middleware: basic request log (compact) ────────────────────────────────────
+app.use((req, _res, next) => {
+  // Express's req.ip respects proxy headers if trust proxy is set; here we keep raw-ish
+  L.log("REQ", `${req.method} ${req.url} from ${req.headers["x-forwarded-for"] || req.socket.remoteAddress || "?"}`);
+  next();
 });
 
-app.use('/fonts', express.static(FONT_DIR));
+// ── Fonts: serve from current FONT_DIR ─────────────────────────────────────────
+app.use("/fonts", express.static(FONT_DIR));
 
-// Legacy Redirect
-app.get('/tiles_raster/:z/:x/:y.png', (req, res) => {
-  const { z, x, y } = req.params;
-  const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
-  return res.redirect(308, `/raster/${z}/${x}/${y}.png${qs}`);
-});
-
-// Serve Raster Tiles
-app.get("/raster/:z/:x/:y.png", async (req, res) => {
-  const { z, x, y } = req.params;
-  console.log(`[REQ] GET /raster/${z}/${x}/${y}.png`);
-
-  let zStr, xStr, yStr;
+// ── Style: serve editable style, make glyphs/tiles absolute to this origin ─────
+app.get("/style.json", (_req, res) => {
   try {
-    [zStr, xStr, yStr] = zxysToStrings(z, x, y);
-  } catch (e) {
-    console.error(`[REQ-ERR] Bad z/x/y: ${e.message}`);
-    // Return a blank to keep downloaders happy, even on bad input
-    await ensureBlankTilePresent();
-    return sendTileFile(res, BLANK_TILE_PATH);
-  }
+    const origin = `${res.req.protocol}://${res.req.get("host")}`;
+    const ensureAbs = (u) => /^https?:\/\//i.test(u) ? u : origin + (u.startsWith("/") ? u : `/${u}`);
 
-  const tilePath = path.join(rasterRoot, zStr, xStr, `${yStr}.png`);
+    const raw = fs.readFileSync(STYLE_PATH, "utf8");
+    const style = JSON.parse(raw);
 
-  // Serve cached raster if present
-  if (fileExistsNonEmpty(tilePath)) {
-    console.log(`[CACHE] ${tilePath}`);
-    return sendTileFile(res, tilePath);
-  }
+    // glyphs (default to /fonts/... if missing)
+    style.glyphs = ensureAbs(style.glyphs || "/fonts/{fontstack}/{range}.pbf");
 
-  // Ensure prerequisite vector PBF (or serve blank if empty/fails)
-  try {
-    await ensureVectorTile(zStr, xStr, yStr);
-  } catch (e) {
-    if (e?.code === "EMPTY_PBF") {
-      console.warn(`[PBF] ${zStr}/${xStr}/${yStr}: empty from upstream; serving blank`);
-    } else {
-      console.error(`[PBF] ${zStr}/${xStr}/${yStr}: ${e?.message || e}; serving blank`);
-    }
-
-    const reason = e?.code === "EMPTY_PBF" ? "EMPTY PBF" : `PBF FAIL ${e?.status || ""}`.trim();
-    if (CACHE_BLANK_TILES) {
-      await writeBlankTile(tilePath, reason);
-      return sendTileFile(res, tilePath);
-    } else {
-      await ensureBlankTilePresent();
-      return sendTileFile(res, BLANK_TILE_PATH);
-    }
-  }
-
-  // Render and serve
-  try {
-    const out = await renderSingleTile(zStr, xStr, yStr);
-    return sendTileFile(res, out);
-  } catch (e) {
-    console.error(`[ERR] Rendering failed for ${zStr}/${xStr}/${yStr}: ${e.message || e}`);
-    // Serve error.png on render errors
-    return sendTileFile(res, ERROR_TILE_PATH);
-  }
-});
-
-// Serve vector tiles with download-on-miss: /vector/:z/:x/:y.pbf
-app.get("/vector/:z/:x/:y.pbf", async (req, res) => {
-  const { z, x, y } = req.params;
-  console.log(`[REQ] GET /vector/${z}/${x}/${y}.pbf`);
-
-  let zStr, xStr, yStr;
-  try {
-    [zStr, xStr, yStr] = zxysToStrings(z, x, y);
-  } catch (e) {
-    console.error(`[REQ-ERR] Bad z/x/y: ${e.message}`);
-    return res.status(400).send('bad z/x/y');
-  }
-
-  const pbfPath = path.join(vectorRoot, zStr, xStr, `${yStr}.pbf`);
-
-  try {
-    await ensureVectorTile(zStr, xStr, yStr);     // may throw with e.code = 'EMPTY_PBF'
-  } catch (e) {
-    const status = e?.code === 'EMPTY_PBF' ? 204 : (e?.status || 502);
-
-    if (e?.code === 'EMPTY_PBF') {
-      // boundary/no-data is an expected condition → WARN (yellow) or silence
-      console.warn(`[PBF] ${zStr}/${xStr}/${yStr}: empty from upstream; returning ${status}`);
-      // If you want total silence for empty tiles, comment the line above.
-    } else {
-      // real failure → ERR (red)
-      console.error(`[PBF-ERR] ${zStr}/${xStr}/${yStr}: ${e?.message || e}; returning ${status}`);
-    }
-
-    return res.status(status).end();
-  }
-
-  try {
-    // peek first 2 bytes for gzip magic 1F 8B and set headers
-    let first2 = Buffer.alloc(2);
-    try {
-      const fd = fs.openSync(pbfPath, 'r');
-      fs.readSync(fd, first2, 0, 2, 0);
-      fs.closeSync(fd);
-    } catch {}
-
-    res.setHeader('Content-Type', 'application/x-protobuf');
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    if (first2[0] === 0x1f && first2[1] === 0x8b) {
-      res.setHeader('Content-Encoding', 'gzip');
-    }
-    return res.sendFile(pbfPath);
-  } catch (e) {
-    console.error(`[PBF-SEND-ERR] ${pbfPath}: ${e.message || e}`);
-    return res.status(500).end();
-  }
-});
-
-// Optional tiny logger for the root
-app.use((req, _res, next) => { if (req.path === '/') console.log('[INFO] Serving index.html'); next(); });
-
-// Serve the viewer and assets from /public (handles /, /index.html, /main.js, etc.)
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Raster viewer (index) at /raster
-app.get('/raster', (req, res) => {
-  try {
-    // optional: simple log line in your standard format
-    console.log(`[LOG] [${new Date().toISOString()}] [REQ]: GET /raster (viewer)`);
-
-    res.type('html').sendFile(path.join(__dirname, 'public', 'index_raster.html'));
-  } catch (e) {
-    console.error(`[ERR] [${new Date().toISOString()}] [SYS]: Failed to serve raster viewer: ${e.message}`);
-    res.status(500).send('Raster viewer unavailable');
-  }
-});
-
-// ─────────────────────────────────────────────────────────────
-// Cleanup helpers
-// ─────────────────────────────────────────────────────────────
-async function cleanupOldFiles(rootDir, ttlMs, allowedExts, exclusions = new Set()) {
-  if (!Number.isFinite(ttlMs)) return 0; // TTL=∞ → do nothing
-  const now = Date.now();
-  let deleted = 0;
-  const stack = [rootDir];
-
-  while (stack.length) {
-    const dir = stack.pop();
-    let entries;
-    try {
-      entries = await fs.promises.readdir(dir, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-
-    for (const ent of entries) {
-      const p = path.join(dir, ent.name);
-      if (exclusions.has(p)) continue;
-
-      if (ent.isDirectory()) {
-        stack.push(p);
-        continue;
-      }
-
-      const ext = path.extname(ent.name).toLowerCase();
-      if (!allowedExts.has(ext)) continue;
-
-      try {
-        const st = await fs.promises.stat(p);
-        if (!st.isFile()) continue;
-
-        if (now - st.mtimeMs > ttlMs) {
-          await fs.promises.unlink(p);
-          deleted++;
-          if (CLEANUP_MAX_DELETES > 0 && deleted >= CLEANUP_MAX_DELETES) break;
+    // sources.tiles → absolute
+    if (style.sources) {
+      for (const src of Object.values(style.sources)) {
+        if (Array.isArray(src.tiles)) {
+          src.tiles = src.tiles.map(ensureAbs);
         }
-      } catch (e) {
-        console.error(`[CLEANUP] Failed to Delete ${p}: ${e.message}`);
       }
     }
 
-    if (CLEANUP_MAX_DELETES > 0 && deleted >= CLEANUP_MAX_DELETES) break;
-
-    // Best-effort: prune empty dirs (but never remove the root itself)
-    try {
-      const left = await fs.promises.readdir(dir);
-      if (left.length === 0 && dir !== rootDir) {
-        await fs.promises.rmdir(dir);
-      }
-    } catch {}
-  }
-
-  return deleted;
-}
-
-// ─────────────────────────────────────────────────────────────
-// Scheduled cleanup (defer overlaps; skip ∞ TTL trees)
-// ─────────────────────────────────────────────────────────────
-let cleanupTimer = null;
-let cleanupRunning = false;
-let cleanupPending = false;
-const intervalMs = Math.max(1, CLEANUP_INTERVAL_MINUTES) * 60 * 1000;
-
-async function runCleanupOnce(reason = "scheduled") {
-  if (!CLEANUP_ENABLED) return;
-
-  // if one is in progress, queue a single follow-up pass
-  if (cleanupRunning) {
-    cleanupPending = true;
-    console.log(`[CLEANUP] Deferred (${reason}); another pass is already running`);
-    return;
-  }
-
-  cleanupRunning = true;
-
-  const rasterTTL = toMsOrInfinity(RASTER_TTL_HOURS); // 0 → Infinity
-  const vectorTTL = toMsOrInfinity(VECTOR_TTL_HOURS); // 0 → Infinity
-  const rasterTTLDesc = Number.isFinite(rasterTTL) ? `${RASTER_TTL_HOURS}h` : "∞";
-  const vectorTTLDesc = Number.isFinite(vectorTTL) ? `${VECTOR_TTL_HOURS}h` : "∞";
-
-  const start = Date.now();
-  console.log(`[CLEANUP] Start (${reason})  raster TTL=${rasterTTLDesc}, vector TTL=${vectorTTLDesc}`);
-
-  const exclusions = new Set([BLANK_TILE_PATH]);
-
-  try {
-    let delRaster = 0, delVector = 0;
-
-    if (Number.isFinite(rasterTTL)) {
-      delRaster = await cleanupOldFiles(rasterRoot, rasterTTL, new Set([".png"]), exclusions);
-    } else {
-      console.log("[CLEANUP] Skipping raster tree (TTL=∞)");
-    }
-
-    if (Number.isFinite(vectorTTL)) {
-      delVector = await cleanupOldFiles(vectorRoot, vectorTTL, new Set([".pbf"]), exclusions);
-    } else {
-      console.log("[CLEANUP] Skipping vector tree (TTL=∞)");
-    }
-
-    console.log(`[CLEANUP] Done in ${Date.now() - start} ms  deleted: raster=${delRaster}, vector=${delVector}`);
+    res.type("application/json; charset=utf-8").send(style);
   } catch (e) {
-    console.error(`[CLEANUP] Error: ${e.message || e}`);
-  } finally {
-    cleanupRunning = false;
+    L.err("SYS", `style.json error: ${e.message}`);
+    res.status(500).send("style error");
+  }
+});
 
-    // if a pass was requested while we worked, run again immediately once
-    if (cleanupPending) {
-      cleanupPending = false;
-      setImmediate(() => runCleanupOnce("pending"));
+// ── Vector tile route: GET /vector/:z/:x/:y.pbf  (download-on-miss) ────────────
+app.get("/vector/:z(\\d+)/:x(\\d+)/:y(\\d+).pbf", async (req, res) => {
+  const z = Number(req.params.z), x = Number(req.params.x), y = Number(req.params.y);
+  try {
+    const r = await ensureVectorTile(z, x, y, {
+      vectorDir: VECTOR_DIR,
+      upstreamUrlBuilder: qldUpstream,
+      L,
+    });
+
+    if (r.status === "empty") {
+      // 204 to keep MapLibre quiet (no body)
+      res.status(204).end();
       return;
     }
 
-    // otherwise schedule the next pass relative to completion time
-    cleanupTimer = setTimeout(() => runCleanupOnce("timer"), intervalMs);
-    cleanupTimer.unref?.();
-    console.log(`[CLEANUP] Next pass in ${Math.round(intervalMs / 60000)} min`);
+    // OK
+    res.setHeader("Content-Type", "application/x-protobuf");
+    res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=600");
+    fs.createReadStream(r.path).pipe(res);
+  } catch (err) {
+    L.err("PBF-ERR", `${z}/${x}/${y}: ${err.message}`);
+    res.status(502).send("upstream error");
+  }
+});
+
+// ── Raster route: GET /raster/:z/:x/:y.png  (cache-or-render) ──────────────────
+app.get("/raster/:z(\\d+)/:x(\\d+)/:y(\\d+).png", async (req, res) => {
+  const z = Number(req.params.z), x = Number(req.params.x), y = Number(req.params.y);
+  const outDir  = path.join(RASTER_DIR, String(z), String(x));
+  const outPath = path.join(outDir, `${y}.png`);
+
+  try {
+    // cache hit
+    if (fileExistsNonEmpty(outPath)) {
+      setTileHeaders(res);
+      return fs.createReadStream(outPath).pipe(res);
+    }
+
+    // ensure vector tile (download if missing)
+    const pbf = await ensureVectorTile(z, x, y, {
+      vectorDir: VECTOR_DIR,
+      upstreamUrlBuilder: qldUpstream,
+      L,
+    });
+
+    // empty PBF -> write/send blank
+    if (pbf.status === "empty") {
+      writeBlankTile(outPath, BLANK_TILE_PATH);
+      setTileHeaders(res);
+      return fs.createReadStream(outPath).pipe(res);
+    }
+
+    // render via worker
+    const renderedPath = await renderSingleTile(z, x, y, {
+      rasterDir: RASTER_DIR,
+      STYLE_PATH,
+      FONT_DIR,
+      L,
+    });
+
+    setTileHeaders(res);
+    fs.createReadStream(renderedPath).pipe(res);
+  } catch (err) {
+    L.err("RDR", `fail ${z}/${x}/${y}: ${err.message}`);
+    // fall back to blank
+    try {
+      writeBlankTile(outPath, BLANK_TILE_PATH);
+      setTileHeaders(res);
+      fs.createReadStream(outPath).pipe(res);
+    } catch {
+      res.status(500).send("render failed");
+    }
+  }
+});
+
+// ── Legacy redirects (compat) ──────────────────────────────────────────────────
+app.get("/tiles_raster/:z(\\d+)/:x(\\d+)/:y(\\d+).png", (req, res) => {
+  const { z, x, y } = req.params;
+  const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+  res.redirect(302, `/raster/${z}/${x}/${y}.png${qs}`);
+});
+app.get("/tiles_vector/:z(\\d+)/:x(\\d+)/:y(\\d+).pbf", (req, res) => {
+  const { z, x, y } = req.params;
+  const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+  res.redirect(302, `/vector/${z}/${x}/${y}.pbf${qs}`);
+});
+
+// ── Static: viewers & assets ───────────────────────────────────────────────────
+app.use(express.static(path.join(__dirname, "public"))); // / → vector viewer
+app.get("/raster", (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index_raster.html"));
+});
+
+// Health
+app.get("/healthz", (_req, res) => res.type("text/plain").send("ok"));
+
+// ── TTL Cleanup (simple, non-overlapping) ──────────────────────────────────────
+let cleanupRunning = false;
+function fileIsOld(full, ttlHours) {
+  try {
+    if (!Number.isFinite(ttlHours)) return false; // Infinity => skip
+    const st = fs.statSync(full);
+    if (!st.isFile()) return false;
+    const ageMs = Date.now() - st.mtimeMs;
+    return ageMs > ttlHours * 3600 * 1000;
+  } catch { return false; }
+}
+function pruneEmptyDirs(root) {
+  try {
+    const entries = fs.readdirSync(root, { withFileTypes: true });
+    for (const e of entries) {
+      const p = path.join(root, e.name);
+      if (e.isDirectory()) {
+        pruneEmptyDirs(p);
+        try {
+          if (fs.readdirSync(p).length === 0) fs.rmdirSync(p);
+        } catch {}
+      }
+    }
+  } catch {}
+}
+async function runCleanupOnce(trigger = "scheduled") {
+  if (cleanupRunning) return;
+  cleanupRunning = true;
+  const t0 = Date.now();
+  try {
+    const deleted = { raster: 0, vector: 0 };
+
+    // Raster
+    if (Number.isFinite(RASTER_TTL_HOURS)) {
+      const walk = (dir) => {
+        for (const name of fs.readdirSync(dir)) {
+          const p = path.join(dir, name);
+          const st = fs.statSync(p);
+          if (st.isDirectory()) walk(p);
+          else if (fileIsOld(p, RASTER_TTL_HOURS)) {
+            try { fs.unlinkSync(p); deleted.raster++; } catch {}
+          }
+        }
+      };
+      try { walk(RASTER_DIR); pruneEmptyDirs(RASTER_DIR); } catch {}
+    }
+
+    // Vector (skip if ∞)
+    if (Number.isFinite(VECTOR_TTL_HOURS)) {
+      const walk = (dir) => {
+        for (const name of fs.readdirSync(dir)) {
+          const p = path.join(dir, name);
+          const st = fs.statSync(p);
+          if (st.isDirectory()) walk(p);
+          else if (fileIsOld(p, VECTOR_TTL_HOURS)) {
+            try { fs.unlinkSync(p); deleted.vector++; } catch {}
+          }
+        }
+      };
+      try { walk(VECTOR_DIR); pruneEmptyDirs(VECTOR_DIR); } catch {}
+    }
+
+    const dt = Date.now() - t0;
+    L.log("CLEANUP", `Done in ${dt} ms  deleted: raster=${deleted.raster}, vector=${deleted.vector}`);
+  } catch (e) {
+    L.err("CLEANUP", e.stack || e.message);
+  } finally {
+    cleanupRunning = false;
   }
 }
-
 function scheduleCleanup() {
-  if (!CLEANUP_ENABLED) {
-    console.log("[CLEANUP] Disabled");
-    return;
-  }
-  console.log(`[CLEANUP] Scheduled every ${CLEANUP_INTERVAL_MINUTES} min`);
-  // kick an initial pass; subsequent runs self-schedule
-  cleanupTimer = setTimeout(() => runCleanupOnce("initial"), 5000);
-  cleanupTimer.unref?.();
+  L.log("CLEANUP", "Scheduled every 15 min");
+  setInterval(() => runCleanupOnce("scheduled"), 15 * 60 * 1000);
+  // kick once at boot
+  setTimeout(() => runCleanupOnce("initial"), 1000);
 }
-
-// start scheduler once at boot
 scheduleCleanup();
 
-// graceful shutdown
-process.on("SIGTERM", () => { if (cleanupTimer) clearTimeout(cleanupTimer); });
-process.on("SIGINT",  () => { if (cleanupTimer) clearTimeout(cleanupTimer); });
+// ── Start server ───────────────────────────────────────────────────────────────
+app.listen(PORT, "0.0.0.0", () => {
+  L.sys(`Tile server running on http://0.0.0.0:${PORT}`);
+  L.log("INIT", `VECTOR_DIR=${VECTOR_DIR}`);
+  L.log("INIT", `RASTER_DIR=${RASTER_DIR}`);
+  L.log("INIT", `STYLE_DIR=${STYLE_DIR}`);
+  L.log("INIT", `STYLE_PATH=${STYLE_PATH}`);
+});#!/usr/bin/env node
+// server.js
+const express = require("express");
+const fs = require("fs");
+const path = require("path");
 
-// ─────────────────────────────────────────────────────────────
-app.listen(PORT, HOST, () => {
-  console.log(`[INIT] VECTOR_DIR=${VECTOR_DIR}`);
-  console.log(`[INIT] RASTER_DIR=${RASTER_DIR}`);
-  console.log(`[INIT] Tile Server Running on http://${HOST}:${PORT}`);
+// ── Logging (UTC, colored) ─────────────────────────────────────────────────────
+const L = require("./lib/logger");
+
+// ── Config (paths, TTLs, env export for worker) ────────────────────────────────
+const {
+  DATA_DIR, RASTER_DIR, VECTOR_DIR,
+  STYLE_DIR, STYLE_PATH,
+  FONT_DIR,
+  RASTER_TTL_HOURS, VECTOR_TTL_HOURS
+} = require("./lib/config");
+
+// ── Utilities (dirs, tiles, blank) ─────────────────────────────────────────────
+const {
+  ensureDir,
+  fileExistsNonEmpty,
+  setTileHeaders,
+  sendTileFile,
+  ensureBlankTilePresent,
+  writeBlankTile,
+} = require("./lib/utils");
+
+// ── PBF ensure + Render (worker spawn wrapper) ─────────────────────────────────
+const { ensureVectorTile } = require("./lib/pbf");
+const { renderSingleTile } = require("./lib/render");
+
+// ── Constants ──────────────────────────────────────────────────────────────────
+const PORT = Number(process.env.PORT || 8080);
+const app = express();
+
+// Fallback blank (1x1 transparent), ensure it exists
+const BLANK_TILE_PATH = process.env.BLANK_TILE_PATH || path.join(__dirname, "assets", "images", "blank.png");
+ensureBlankTilePresent(BLANK_TILE_PATH, L);
+
+// Ensure data dirs exist
+ensureDir(VECTOR_DIR);
+ensureDir(RASTER_DIR);
+ensureDir(STYLE_DIR);
+
+// ── Upstream vector-tile URL builder (QLD) ─────────────────────────────────────
+// NOTE: QLD endpoint expects Z / Y / X order for vector tiles
+function qldUpstream(z, x, y) {
+  return `https://spatial.information.qld.gov.au/arcgis/rest/services/Hosted/Basemaps_QldBase_Topographic/VectorTileServer/tile/${z}/${y}/${x}.pbf`;
+}
+
+// ── Middleware: basic request log (compact) ────────────────────────────────────
+app.use((req, _res, next) => {
+  // Express's req.ip respects proxy headers if trust proxy is set; here we keep raw-ish
+  L.log("REQ", `${req.method} ${req.url} from ${req.headers["x-forwarded-for"] || req.socket.remoteAddress || "?"}`);
+  next();
+});
+
+// ── Fonts: serve from current FONT_DIR ─────────────────────────────────────────
+app.use("/fonts", express.static(FONT_DIR));
+
+// ── Style: serve editable style, make glyphs/tiles absolute to this origin ─────
+app.get("/style.json", (_req, res) => {
+  try {
+    const origin = `${res.req.protocol}://${res.req.get("host")}`;
+    const ensureAbs = (u) => /^https?:\/\//i.test(u) ? u : origin + (u.startsWith("/") ? u : `/${u}`);
+
+    const raw = fs.readFileSync(STYLE_PATH, "utf8");
+    const style = JSON.parse(raw);
+
+    // glyphs (default to /fonts/... if missing)
+    style.glyphs = ensureAbs(style.glyphs || "/fonts/{fontstack}/{range}.pbf");
+
+    // sources.tiles → absolute
+    if (style.sources) {
+      for (const src of Object.values(style.sources)) {
+        if (Array.isArray(src.tiles)) {
+          src.tiles = src.tiles.map(ensureAbs);
+        }
+      }
+    }
+
+    res.type("application/json; charset=utf-8").send(style);
+  } catch (e) {
+    L.err("SYS", `style.json error: ${e.message}`);
+    res.status(500).send("style error");
+  }
+});
+
+// ── Vector tile route: GET /vector/:z/:x/:y.pbf  (download-on-miss) ────────────
+app.get("/vector/:z(\\d+)/:x(\\d+)/:y(\\d+).pbf", async (req, res) => {
+  const z = Number(req.params.z), x = Number(req.params.x), y = Number(req.params.y);
+  try {
+    const r = await ensureVectorTile(z, x, y, {
+      vectorDir: VECTOR_DIR,
+      upstreamUrlBuilder: qldUpstream,
+      L,
+    });
+
+    if (r.status === "empty") {
+      // 204 to keep MapLibre quiet (no body)
+      res.status(204).end();
+      return;
+    }
+
+    // OK
+    res.setHeader("Content-Type", "application/x-protobuf");
+    res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=600");
+    fs.createReadStream(r.path).pipe(res);
+  } catch (err) {
+    L.err("PBF-ERR", `${z}/${x}/${y}: ${err.message}`);
+    res.status(502).send("upstream error");
+  }
+});
+
+// ── Raster route: GET /raster/:z/:x/:y.png  (cache-or-render) ──────────────────
+app.get("/raster/:z(\\d+)/:x(\\d+)/:y(\\d+).png", async (req, res) => {
+  const z = Number(req.params.z), x = Number(req.params.x), y = Number(req.params.y);
+  const outDir  = path.join(RASTER_DIR, String(z), String(x));
+  const outPath = path.join(outDir, `${y}.png`);
+
+  try {
+    // cache hit
+    if (fileExistsNonEmpty(outPath)) {
+      setTileHeaders(res);
+      return fs.createReadStream(outPath).pipe(res);
+    }
+
+    // ensure vector tile (download if missing)
+    const pbf = await ensureVectorTile(z, x, y, {
+      vectorDir: VECTOR_DIR,
+      upstreamUrlBuilder: qldUpstream,
+      L,
+    });
+
+    // empty PBF -> write/send blank
+    if (pbf.status === "empty") {
+      writeBlankTile(outPath, BLANK_TILE_PATH);
+      setTileHeaders(res);
+      return fs.createReadStream(outPath).pipe(res);
+    }
+
+    // render via worker
+    const renderedPath = await renderSingleTile(z, x, y, {
+      rasterDir: RASTER_DIR,
+      STYLE_PATH,
+      FONT_DIR,
+      L,
+    });
+
+    setTileHeaders(res);
+    fs.createReadStream(renderedPath).pipe(res);
+  } catch (err) {
+    L.err("RDR", `fail ${z}/${x}/${y}: ${err.message}`);
+    // fall back to blank
+    try {
+      writeBlankTile(outPath, BLANK_TILE_PATH);
+      setTileHeaders(res);
+      fs.createReadStream(outPath).pipe(res);
+    } catch {
+      res.status(500).send("render failed");
+    }
+  }
+});
+
+// ── Legacy redirects (compat) ──────────────────────────────────────────────────
+app.get("/tiles_raster/:z(\\d+)/:x(\\d+)/:y(\\d+).png", (req, res) => {
+  const { z, x, y } = req.params;
+  const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+  res.redirect(302, `/raster/${z}/${x}/${y}.png${qs}`);
+});
+app.get("/tiles_vector/:z(\\d+)/:x(\\d+)/:y(\\d+).pbf", (req, res) => {
+  const { z, x, y } = req.params;
+  const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+  res.redirect(302, `/vector/${z}/${x}/${y}.pbf${qs}`);
+});
+
+// ── Static: viewers & assets ───────────────────────────────────────────────────
+app.use(express.static(path.join(__dirname, "public"))); // / → vector viewer
+app.get("/raster", (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index_raster.html"));
+});
+
+// Health
+app.get("/healthz", (_req, res) => res.type("text/plain").send("ok"));
+
+// ── TTL Cleanup (simple, non-overlapping) ──────────────────────────────────────
+let cleanupRunning = false;
+function fileIsOld(full, ttlHours) {
+  try {
+    if (!Number.isFinite(ttlHours)) return false; // Infinity => skip
+    const st = fs.statSync(full);
+    if (!st.isFile()) return false;
+    const ageMs = Date.now() - st.mtimeMs;
+    return ageMs > ttlHours * 3600 * 1000;
+  } catch { return false; }
+}
+function pruneEmptyDirs(root) {
+  try {
+    const entries = fs.readdirSync(root, { withFileTypes: true });
+    for (const e of entries) {
+      const p = path.join(root, e.name);
+      if (e.isDirectory()) {
+        pruneEmptyDirs(p);
+        try {
+          if (fs.readdirSync(p).length === 0) fs.rmdirSync(p);
+        } catch {}
+      }
+    }
+  } catch {}
+}
+async function runCleanupOnce(trigger = "scheduled") {
+  if (cleanupRunning) return;
+  cleanupRunning = true;
+  const t0 = Date.now();
+  try {
+    const deleted = { raster: 0, vector: 0 };
+
+    // Raster
+    if (Number.isFinite(RASTER_TTL_HOURS)) {
+      const walk = (dir) => {
+        for (const name of fs.readdirSync(dir)) {
+          const p = path.join(dir, name);
+          const st = fs.statSync(p);
+          if (st.isDirectory()) walk(p);
+          else if (fileIsOld(p, RASTER_TTL_HOURS)) {
+            try { fs.unlinkSync(p); deleted.raster++; } catch {}
+          }
+        }
+      };
+      try { walk(RASTER_DIR); pruneEmptyDirs(RASTER_DIR); } catch {}
+    }
+
+    // Vector (skip if ∞)
+    if (Number.isFinite(VECTOR_TTL_HOURS)) {
+      const walk = (dir) => {
+        for (const name of fs.readdirSync(dir)) {
+          const p = path.join(dir, name);
+          const st = fs.statSync(p);
+          if (st.isDirectory()) walk(p);
+          else if (fileIsOld(p, VECTOR_TTL_HOURS)) {
+            try { fs.unlinkSync(p); deleted.vector++; } catch {}
+          }
+        }
+      };
+      try { walk(VECTOR_DIR); pruneEmptyDirs(VECTOR_DIR); } catch {}
+    }
+
+    const dt = Date.now() - t0;
+    L.log("CLEANUP", `Done in ${dt} ms  deleted: raster=${deleted.raster}, vector=${deleted.vector}`);
+  } catch (e) {
+    L.err("CLEANUP", e.stack || e.message);
+  } finally {
+    cleanupRunning = false;
+  }
+}
+function scheduleCleanup() {
+  L.log("CLEANUP", "Scheduled every 15 min");
+  setInterval(() => runCleanupOnce("scheduled"), 15 * 60 * 1000);
+  // kick once at boot
+  setTimeout(() => runCleanupOnce("initial"), 1000);
+}
+scheduleCleanup();
+
+// ── Start server ───────────────────────────────────────────────────────────────
+app.listen(PORT, "0.0.0.0", () => {
+  L.sys(`Tile server running on http://0.0.0.0:${PORT}`);
+  L.log("INIT", `VECTOR_DIR=${VECTOR_DIR}`);
+  L.log("INIT", `RASTER_DIR=${RASTER_DIR}`);
+  L.log("INIT", `STYLE_DIR=${STYLE_DIR}`);
+  L.log("INIT", `STYLE_PATH=${STYLE_PATH}`);
 });
