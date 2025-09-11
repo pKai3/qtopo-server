@@ -25,6 +25,8 @@ const {
   writeBlankTile,
 } = require("./lib/utils");
 
+const { runCleanupOnce } = require("./lib/cleaner");
+
 // ── PBF ensure + Render (worker spawn wrapper) ─────────────────────────────────
 const { ensureVectorTile } = require("./lib/pbf");
 const { renderSingleTile } = require("./lib/render");
@@ -191,84 +193,22 @@ app.get("/raster", (_req, res) => {
 // Health
 app.get("/healthz", (_req, res) => res.type("text/plain").send("ok"));
 
-// ── TTL Cleanup (simple, non-overlapping) ──────────────────────────────────────
-let cleanupRunning = false;
-function fileIsOld(full, ttlHours) {
-  try {
-    if (!Number.isFinite(ttlHours)) return false; // Infinity => skip
-    const st = fs.statSync(full);
-    if (!st.isFile()) return false;
-    const ageMs = Date.now() - st.mtimeMs;
-    return ageMs > ttlHours * 3600 * 1000;
-  } catch { return false; }
-}
-function pruneEmptyDirs(root) {
-  try {
-    const entries = fs.readdirSync(root, { withFileTypes: true });
-    for (const e of entries) {
-      const p = path.join(root, e.name);
-      if (e.isDirectory()) {
-        pruneEmptyDirs(p);
-        try {
-          if (fs.readdirSync(p).length === 0) fs.rmdirSync(p);
-        } catch {}
-      }
-    }
-  } catch {}
-}
-async function runCleanupOnce(trigger = "scheduled") {
-  if (cleanupRunning) return;
-  cleanupRunning = true;
-  const t0 = Date.now();
-  try {
-    const deleted = { raster: 0, vector: 0 };
 
-    // Raster
-    if (Number.isFinite(RASTER_TTL_HOURS)) {
-      const walk = (dir) => {
-        for (const name of fs.readdirSync(dir)) {
-          const p = path.join(dir, name);
-          const st = fs.statSync(p);
-          if (st.isDirectory()) walk(p);
-          else if (fileIsOld(p, RASTER_TTL_HOURS)) {
-            try { fs.unlinkSync(p); deleted.raster++; } catch {}
-          }
-        }
-      };
-      try { walk(RASTER_DIR); pruneEmptyDirs(RASTER_DIR); } catch {}
-    }
-
-    // Vector (skip if ∞)
-    if (Number.isFinite(VECTOR_TTL_HOURS)) {
-      const walk = (dir) => {
-        for (const name of fs.readdirSync(dir)) {
-          const p = path.join(dir, name);
-          const st = fs.statSync(p);
-          if (st.isDirectory()) walk(p);
-          else if (fileIsOld(p, VECTOR_TTL_HOURS)) {
-            try { fs.unlinkSync(p); deleted.vector++; } catch {}
-          }
-        }
-      };
-      try { walk(VECTOR_DIR); pruneEmptyDirs(VECTOR_DIR); } catch {}
-    }
-
-    const dt = Date.now() - t0;
-    L.log("CLEANUP", `Done in ${dt} ms  deleted: raster=${deleted.raster}, vector=${deleted.vector}`);
-  } catch (e) {
-    L.err("CLEANUP", e.stack || e.message);
-  } finally {
-    cleanupRunning = false;
-  }
-}
+// Run Cleanup
 function scheduleCleanup() {
   L.log("CLEANUP", "Scheduled every 15 min");
-  setInterval(() => runCleanupOnce("scheduled"), 15 * 60 * 1000);
-  // kick once at boot
-  setTimeout(() => runCleanupOnce("initial"), 1000);
-}
-scheduleCleanup();
+  setInterval(() => {
+    // swallow errors to avoid unhandled rejection noise
+    Promise.resolve(runCleanupOnce("scheduled")).catch(() => {});
+  }, 15 * 60 * 1000);
 
+  // kick once shortly after boot
+  setTimeout(() => {
+    Promise.resolve(runCleanupOnce("initial")).catch(() => {});
+  }, 1000);
+}
+
+scheduleCleanup();
 // ── Start server ───────────────────────────────────────────────────────────────
 app.listen(PORT, "0.0.0.0", () => {
   L.sys(`Tile server running on http://0.0.0.0:${PORT}`);
