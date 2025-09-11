@@ -161,7 +161,7 @@ app.get("/raster/:z/:x/:y.png", async (req, res) => {
     setTileHeaders(res);
     fs.createReadStream(renderedPath).pipe(res);
   } catch (err) {
-    L.err("RDR", `fail ${z}/${x}/${y}: ${err.message}`);
+    L.err("RENDER", `Failed on ${z}/${x}/${y}: ${err.message}`);
     try {
       writeBlankTile(outPath, BLANK_TILE_PATH);
       setTileHeaders(res);
@@ -194,26 +194,26 @@ app.get("/raster", (_req, res) => {
 app.get("/healthz", (_req, res) => res.type("text/plain").send("ok"));
 
 
-// Run Cleanup
+// Run Cleanup and Set Schedule
 function scheduleCleanup() {
-  L.log("CLEANUP", "Scheduled every 15 min");
-  setInterval(() => {
-    // swallow errors to avoid unhandled rejection noise
-    Promise.resolve(runCleanupOnce("scheduled")).catch(() => {});
-  }, 15 * 60 * 1000);
+  const h = CLEANER_INTERVAL_HOURS;
 
-  // kick once shortly after boot
-  setTimeout(() => {
-    Promise.resolve(runCleanupOnce("initial")).catch(() => {});
-  }, 1000);
+  if (!Number.isFinite(h)) {
+    L.warn("CLEANUP", "Disabled (CLEANER_INTERVAL_HOURS = ∞)");
+    return;
+  }
+
+  L.log("CLEANUP", `Scheduled Every ${h} h`);
+  setInterval(() => runCleanupOnce("scheduled"), h * 3600 * 1000);
+  setTimeout(() => runCleanupOnce("initial"), 1000);
 }
 
 scheduleCleanup();
 // ── Start server ───────────────────────────────────────────────────────────────
 app.listen(PORT, "0.0.0.0", () => {
   L.sys(`Tile server running on http://0.0.0.0:${PORT}`);
-  L.log("INIT", `VECTOR_DIR=${VECTOR_DIR}`);
-  L.log("INIT", `RASTER_DIR=${RASTER_DIR}`);
-  L.log("INIT", `STYLE_DIR=${STYLE_DIR}`);
-  L.log("INIT", `STYLE_PATH=${STYLE_PATH}`);
+  L.log("INIT", `VECTOR_DIR = ${VECTOR_DIR}`);
+  L.log("INIT", `RASTER_DIR = ${RASTER_DIR}`);
+  L.log("INIT", `STYLE_DIR  = ${STYLE_DIR}`);
+  L.log("INIT", `STYLE_PATH = ${STYLE_PATH}`);
 });
