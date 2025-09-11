@@ -12,7 +12,7 @@ const {
   DATA_DIR, RASTER_DIR, VECTOR_DIR,
   STYLE_DIR, STYLE_PATH,
   FONT_DIR,
-  RASTER_TTL_HOURS, VECTOR_TTL_HOURS
+  CLEANER_INTERVAL_HOURS, RASTER_TTL_HOURS, VECTOR_TTL_HOURS
 } = require("./lib/config");
 
 // ── Utilities (dirs, tiles, blank) ─────────────────────────────────────────────
