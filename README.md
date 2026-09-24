@@ -122,4 +122,4 @@ The live rendering checks depend on public government services. If an upstream s
 
 The bundled NSW style is a snapshot of its published service style, with its source URL recorded in metadata. Existing local styles are never overwritten by an update.
 
-Automatic state selection uses a bundled [ABS ASGS 2021 State and Territory boundary](https://geo.abs.gov.au/arcgis/rest/services/ASGS2021/STE/MapServer/0), simplified to approximately 5 metres and rounded to six decimal places. © Australian Bureau of Statistics, CC BY 4.0. The NSW vector basemap also covers the ACT. The boundary is used to combine map imagery, not as a surveyed boundary.
+Automatic state selection uses the shared QLD–NSW border from the [ABS ASGS 2021 State and Territory boundary](https://geo.abs.gov.au/arcgis/rest/services/ASGS2021/STE/MapServer/0), simplified to approximately 5 metres and rounded to six decimal places. © Australian Bureau of Statistics, CC BY 4.0. The NSW vector basemap also covers the ACT. The shared border is extended across service coverage to retain river and coastal water. It is used to combine map imagery, not as a surveyed boundary.
