@@ -1,0 +1,21 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { createLogBuffer } = require('../lib/log-buffer');
+test('logs are bounded, incremental, plain text, and recover after rollover or restart', () => {
+  const logs = createLogBuffer(3);
+  logs.append('\x1b[31m[ERR]\x1b[0m first');
+  const first = logs.read();
+  assert.equal(first.entries[0].line, '[ERR] first');
+  logs.append('second'); logs.append('third');
+  assert.deepEqual(logs.read(first.next, first.session).entries.map(e => e.line), ['second', 'third']);
+  logs.append('fourth'); logs.append('fifth');
+  const late = logs.read(first.next, first.session);
+  assert.equal(late.truncated, true); assert.equal(late.entries.length, 3);
+  assert.deepEqual(late.entries.map(e => e.line), ['third', 'fourth', 'fifth']);
+  assert.equal(logs.read(late.next, late.session).entries.length, 0);
+  assert.equal(logs.read(999, late.session).reset, true);
+  assert.equal(logs.read(2, 'another-server').reset, true);
+  logs.append('x'.repeat(9000));
+  assert.match(logs.read().entries.at(-1).line, /\[truncated\]$/);
+  assert.ok(logs.read().entries.at(-1).line.length < 8300);
+});

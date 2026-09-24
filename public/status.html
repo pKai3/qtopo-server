@@ -9,25 +9,60 @@
 </head>
 <body>
   <main>
-    <header><div><a class="brand" href="/">QTopo <span>↗ Open map</span></a><h1>Server activity</h1><p>Live tile delivery, rendering and prefetch.</p></div><div class="update"><span id="activity" class="badge">Connecting…</span><p id="updated" role="status">Updates every 0.5 seconds</p></div></header>
+    <header><div><a class="brand" href="/">QTopo <span>↗ Open map</span></a><h1>Server activity</h1><p>Live tile delivery, rendering and prefetch.</p></div><div class="update"><span id="activity" class="badge">Connecting…</span><p id="updated">Updates every 0.25 seconds</p></div></header>
     <p id="error" role="alert" hidden></p>
     <section class="cards" aria-label="Current activity">
       <article><h2>Render workers</h2><strong id="workers">—</strong><p id="workers-detail">Waiting for activity</p><div class="meter" aria-hidden="true"><i id="workers-meter"></i></div></article>
       <article><h2>Served from cache</h2><strong id="hit-rate">—</strong><p id="cache-detail">Successful tile responses</p></article>
-      <article><h2>Waiting to render</h2><strong id="queued">—</strong><p id="queue-detail">Foreground and prefetch</p></article>
+      <article><h2>Tiles waiting</h2><strong id="queued">—</strong><p id="queue-detail">Requested tiles and prefetch</p></article>
       <article><h2>Upstream downloads</h2><strong id="downloads">—</strong><p id="download-detail">Government map resources</p></article>
+    </section>
+    <section class="panel queue-panel" aria-labelledby="queue-heading">
+      <div class="queue-heading"><h2 id="queue-heading">Render queue</h2><p class="hint">Live · refreshes every 0.25 seconds</p></div>
+      <div class="queue-charts">
+        <div class="queue-chart">
+          <div class="stack-heading"><h3>Rendering</h3><span id="rendering-total">— workers busy</span></div>
+          <div id="rendering-stack" class="stack" role="img" aria-label="Waiting for rendering activity">
+            <span id="rendering-requested" class="requested"></span><span id="rendering-neighbours" class="neighbours"></span><span id="rendering-zoom" class="zoom"></span>
+          </div>
+          <ul class="stack-counts" aria-label="Rendering by priority">
+            <li><i class="requested" aria-hidden="true"></i>Requested <strong id="rendering-requested-count">—</strong></li>
+            <li><i class="neighbours" aria-hidden="true"></i>Nearby <strong id="rendering-neighbours-count">—</strong></li>
+            <li><i class="zoom" aria-hidden="true"></i>Zoom <strong id="rendering-zoom-count">—</strong></li>
+          </ul>
+          <p id="rendering-space" class="hint">Grey shows idle workers.</p>
+        </div>
+        <div class="queue-chart">
+          <div class="stack-heading"><h3>Waiting</h3><span id="waiting-total">— tiles waiting</span></div>
+          <div id="waiting-stack" class="stack" role="img" aria-label="Waiting for queue activity">
+            <span id="waiting-requested" class="requested"></span><span id="waiting-neighbours" class="neighbours"></span><span id="waiting-zoom" class="zoom"></span>
+          </div>
+          <ul class="stack-counts" aria-label="Waiting by priority">
+            <li><i class="requested" aria-hidden="true"></i>Requested <strong id="waiting-requested-count">—</strong></li>
+            <li><i class="neighbours" aria-hidden="true"></i>Nearby <strong id="waiting-neighbours-count">—</strong></li>
+            <li><i class="zoom" aria-hidden="true"></i>Zoom <strong id="waiting-zoom-count">—</strong></li>
+          </ul>
+          <p id="waiting-space" class="hint">Grey shows unused queue space.</p>
+        </div>
+      </div>
+      <p class="hint queue-explanation">Requested tiles have first priority, followed by nearby prefetch, then zoom prefetch. Waiting includes all work still to start. Cached tiles bypass rendering; requesting an unfinished prefetch tile moves its render to Requested.</p>
     </section>
     <div class="columns">
       <section class="panel"><h2>Where the time goes</h2><p class="hint">Median is the typical response. 95th percentile shows the slower end.</p>
         <table><thead><tr><th scope="col">Stage</th><th scope="col">Median</th><th scope="col">95th percentile</th></tr></thead><tbody id="timings"></tbody></table>
-        <p class="hint" id="samples">Waiting for timing samples.</p><p class="hint">Ready time ends before the PNG is sent. Response time includes sending it from this server, not Gaia displaying it. Resource waiting and CPU time can overlap; do not add the rows together.</p>
+        <p class="hint" id="samples">Waiting for timing samples.</p><p class="hint">Render queue time measures waiting for a worker, excluding the separate prefetch queue. A zero median means most renders started immediately. Ready time ends before the PNG is sent. Response time includes sending it from this server, not Gaia displaying it. Resource waiting and CPU time can overlap; do not add the rows together.</p>
       </section>
-      <section class="panel"><h2>Work in progress</h2><table><thead><tr><th scope="col">Priority</th><th scope="col">Running</th><th scope="col">Queued</th></tr></thead><tbody id="priorities"></tbody></table>
-        <h3>Prefetch</h3><p id="prefetch">—</p><p id="prefetch-use" class="hint">—</p>
+      <section class="panel"><h2>Prefetch</h2><p id="prefetch">—</p><p id="prefetch-use" class="hint">—</p>
         <h3>This session</h3><dl id="session"></dl>
       </section>
     </div>
     <section class="panel settings"><h2>Running configuration</h2><dl id="settings"></dl><p class="hint">Counters reset on restart. This page observes activity without requesting map tiles or testing upstream services.</p></section>
+    <details id="logs-panel" class="panel logs">
+      <summary>Application log</summary>
+      <div class="log-toolbar"><p class="hint">Latest 500 application log entries, kept in memory. Full container output remains available in Unraid.</p><button id="logs-pause" type="button" aria-pressed="false">Pause</button></div>
+      <p id="logs-status" class="hint">Opens a live view, updating every 0.25 seconds.</p>
+      <pre id="logs-output" tabindex="0" aria-label="Recent application log">Loading log…</pre>
+    </details>
     <footer><span id="release">Release —</span><a href="/readyz">View raw status</a></footer>
   </main>
 </body>
