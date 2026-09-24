@@ -47,7 +47,7 @@
       if ($('regions').checked && !map.getSource('regions')) {
         map.addSource('regions', { type: 'geojson', data: '/regions.geojson' });
         map.addLayer({ id: 'regions-outline', type: 'line', source: 'regions', paint: { 'line-color': '#aa4938', 'line-width': 2 } });
-        map.addLayer({ id: 'regions-label', type: 'symbol', source: 'regions', layout: { 'text-field': ['get', 'name'], 'text-size': 12 }, paint: { 'text-color': '#aa4938', 'text-halo-color': '#ffffff', 'text-halo-width': 1 } });
+        map.addLayer({ id: 'regions-label', type: 'symbol', source: 'regions', layout: { 'text-field': ['get', 'name'], 'text-size': 12, 'text-font': provider.id === 'nsw' && $('mode').value !== 'raster' ? ['Public Sans Regular'] : ['Open Sans Regular', 'Arial Unicode MS Regular'] }, paint: { 'text-color': '#aa4938', 'text-halo-color': '#ffffff', 'text-halo-width': 1 } });
       }
       for (const id of ['regions-outline', 'regions-label']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', $('regions').checked ? 'visible' : 'none');
     }

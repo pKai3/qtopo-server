@@ -1,24 +1,29 @@
 # syntax=docker/dockerfile:1.7
-FROM node:24-bookworm-slim AS dependencies
+FROM node:24-bookworm-slim AS node
+
+# MapLibre's Linux native binary targets Ubuntu and requires libjpeg.so.8.
+FROM ubuntu:22.04 AS base
+ENV DEBIAN_FRONTEND=noninteractive NODE_ENV=production LIBGL_ALWAYS_SOFTWARE=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates python3 build-essential pkg-config \
-    libcairo2-dev libpango1.0-dev libjpeg62-turbo-dev libgif-dev librsvg2-dev \
-    && rm -rf /var/lib/apt/lists/*
+    ca-certificates xvfb libgl1 libegl1 libopengl0 libgles2 libglfw3 libcurl4 libuv1 libicu70 libwebp7 \
+    libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libjpeg-turbo8 libgif7 librsvg2-2 \
+    tini gosu \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
+COPY --from=node /usr/local /usr/local
 WORKDIR /usr/src/app
+
+FROM base AS dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-turbo8-dev libgif-dev librsvg2-dev \
+    && rm -rf /var/lib/apt/lists/*
 COPY package*.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci --include=dev
 COPY styles/style.json styles/style.json
 COPY scripts/build_sprites.js scripts/build_sprites.js
 RUN npm run build:sprites && npm prune --omit=dev
 
-FROM node:24-bookworm-slim
-ENV NODE_ENV=production LIBGL_ALWAYS_SOFTWARE=1
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates xvfb libgl1 libegl1 libopengl0 libgles2 libcurl4 libuv1 \
-    libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libjpeg62-turbo libgif7 librsvg2-2 \
-    tini gosu \
-    && rm -rf /var/lib/apt/lists/*
-WORKDIR /usr/src/app
+FROM base
 COPY --from=dependencies /usr/src/app/node_modules ./node_modules
 COPY . .
 COPY --from=dependencies /usr/src/app/assets/sprites ./assets/sprites
