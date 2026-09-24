@@ -86,6 +86,7 @@ Additional endpoints:
 | CLEAR_RASTER_ON_BOOT | unset | Set 1 to clear only the new v2 raster cache |
 | PUID / PGID | unset | Optional runtime user/group |
 | FIX_PERMISSIONS | unset | Set 1 with PUID/PGID for a one-time recursive ownership correction |
+| MESA_SHADER_CACHE_DIR | /data/resources/mesa | Compiled graphics cache shared by rendering workers; must be writable by the runtime user |
 
 Invalid configuration fails at startup. Cache expiry is checked on access, not just by the cleanup job. Style changes and render-setting changes automatically use a new raster cache revision. Browser/GPS clients may retain an already downloaded tile for up to one hour.
 
