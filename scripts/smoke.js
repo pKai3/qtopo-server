@@ -23,7 +23,7 @@ async function main() {
     ['auto', 153.03, -27.47, 13],
     ['auto', 150.31, -33.72, 13],
     ['auto', 150.31, -33.72, 18],
-    ['auto', 153.539, -28.166, 14],
+    ['auto', 153.539, -28.176, 14],
   ];
   await fs.mkdir('/tmp/smoke', { recursive: true });
   const contact = createCanvas(512 * samples.length, 554), ctx = contact.getContext('2d');
