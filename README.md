@@ -44,7 +44,7 @@ All client tile URLs use XYZ order: zoom, column, row. ArcGIS row/column orderin
 
 NSW map sheets preserve the published cartography and always output 256px PNGs (upstream JPEG tiles are converted). The vector maps allow editable styles and label sizing. The map-sheet provider caps requests at zoom 16; the viewer can overzoom those tiles.
 
-NSW vector raster output retains the published background colour for standalone GPS use. QLD retains its previous transparent-background behavior. Genuinely empty QLD raster tiles remain transparent and expire after EMPTY_TILE_TTL_MINUTES.
+NSW's published vector style is an overlay, so the viewer and raster output add a light background for standalone GPS use. An explicit background in your edited NSW style takes precedence. QLD retains its previous transparent-background behavior. Genuinely empty QLD raster tiles remain transparent and expire after EMPTY_TILE_TTL_MINUTES.
 
 Existing `/raster/{z}/{x}/{y}.png`, `/vector/{z}/{x}/{y}.pbf`, and `/style.json` remain QLD aliases, regardless of DEFAULT_PROVIDER.
 

@@ -36,11 +36,13 @@ async function main() {
     assert.equal(image.width, expected); assert.equal(image.height, expected);
     const canvas = createCanvas(expected, expected), c = canvas.getContext('2d'); c.drawImage(image, 0, 0);
     const pixels = c.getImageData(0, 0, expected, expected).data;
-    const colors = new Set(); let visible = 0;
+    const colors = new Set(); let visible = 0, opaque = 0;
     for (let i = 0; i < pixels.length; i += 4) {
       if (pixels[i + 3]) { visible++; colors.add(`${pixels[i]},${pixels[i+1]},${pixels[i+2]}`); }
+      if (pixels[i + 3] === 255) opaque++;
     }
     assert.ok(visible > 0 && colors.size > 20, `${provider} z${z} is empty or lacks map detail (${colors.size} colors)`);
+    if (provider === 'nsw') assert.equal(opaque, expected * expected, 'NSW standalone maps must have an opaque background');
     await fs.writeFile(`/tmp/smoke/${provider}-z${z}-${size}.png`, data);
     const cached = await fetch(url); assert.deepEqual(Buffer.from(await cached.arrayBuffer()), data);
     ctx.drawImage(image, col * 512, 42, 512, 512);
