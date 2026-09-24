@@ -1,4 +1,4 @@
-'use strict';
+import * as maplibregl from '/vendor/maplibre/maplibre-gl.mjs';
 (async () => {
   const $ = id => document.getElementById(id);
   const params = new URLSearchParams(location.search);
