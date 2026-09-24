@@ -39,3 +39,18 @@ test('empty raster tiles expire even when positive cache lifetime is unlimited',
   await prune(root, 0, 1000);
   await assert.rejects(fs.stat(pending), { code: 'ENOENT' });
 });
+
+test('reuse workers across tiles, deduplicate requests, and replace failed workers', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-pool-test-'));
+  const renderer = createRenderer({ renderConcurrency: 1, renderQueueLimit: 4, rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 2000 }, path.join(__dirname, 'fixtures/render-worker.js'));
+  t.after(async () => { renderer.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const tile = i => ({ outPath: path.join(root, `${i}.png`), recordPid: path.join(root, `${i}.pid`) });
+  const first = renderer.render(tile(1));
+  assert.equal(renderer.render(tile(1)), first);
+  await first; await renderer.render(tile(2));
+  assert.equal(await fs.readFile(tile(1).recordPid, 'utf8'), await fs.readFile(tile(2).recordPid, 'utf8'));
+  await assert.rejects(renderer.render({ ...tile(3), fail: true }), /fixture failure/);
+  await renderer.render(tile(3));
+  assert.notEqual(await fs.readFile(tile(2).recordPid, 'utf8'), await fs.readFile(tile(3).recordPid, 'utf8'));
+  assert.equal(renderer.stats.spawned, 2);
+});

@@ -34,7 +34,7 @@ Keep using `http://<unraid-host>:<host-port>/raster/{z}/{x}/{y}.png` in Gaia or 
 
 ## Maps and tile URLs
 
-Use **`/raster/{z}/{x}/{y}.png`** for the automatic QLD + NSW map, at zooms 0–19. It selects the QLD or NSW vector service by location, renders the selected vector data to PNG, and combines both renders within tiles that cross the state boundary. Output is always TILE_PX (512 by default), with the same XYZ grid as before. Keep the tile-size setting that already works for QLD in your GPS app.
+Use **`/raster/{z}/{x}/{y}.png`** for the automatic QLD + NSW map, at zooms 0–19. It selects the QLD or NSW vector service by location, renders the selected vector data to PNG, and combines both renders within tiles that cross the state boundary. Output is always TILE_PX (1024 by default), with the same XYZ grid as before. Keep the tile-size setting that already works for QLD in your GPS app. The 1024px output is rendered directly from vectors at double pixel density, preserving the same geographic extent and label scale. If your container explicitly sets `TILE_PX=512`, change it to `1024` to use the higher resolution.
 
 NSW’s published tile index selects the available vector parent at high zooms, avoiding requests for nonexistent child tiles. The renderer draws those vectors at the requested zoom. Both states render directly at the configured output resolution; the automatic route does not use scanned map sheets. QLD-only tiles reuse the existing QLD cache without changing their pixels. Previously downloaded blank NSW tiles in a GPS app may need refreshing.
 
@@ -74,11 +74,13 @@ Additional endpoints:
 | FONT_DIR | Bundled fonts | Local QLD glyph directory |
 | DEFAULT_PROVIDER | qld | Initial viewer location: qld, nsw, nsw-topo; automatic GPS coverage is always enabled |
 | PUBLIC_URL | Request origin | External origin, e.g. https://maps.example.com, when using an HTTPS reverse proxy |
-| TILE_PX | 512 | 256 or 512 output pixels for vector-to-raster maps |
+| TILE_PX | 1024 | 256, 512 or 1024 output pixels for vector-to-raster maps |
 | LABEL_SCALE | 1 | Raster text/icon scale, 0.5–3; try 1.4 for a GPS app |
 | VECTOR_UPSTREAM | QLD service | Optional QLD template containing {z}, {x}, {y} |
-| RENDER_CONCURRENCY | 2 | Maximum simultaneous native workers |
+| RENDER_CONCURRENCY | 2 | Maximum simultaneous reusable native workers, 1–16 |
 | RENDER_QUEUE_LIMIT | 64 | Maximum queued distinct renders |
+| PREFETCH_RADIUS | 1 | Pre-render the eight adjacent tiles after requested tiles finish; 0 disables, 2 extends to 24 neighbours |
+| PREFETCH_QUEUE_LIMIT | 64 | Maximum pending neighbouring tiles; older queued tiles are dropped when full |
 | RENDER_TIMEOUT_SECONDS | 60 | Worker deadline, maximum 300 |
 | UPSTREAM_TIMEOUT_SECONDS | 20 | Download deadline, maximum 120 |
 | RASTER_TTL_HOURS | 72 | Raster cache lifetime; 0 keeps successful tiles indefinitely |
@@ -98,6 +100,10 @@ A failed download or render returns an uncached 502/504 response. A full render 
 
 Container logs include tile requests (`REQ`), automatic state selection (`AUTO`), vector downloads and cache saves (`PBF-GET`/`PBF`), rendering and cache hits (`RDR`), and response status with elapsed time (`RES`). Transparent tiles are explicitly logged as empty. These messages appear in the Unraid container log without any extra configuration.
 
+Rendering workers are reused between tiles, including their loaded map style and resources. Idle workers are released after two minutes and busy workers are periodically recycled. PNG compression remains lossless. `/readyz` reports active/queued renders, worker starts and prefetch progress.
+
+Adjacent-tile prefetch begins after a 500ms pause with no outstanding raster requests, runs one tile at a time, and never expands from prefetched tiles. Requested tiles take queue priority; requesting an already queued render promotes it instead of duplicating it. At most one background render runs at a time, leaving a worker slot available when concurrency is greater than one. A background render already in progress finishes normally. Prefetch uses the same state selection, resolution and cache as requested tiles, and is logged as `PREFETCH`. Increasing concurrency uses more CPU and RAM; 1024px tiles also require more rendering work, storage and bandwidth than 512px tiles.
+
 The viewer serves its JavaScript locally. Map data and uncached NSW glyphs/sprites still require internet access. Upstream resources are fetched from fixed provider URLs; this is not a general-purpose proxy.
 
 ## Development and verification
@@ -111,7 +117,7 @@ npm run build:sprites
 DATA_DIR=/tmp/qtopo node server.js
 ```
 
-Native raster rendering needs the platform's graphics libraries; Linux headless operation uses Xvfb. GitHub Actions builds the amd64 Unraid image, runs native rendering checks against QLD and both NSW services at 256 and 512 pixels, and saves sample tiles as the `map-render-checks` artifact. PRs never publish latest or stable.
+Native raster rendering needs the platform's graphics libraries; Linux headless operation uses Xvfb. GitHub Actions builds the amd64 Unraid image, runs native rendering checks against QLD and both NSW services at 256, 512 and 1024 pixels, verifies neighbouring-tile prefetch, and saves sample tiles as the `map-render-checks` artifact. PRs never publish latest or stable.
 
 The live rendering checks depend on public government services. If an upstream service is down, publishing stops until the checks pass.
 

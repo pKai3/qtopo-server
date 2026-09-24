@@ -21,7 +21,7 @@
       if ($('mode').value !== 'raster' && provider.type !== 'raster') return provider.style;
       return {
         version: 8, glyphs: location.origin + '/fonts/{fontstack}/{range}.pbf',
-        sources: { topo: { type: 'raster', tiles: [provider.raster], tileSize: provider.tileSize, bounds: provider.bounds, maxzoom: provider.maxzoom, attribution: provider.attribution } },
+        sources: { topo: { type: 'raster', tiles: [provider.raster], tileSize: provider.id === 'nsw-topo' ? 256 : 512, bounds: provider.bounds, maxzoom: provider.maxzoom, attribution: provider.attribution } },
         layers: [{ id: 'topographic-map', type: 'raster', source: 'topo' }],
       };
     }
