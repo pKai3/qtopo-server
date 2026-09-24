@@ -10,6 +10,8 @@ const { cachedRaster, httpError } = require('./lib/utils');
 const { seedStyles, getStyle, absoluteStyle, renderStyle, styleRevision } = require('./lib/styles');
 const { createRenderer } = require('./lib/render');
 const { startCleaner } = require('./lib/cleaner');
+const { coverage, boundaryRevision } = require('./lib/coverage');
+const { createTileIndex } = require('./lib/tile-index');
 
 async function createApp(config = loadConfig(), dependencies = {}) {
   process.umask(0o002);
@@ -19,6 +21,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   if (config.clearRaster) await fs.rm(path.join(config.rasterDir, 'v2'), { recursive: true, force: true });
   const cache = dependencies.cache || createCache({ timeoutMs: config.upstreamTimeoutMs, emptyTTL: config.emptyTTL });
   const renderer = dependencies.renderer || createRenderer(config);
+  const nativeZoom = dependencies.nativeZoom || createTileIndex(config, cache);
   const stopCleaner = startCleaner(config, L);
   const app = express();
   app.disable('x-powered-by');
@@ -50,10 +53,19 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     if (result.empty) return res.status(204).end();
     await sendFile(res, result.path, 'application/x-protobuf');
   }
-  async function raster(req, res) {
-    const p = providerFor(req);
-    const tile = coordinates(req, p);
+  async function styleForRaster(p, tile) {
     const style = await getStyle(config, p);
+    if (p.tileMap) {
+      const zoom = await nativeZoom(p, tile);
+      if (zoom === null) return { version: 8, sources: {}, layers: [] };
+      // Indexed ArcGIS services omit children once the parent has all detail.
+      // Render that vector parent at the requested camera zoom, without scaling a PNG.
+      for (const source of Object.values(style.sources)) if (source.type === 'vector') source.maxzoom = Math.min(source.maxzoom, zoom);
+    }
+    return style;
+  }
+  async function rasterFile(p, tile) {
+    const style = await styleForRaster(p, tile);
     const revision = styleRevision(style, config, p);
     const outPath = path.join(config.rasterDir, 'v2', p.id, revision, String(tile.z), String(tile.x), `${tile.y}.png`);
     if (!(await cachedRaster(outPath, config.rasterTTL, config.emptyTTL))) {
@@ -71,14 +83,37 @@ async function createApp(config = loadConfig(), dependencies = {}) {
       }
       await renderer.render(job);
     }
+    return outPath;
+  }
+  async function deliverRaster(res, outPath) {
     const result = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
     headers(res, result?.empty ? Math.floor(config.emptyTTL / 1000) : 3600);
     await sendFile(res, outPath, 'image/png');
+  }
+  async function raster(req, res) {
+    const p = providerFor(req);
+    await deliverRaster(res, await rasterFile(p, coordinates(req, p)));
+  }
+  async function automaticRaster(req, res) {
+    const tile = coordinates(req, providers.qld);
+    const area = coverage(tile);
+    if (area.region === 'qld') return deliverRaster(res, await rasterFile(providers.qld, tile));
+    if (area.region === 'nsw') return deliverRaster(res, await rasterFile(providers.nsw, tile));
+    const [qldStyle, nswStyle] = await Promise.all([styleForRaster(providers.qld, tile), styleForRaster(providers.nsw, tile)]);
+    const revision = hash(JSON.stringify({ version: 2, boundaryRevision, qld: styleRevision(qldStyle, config, providers.qld), nsw: styleRevision(nswStyle, config, providers.nsw) }));
+    const outPath = path.join(config.rasterDir, 'v2', 'auto', revision, String(tile.z), String(tile.x), `${tile.y}.png`);
+    if (!(await cachedRaster(outPath, config.rasterTTL, config.emptyTTL))) {
+      const [backgroundPath, foregroundPath] = await Promise.all([rasterFile(providers.qld, tile), rasterFile(providers.nsw, tile)]);
+      const rect = [0, 0, config.tilePx, config.tilePx];
+      await renderer.render({ ...tile, outPath, size: config.tilePx, kind: 'composite', backgroundPath, images: [{ path: foregroundPath, source: rect, destination: rect }], clip: area.rings });
+    }
+    await deliverRaster(res, outPath);
   }
 
   app.get('/api/providers', (req, res) => {
     res.set('Cache-Control', 'no-cache').json({
       defaultProvider: config.defaultProvider,
+      automatic: { raster: `${origin(req)}/raster/{z}/{x}/{y}.png`, tileSize: config.tilePx, maxzoom: providers.qld.maxzoom, bounds: [137.8, -37.6, 162.7, -9], attribution: `${providers.qld.attribution}; ${providers.nsw.attribution}` },
       providers: Object.values(providers).map(p => ({
         id: p.id, name: p.name, type: p.type, bounds: p.bounds, center: p.center, zoom: p.zoom,
         minzoom: p.minzoom, maxzoom: p.maxzoom, tileSize: p.type === 'raster' ? 256 : config.tilePx,
@@ -96,7 +131,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   app.get('/vector/:provider/:z/:x/:y.pbf', vector);
   app.get('/vector/:z/:x/:y.pbf', vector);
   app.get('/raster/:provider/:z/:x/:y.png', raster);
-  app.get('/raster/:z/:x/:y.png', raster);
+  app.get('/raster/:z/:x/:y.png', automaticRaster);
   for (const [old, current, extension] of [['tiles_raster', 'raster', 'png'], ['tiles_vector', 'vector', 'pbf']]) {
     app.get(`/${old}/:z/:x/:y.${extension}`, (req, res) => {
       if (!parseTile(req.params)) throw httpError('Invalid tile coordinates', 400);

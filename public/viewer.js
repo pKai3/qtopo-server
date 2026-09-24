@@ -11,11 +11,21 @@
     const response = await fetch('/api/providers');
     if (!response.ok) throw new Error('Could not load the map list.');
     const catalog = await response.json();
-    let provider = catalog.providers.find(p => p.id === params.get('provider')) || catalog.providers.find(p => p.id === catalog.defaultProvider);
+    const initial = catalog.providers.find(p => p.id === catalog.defaultProvider);
+    catalog.providers.unshift({ ...catalog.automatic, id: 'auto', name: 'QLD + NSW — automatic', type: 'raster', center: initial.center, zoom: initial.zoom });
+    let provider = catalog.providers.find(p => p.id === params.get('provider')) || catalog.providers[0];
     for (const p of catalog.providers) $('provider').add(new Option(p.name, p.id));
     $('provider').value = provider.id;
     $('mode').value = params.get('mode') === 'raster' ? 'raster' : 'vector';
-    const map = new maplibregl.Map({ container: 'map', style: provider.style, center: provider.center, zoom: provider.zoom, hash: true, maxZoom: 22 });
+    function previewStyle() {
+      if ($('mode').value !== 'raster' && provider.type !== 'raster') return provider.style;
+      return {
+        version: 8, glyphs: location.origin + '/fonts/{fontstack}/{range}.pbf',
+        sources: { topo: { type: 'raster', tiles: [provider.raster], tileSize: provider.tileSize, bounds: provider.bounds, maxzoom: provider.maxzoom, attribution: provider.attribution } },
+        layers: [{ id: 'topographic-map', type: 'raster', source: 'topo' }],
+      };
+    }
+    const map = new maplibregl.Map({ container: 'map', style: previewStyle(), center: provider.center, zoom: provider.zoom, hash: true, maxZoom: 22 });
     map.addControl(new maplibregl.NavigationControl(), 'top-right');
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-right');
     map.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }), 'top-right');
@@ -35,6 +45,7 @@
     }
     function syncUI() {
       const raster = $('mode').value === 'raster' || provider.type === 'raster';
+      $('mode').disabled = provider.type === 'raster';
       $('layers').disabled = raster;
       $('layers').style.opacity = raster ? '0.45' : '1';
       $('tile-size').textContent = `${provider.tileSize} × ${provider.tileSize} raster tiles · ${provider.attribution}`;
@@ -53,13 +64,7 @@
     }
     function switchStyle() {
       syncUI();
-      if ($('mode').value === 'raster') {
-        map.setStyle({
-          version: 8, glyphs: location.origin + '/fonts/{fontstack}/{range}.pbf',
-          sources: { topo: { type: 'raster', tiles: [provider.raster], tileSize: provider.tileSize, bounds: provider.bounds, maxzoom: provider.maxzoom, attribution: provider.attribution } },
-          layers: [{ id: 'topographic-map', type: 'raster', source: 'topo' }],
-        });
-      } else map.setStyle(provider.style);
+      map.setStyle(previewStyle());
     }
     map.on('style.load', () => { applyLayers(); showRegions(); });
     map.on('error', e => { console.error(e.error); $('status').textContent = 'Some map data could not load. Please try again shortly.'; $('status').className = 'error'; });
@@ -72,11 +77,10 @@
     $('mode').addEventListener('change', switchStyle);
     $('regions').addEventListener('change', showRegions);
     $('copy-url').addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(provider.raster); $('status').textContent = 'Tile URL copied.'; }
-      catch { window.prompt('Copy this tile URL into your GPS app:', provider.raster); }
+      try { await navigator.clipboard.writeText(catalog.automatic.raster); $('status').textContent = 'QLD + NSW tile URL copied.'; }
+      catch { window.prompt('Copy this QLD + NSW URL into Gaia or your GPS app:', catalog.automatic.raster); }
     });
     syncUI();
-    if ($('mode').value === 'raster') map.once('load', switchStyle);
     if (innerWidth < 600) document.querySelector('details').open = false;
   } catch (err) { $('status').textContent = err.message; $('status').className = 'error'; }
 })();
