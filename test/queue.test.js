@@ -73,3 +73,31 @@ test('a full prefetch queue drops an older location to admit the latest one', as
   await new Promise(resolve => setImmediate(resolve)); release();
   await first; await rejected; assert.equal(await latest, 'latest'); queue.close();
 });
+
+test('running work is reclassified on promotion and releases its current priority on success or failure', async () => {
+  for (const fail of [false, true]) {
+    const queue = new WorkQueue(2, 8);
+    let release;
+    const first = queue.run(async () => {
+      await new Promise(resolve => { release = resolve; });
+      if (fail) throw new Error('fixture failure');
+    }, { key: 'shared', priority: PRIORITY.ZOOM });
+    const completion = fail ? assert.rejects(first, /fixture failure/) : first;
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(queue.stats.activeByPriority, { requested: 0, neighbours: 0, zoom: 1 });
+    queue.promote('shared', PRIORITY.NEIGHBOUR);
+    assert.deepEqual(queue.stats.activeByPriority, { requested: 0, neighbours: 1, zoom: 0 });
+    queue.promote('shared'); queue.promote('shared', PRIORITY.ZOOM);
+    assert.deepEqual(queue.stats.activeByPriority, { requested: 1, neighbours: 0, zoom: 0 });
+    let zoomStarted = false;
+    const zoom = queue.run(() => { zoomStarted = true; }, { priority: PRIORITY.ZOOM });
+    assert.equal(zoomStarted, false);
+    assert.equal(queue.stats.active, 1); assert.equal(queue.stats.queued, 1);
+    release(); await Promise.all([completion, zoom]);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(zoomStarted, true);
+    assert.equal(queue.stats.active, 0);
+    assert.deepEqual(queue.stats.activeByPriority, { requested: 0, neighbours: 0, zoom: 0 });
+    queue.close();
+  }
+});

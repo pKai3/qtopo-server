@@ -4,6 +4,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { createRenderer } = require('../lib/render');
+const { PRIORITY } = require('../lib/queue');
 const { atomicWrite, cachedRaster } = require('../lib/utils');
 const { prune } = require('../lib/cleaner');
 test('terminate a hung child and allow queued work to continue', async t => {
@@ -72,4 +73,26 @@ test('concurrency eight actually starts eight separate workers simultaneously', 
     assert.equal(renderer.stats.active, 8);
     assert.equal(renderer.stats.peakActive, 8);
   } finally { await fs.writeFile(gate, 'go'); await complete; }
+});
+
+test('a client joining an active prefetch shares the worker and reclassifies counters and timing logs', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-promote-test-'));
+  const renderer = createRenderer({ renderConcurrency: 2, renderQueueLimit: 4, rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 10000 }, path.join(__dirname, 'fixtures/render-worker.js'));
+  t.after(async () => { renderer.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const job = { outPath: path.join(root, 'tile.png'), recordPid: path.join(root, 'tile.pid'), gate: path.join(root, 'go'), priority: PRIORITY.NEIGHBOUR, timings: { resourceWaitMs: 0, encodeMs: 1, cpuMs: 1 } };
+  const background = renderer.render(job);
+  try {
+    for (let i = 0; i < 200; i++) {
+      if (await fs.access(job.recordPid).then(() => true, () => false)) break;
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    await fs.access(job.recordPid);
+    assert.equal(renderer.stats.activeByPriority.neighbours, 1);
+    const requested = renderer.render({ ...job, priority: PRIORITY.REQUEST });
+    assert.equal(requested, background, 'the same render is shared');
+    assert.deepEqual(renderer.stats.activeByPriority, { requested: 1, neighbours: 0, zoom: 0 });
+    assert.equal(renderer.stats.spawned, 1);
+  } finally { await fs.writeFile(job.gate, 'go'); await background; }
+  assert.equal(renderer.stats.lastRender.priority, 'requested');
+  assert.equal(renderer.stats.completed, 1);
 });

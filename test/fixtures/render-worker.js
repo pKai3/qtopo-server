@@ -5,5 +5,5 @@ process.on('message', async job => {
   if (job.recordPid) fs.writeFileSync(job.recordPid, String(process.pid));
   while (job.gate && !fs.existsSync(job.gate)) await new Promise(resolve => setTimeout(resolve, 5));
   fs.writeFileSync(job.outPath, Buffer.from('rendered-test-output'));
-  process.send({ done: true });
+  process.send({ done: true, timings: job.timings });
 });

@@ -9,6 +9,7 @@ const { atomicWrite } = require('../lib/utils');
 const { createProviders, tileURL, parseTile } = require('../lib/providers');
 const { getStyle, renderStyle, absoluteStyle, styleRevision } = require('../lib/styles');
 const { validateStyleMin } = require('@maplibre/maplibre-gl-style-spec');
+const logger = require('../lib/logger');
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/YYbL4QAAAAASUVORK5CYII=', 'base64');
 async function server(t, dependencies = {}) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-app-test-'));
@@ -20,6 +21,18 @@ async function server(t, dependencies = {}) {
   t.after(async () => { instance.close(); listener.closeAllConnections(); await new Promise(r => listener.close(r)); await fs.rm(dir, { recursive: true, force: true }); });
   return { ...instance, config, url };
 }
+test('status log endpoint returns only new application messages and rejects invalid cursors', async t => {
+  const s = await server(t);
+  const cursor = logger.read();
+  logger.log('TEST', 'Log panel message <plain text>');
+  const response = await fetch(`${s.url}/api/logs?after=${cursor.next}&session=${cursor.session}`);
+  assert.equal(response.status, 200); assert.equal(response.headers.get('cache-control'), 'no-store');
+  const result = await response.json();
+  assert.equal(result.entries.length, 1); assert.match(result.entries[0].line, /Log panel message <plain text>/);
+  assert.equal((await (await fetch(`${s.url}/api/logs?after=${result.next}&session=${result.session}`)).json()).entries.length, 0);
+  assert.equal((await fetch(s.url + '/api/logs?after=-1')).status, 400);
+  assert.equal((await fetch(s.url + '/api/logs?after=1&after=2')).status, 400);
+});
 test('browser preview loads its MapLibre module from an existing JavaScript asset', async t => {
   const s = await server(t);
   const html = await (await fetch(s.url + '/')).text();

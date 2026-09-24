@@ -214,11 +214,16 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   app.get('/readyz', (_req, res) => res.set('Cache-Control', 'no-store').json({
     status: 'ok', startedAt, version: require('./package.json').version,
     revision: process.env.BUILD_REVISION || 'development',
-    settings: { tilePx: config.tilePx, pngCompression: config.pngCompression, renderConcurrency: config.renderConcurrency, renderQueueLimit: config.renderQueueLimit, upstreamConcurrency: config.upstreamConcurrency, prefetchConcurrency: config.prefetchConcurrency, prefetchRadius: config.prefetchRadius, prefetchZoom: config.prefetchZoom },
+    settings: { tilePx: config.tilePx, pngCompression: config.pngCompression, renderConcurrency: config.renderConcurrency, renderQueueLimit: config.renderQueueLimit, upstreamConcurrency: config.upstreamConcurrency, prefetchConcurrency: config.prefetchConcurrency, prefetchQueueLimit: config.prefetchQueueLimit, prefetchRadius: config.prefetchRadius, prefetchZoom: config.prefetchZoom },
     providers: Object.keys(providers), renderer: renderer.stats, cache: cache.stats, prefetch: prefetch.stats,
     requests: requests.stats, styles: styles.stats,
   }));
   app.get('/status', (_req, res) => res.sendFile(path.join(config.root, 'public/status.html')));
+  app.get('/api/logs', (req, res) => {
+    const after = req.query.after ?? '0', session = req.query.session;
+    if (typeof after !== 'string' || !/^\d+$/.test(after) || !Number.isSafeInteger(Number(after)) || (session != null && (typeof session !== 'string' || session.length > 64))) throw httpError('Invalid log cursor', 400);
+    res.set('Cache-Control', 'no-store').json(L.read(Number(after), session));
+  });
   app.get('/raster', (_req, res) => res.redirect(302, '/?mode=raster'));
   app.use(express.static(path.join(config.root, 'public')));
   app.use((err, req, res, next) => {
