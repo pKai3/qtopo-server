@@ -52,7 +52,9 @@ jobs:
       - name: Container logs
         if: always()
         run: |
+          mkdir -p test-results
           for pixels in 512 256; do
+            docker cp qtopo-smoke-$pixels:/tmp/smoke/. test-results/ 2>/dev/null || true
             docker logs qtopo-smoke-$pixels > test-results/container-$pixels.log 2>&1 || true
           done
       - uses: actions/upload-artifact@v4

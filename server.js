@@ -6,7 +6,7 @@ const L = require('./lib/logger');
 const { loadConfig } = require('./lib/config');
 const { createProviders, tileURL, parseTile, hash } = require('./lib/providers');
 const { createCache } = require('./lib/cache');
-const { cachedFile, httpError } = require('./lib/utils');
+const { cachedRaster, httpError } = require('./lib/utils');
 const { seedStyles, getStyle, absoluteStyle, renderStyle, styleRevision } = require('./lib/styles');
 const { createRenderer } = require('./lib/render');
 const { startCleaner } = require('./lib/cleaner');
@@ -56,7 +56,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     const style = await getStyle(config, p);
     const revision = styleRevision(style, config, p);
     const outPath = path.join(config.rasterDir, 'v2', p.id, revision, String(tile.z), String(tile.x), `${tile.y}.png`);
-    if (!(await cachedFile(outPath, config.rasterTTL))?.size) {
+    if (!(await cachedRaster(outPath, config.rasterTTL, config.emptyTTL))) {
       const job = { ...tile, outPath, size: p.type === 'raster' ? 256 : config.tilePx };
       if (p.type === 'raster') {
         const image = await cache.get({
@@ -71,7 +71,8 @@ async function createApp(config = loadConfig(), dependencies = {}) {
       }
       await renderer.render(job);
     }
-    headers(res);
+    const result = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
+    headers(res, result?.empty ? Math.floor(config.emptyTTL / 1000) : 3600);
     await sendFile(res, outPath, 'image/png');
   }
 
