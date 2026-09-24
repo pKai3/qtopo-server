@@ -48,6 +48,12 @@ test('render failure is retryable, uncached and cannot become a long-lived blank
   const url = s.url + '/raster/13/7551/4724.png';
   const failed = await fetch(url); assert.equal(failed.status, 502); assert.equal(failed.headers.get('cache-control'), 'no-store');
   assert.equal((await fetch(url)).status, 200); assert.equal((await fetch(url)).status, 200); assert.equal(attempts, 2);
+  const response = await fetch(s.url + '/readyz'), status = await response.json();
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.equal(status.requests.errors, 1); assert.equal(status.requests.completed, 2);
+  assert.equal(status.requests.hits, 1); assert.equal(status.requests.misses, 1);
+  assert.equal(status.requests.active, 0); assert.equal(status.styles.loads, 1);
+  assert.equal((await fetch(s.url + '/status')).status, 200);
 });
 test('editing a style invalidates raster cache without touching the existing user file', async t => {
   const paths = [];
@@ -58,6 +64,21 @@ test('editing a style invalidates raster cache without touching the existing use
   await fs.writeFile(s.config.stylePath, JSON.stringify(style));
   await fetch(url); assert.equal(paths.length, 2); assert.notEqual(paths[0], paths[1]);
   assert.equal(JSON.parse(await fs.readFile(s.config.stylePath)).layers[0].paint['fill-color'], '#abcdef');
+});
+test('expired raster tiles are regenerated before delivery and never served stale on failure', async t => {
+  let file, fail = false, renders = 0;
+  const s = await server(t, { renderer: { close() {}, async render(job) {
+    renders++; file = job.outPath;
+    if (fail) throw new Error('upstream unavailable');
+    await atomicWrite(file, PNG);
+  } } });
+  const url = s.url + '/raster/qld/3/7/4.png';
+  assert.equal((await fetch(url)).status, 200);
+  await fs.utimes(file, new Date(0), new Date(0)); fail = true;
+  const failed = await fetch(url);
+  assert.equal(failed.status, 502); assert.equal(failed.headers.get('cache-control'), 'no-store');
+  fail = false;
+  assert.equal((await fetch(url)).status, 200); assert.equal(renders, 3);
 });
 test('styles resolve provider tiles, fonts, sprites and attribution consistently', async t => {
   const s = await server(t);
@@ -92,6 +113,9 @@ test('NSW source imagery passes through the conversion queue and never the vecto
 test('configuration and ArcGIS tile order are explicit', () => {
   assert.equal(loadConfig({}).tilePx, 1024);
   assert.equal(loadConfig({ TILE_PX: '512' }).tilePx, 512);
+  assert.equal(loadConfig({ PNG_COMPRESSION_LEVEL: '6' }).pngCompression, 6);
+  assert.throws(() => loadConfig({ PNG_COMPRESSION_LEVEL: '10' }), /PNG_COMPRESSION_LEVEL/);
+  assert.throws(() => loadConfig({ UPSTREAM_CONCURRENCY: '0' }), /UPSTREAM_CONCURRENCY/);
   assert.equal(loadConfig({ PREFETCH_RADIUS: '0' }).prefetchRadius, 0);
   assert.equal(loadConfig({ RENDER_CONCURRENCY: '8' }).prefetchConcurrency, 7);
   assert.equal(loadConfig({ RENDER_CONCURRENCY: '8', PREFETCH_CONCURRENCY: '3' }).prefetchConcurrency, 3);

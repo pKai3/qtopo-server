@@ -5,6 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { gzipSync } = require('node:zlib');
 const { createCache } = require('../lib/cache');
+const { PRIORITY } = require('../lib/queue');
 async function setup(t) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-test-'));
   t.after(() => fs.rm(dir, { recursive: true, force: true }));
@@ -65,4 +66,20 @@ test('expired positive files refresh on access even before cleanup', async t => 
   const opts = { file: path.join(dir, 'tile.pbf'), url: 'https://example.test/tile', ttl: 1000 };
   await cache.get(opts); await fs.utimes(opts.file, new Date(0), new Date(0)); await cache.get(opts);
   assert.equal(calls, 2);
+});
+test('upstream downloads are bounded and reserve capacity for foreground requests', async t => {
+  const dir = await setup(t), seen = [];
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const cache = createCache({ concurrency: 4, fetchImpl: async url => { seen.push(url); await gate; return pbf(); } });
+  t.after(() => { release(); cache.close(); });
+  const background = Array.from({ length: 5 }, (_, i) => cache.get({ file: path.join(dir, `${i}.pbf`), url: `https://example.test/${i}`, priority: PRIORITY.NEIGHBOUR }));
+  for (let i = 0; i < 100 && seen.length < 2; i++) await new Promise(resolve => setTimeout(resolve, 2));
+  assert.equal(seen.length, 2, 'prefetch uses only half the download capacity');
+  const foreground = cache.get({ file: path.join(dir, 'requested.pbf'), url: 'https://example.test/requested' });
+  for (let i = 0; i < 100 && !seen.includes('https://example.test/requested'); i++) await new Promise(resolve => setTimeout(resolve, 2));
+  assert.ok(seen.includes('https://example.test/requested'), 'foreground starts without waiting for prefetch downloads');
+  assert.equal(cache.stats.activeDownloads, 3);
+  release(); await Promise.all([...background, foreground]);
+  assert.ok(cache.stats.peakDownloads <= 4);
 });

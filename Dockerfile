@@ -28,6 +28,9 @@ COPY scripts/build_sprites.js scripts/build_sprites.js
 RUN npm run build:sprites && npm prune --omit=dev
 
 FROM base
+ARG BUILD_REVISION=development
+ENV BUILD_REVISION=$BUILD_REVISION
+LABEL org.opencontainers.image.revision=$BUILD_REVISION
 COPY --from=dependencies /usr/src/app/node_modules ./node_modules
 COPY . .
 COPY --from=dependencies /usr/src/app/assets/sprites ./assets/sprites

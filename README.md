@@ -61,6 +61,7 @@ Additional endpoints:
 - `/raster` and `/index_raster.html` — redirects to raster preview.
 - `/healthz` — lightweight container health.
 - `/readyz` — provider list and cache/renderer counters.
+- `/status` — live server activity, cache-hit rate, response timings, queues and running configuration.
 - `/tiles_raster/…`, `/tiles_vector/…` — legacy 308 redirects.
 
 ## Configuration
@@ -75,6 +76,7 @@ Additional endpoints:
 | DEFAULT_PROVIDER | qld | Initial viewer location: qld, nsw, nsw-topo; automatic GPS coverage is always enabled |
 | PUBLIC_URL | Request origin | External origin, e.g. https://maps.example.com, when using an HTTPS reverse proxy |
 | TILE_PX | 1024 | 256, 512 or 1024 output pixels for vector-to-raster maps |
+| PNG_COMPRESSION_LEVEL | 3 | Lossless PNG compression, 0–9. Try 6 for slightly smaller files at the cost of more encoding CPU; resolution and colours are unchanged. Applies to newly rendered tiles only. |
 | LABEL_SCALE | 1 | Raster text/icon scale, 0.5–3; try 1.4 for a GPS app |
 | VECTOR_UPSTREAM | QLD service | Optional QLD template containing {z}, {x}, {y} |
 | RENDER_CONCURRENCY | 2 | Maximum simultaneous reusable native workers, 1–16 |
@@ -85,6 +87,7 @@ Additional endpoints:
 | PREFETCH_QUEUE_LIMIT | 64 | Maximum pending neighbouring tiles; older queued tiles are dropped when full |
 | RENDER_TIMEOUT_SECONDS | 60 | Worker deadline, maximum 300 |
 | UPSTREAM_TIMEOUT_SECONDS | 20 | Download deadline, maximum 120 |
+| UPSTREAM_CONCURRENCY | 16 | Maximum concurrent upstream downloads, 1–64; prefetch may use up to half, leaving capacity for requested resources when possible |
 | RASTER_TTL_HOURS | 72 | Raster cache lifetime; 0 keeps successful tiles indefinitely |
 | VECTOR_TTL_HOURS | 168 | Vector cache lifetime; 0 keeps successful tiles indefinitely |
 | RESOURCE_TTL_HOURS | 168 | Glyph/sprite cache lifetime |
@@ -98,15 +101,19 @@ Additional endpoints:
 
 Invalid configuration fails at startup. Cache expiry is checked on access, not just by the cleanup job. Style changes and render-setting changes automatically use a new raster cache revision. Browser/GPS clients may retain an already downloaded tile for up to one hour.
 
+Parsed styles and their cache revisions are reused in memory. File metadata is checked on every access so local style edits still take effect immediately. NSW zoom variants are cached separately without altering the base style. Existing raster cache paths are preserved, and successful cached delivery avoids a second PNG/empty-marker lookup. Expired tiles still refresh before delivery; stale tiles are not served while refreshing in the background. Changing PNG compression does not invalidate existing tiles because their pixels are unchanged.
+
 A failed download or render returns an uncached 502/504 response. A full render queue returns 503 with Retry-After. Failures are never saved as successful blank tiles. Concurrent requests for the same resource are combined; providers remain isolated.
 
 Container logs include tile requests (`REQ`), automatic state selection (`AUTO`), vector downloads and cache saves (`PBF-GET`/`PBF`), rendering and cache hits (`RDR`), and response status with elapsed time (`RES`). Transparent tiles are explicitly logged as empty. These messages appear in the Unraid container log without any extra configuration.
 
 Rendering workers are reused between tiles, including their loaded map style and resources. Idle workers are released after two minutes and busy workers are periodically recycled. PNG compression remains lossless. `/readyz` reports configured concurrency, current and peak active renders, active renders by priority, worker starts, active upstream downloads and prefetch progress. `TIMING` logs show queue delay, worker elapsed time, time with resource requests outstanding, PNG encoding time and process CPU time. Resource waiting includes local cache reads through the server and upstream downloads; CPU time can overlap resource waiting and may include multiple native threads, so these values are not additive.
 
-Prefetch starts after a 500ms pause with no outstanding raster requests, then fills its available worker slots without pausing between tiles. It never expands from prefetched tiles. Priority is: requested tiles, same-zoom neighbours, then zoom-out/zoom-in tiles. Within each prefetch tier, the newest requested location comes first, with nearer neighbours first within that location. Overlapping queued neighbours move to the newer request; an older request finishing late cannot jump ahead. When the queue fills, zoom tiles are discarded before same-zoom neighbours, then older/farther entries are discarded.
+Prefetch starts after a 500ms delay at the beginning of a new burst, then prepares same-zoom neighbours using spare rendering capacity even while other raster requests remain outstanding. Continuing requests do not keep resetting that initial delay. The render queue always selects waiting requested tiles first and reserves a foreground slot when possible. It never expands from prefetched tiles. Priority is: requested tiles, same-zoom neighbours, then zoom-out/zoom-in tiles. Within each prefetch tier, the newest requested location comes first, with nearer neighbours first within that location. Overlapping queued neighbours move to the newer request; an older request finishing late cannot jump ahead. When the queue fills, zoom tiles are discarded before same-zoom neighbours, then older/farther entries are discarded.
 
-Zoom prefetch adds only the requested tile’s parent and four children, within the map’s zoom limits. It waits for same-zoom neighbours to finish. Requesting an already queued render promotes it instead of duplicating it. With `RENDER_CONCURRENCY=8`, prefetch can use up to seven workers by default, reserving one for incoming requests. Work already running finishes normally. `PREFETCH_CONCURRENCY` can lower background usage, and `PREFETCH_RADIUS=0` disables all prefetch. Prefetch uses the same state selection, resolution and cache as requested tiles and is logged as `PREFETCH` or `PREFETCH-Z`. Increasing concurrency uses more CPU and RAM; low CPU with active downloads can indicate workers waiting for data. 1024px tiles also require more rendering work, storage and bandwidth than 512px tiles.
+Zoom prefetch adds only the requested tile’s parent and four children, within the map’s zoom limits. It waits for outstanding raster requests and same-zoom neighbours to finish. Requesting an already queued render promotes it instead of duplicating it. With `RENDER_CONCURRENCY=8`, prefetch can use up to seven workers by default, reserving one for incoming requests. Work already running finishes normally. `PREFETCH_CONCURRENCY` can lower background usage, and `PREFETCH_RADIUS=0` disables all prefetch. Prefetch uses the same state selection, resolution and cache as requested tiles and is logged as `PREFETCH` or `PREFETCH-Z`. Increasing concurrency uses more CPU and RAM; low CPU with active downloads can indicate workers waiting for data. 1024px tiles also require more rendering work, storage and bandwidth than 512px tiles.
+
+The `/status` page updates every five seconds while visible. It shows effective settings and the image commit, worker/download activity, queue age, successful raster cache hits, bytes sent, disconnects, and median/95th-percentile timings over the most recent 256 samples. Cached ready time ends before streaming the PNG; response time includes server-side transfer, not display in Gaia. Worker timing covers foreground and background renders. Counters reset on restart. Prefetch reuse tracking is bounded to the most recent 1,024 newly prefetched files, so it is not a complete lifetime hit ratio. Status polling does not request map tiles.
 
 The viewer serves its JavaScript locally. Map data and uncached NSW glyphs/sprites still require internet access. Upstream resources are fetched from fixed provider URLs; this is not a general-purpose proxy.
 
