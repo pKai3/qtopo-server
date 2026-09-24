@@ -67,6 +67,7 @@ test('styles resolve provider tiles, fonts, sprites and attribution consistently
 test('NSW source imagery passes through the conversion queue and never the vector downloader', async t => {
   const calls = [], jobs = [];
   const s = await server(t, {
+    nativeZoom: async (_provider, tile) => tile.z,
     cache: { stats: {}, async get(opts) { calls.push(opts); return { path: '/example/source.jpeg', empty: false }; } },
     renderer: { close() {}, async render(job) { jobs.push(job); await atomicWrite(job.outPath, PNG); } },
   });
@@ -85,6 +86,7 @@ test('configuration and ArcGIS tile order are explicit', () => {
 test('the existing Gaia URL selects QLD and NSW vector rendering and combines border tiles', async t => {
   const calls = [], jobs = [];
   const s = await server(t, {
+    nativeZoom: async (_provider, tile) => Math.min(tile.z, 16),
     cache: { stats: {}, async get(opts) { calls.push(opts); return { path: '/example/source.jpeg', empty: false }; } },
     renderer: { close() {}, async render(job) { jobs.push(job); await atomicWrite(job.outPath, PNG); } },
   });
@@ -97,6 +99,9 @@ test('the existing Gaia URL selects QLD and NSW vector rendering and combines bo
   assert.match(jobs.at(-1).style.glyphs, /resources\/nsw\/fonts/);
   assert.ok(Object.values(jobs.at(-1).style.sources).every(src => src.tiles[0].includes('/vector/nsw/')));
   assert.equal(calls.length, 0, 'automatic maps must never download pre-rendered map sheets');
+  assert.equal((await fetch(s.url + '/raster/18/240524/157180.png')).status, 200);
+  assert.equal(jobs.at(-1).z, 18, 'keep requested camera zoom');
+  assert.ok(Object.values(jobs.at(-1).style.sources).every(src => src.maxzoom === 16), 'use the indexed vector parent');
   const count = jobs.length;
   await fetch(s.url + '/raster/13/7516/4911.png'); assert.equal(jobs.length, count, 'automatic tiles are cached');
   assert.equal((await fetch(s.url + '/raster/14/15179/9528.png')).status, 200);
