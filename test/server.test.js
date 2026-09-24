@@ -79,6 +79,10 @@ test('configuration and ArcGIS tile order are explicit', () => {
   assert.equal(loadConfig({}).tilePx, 1024);
   assert.equal(loadConfig({ TILE_PX: '512' }).tilePx, 512);
   assert.equal(loadConfig({ PREFETCH_RADIUS: '0' }).prefetchRadius, 0);
+  assert.equal(loadConfig({ RENDER_CONCURRENCY: '8' }).prefetchConcurrency, 7);
+  assert.equal(loadConfig({ RENDER_CONCURRENCY: '8', PREFETCH_CONCURRENCY: '3' }).prefetchConcurrency, 3);
+  assert.equal(loadConfig({ RENDER_CONCURRENCY: '2', PREFETCH_CONCURRENCY: '8' }).prefetchConcurrency, 1);
+  assert.equal(loadConfig({ PREFETCH_ZOOM: '0' }).prefetchZoom, false);
   assert.throws(() => loadConfig({ TILE_PX: '300' }), /TILE_PX/);
   assert.throws(() => loadConfig({ RENDER_CONCURRENCY: '-1' }), /RENDER_CONCURRENCY/);
   const config = loadConfig({ DATA_DIR: '/tmp/example', TILE_PX: '256', LABEL_SCALE: '1.4' });

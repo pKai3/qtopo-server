@@ -18,6 +18,7 @@ test('deduplicate one tile while isolating different providers at identical coor
   const b = { file: path.join(dir, 'nsw/3/4/5.pbf'), url: 'https://example.test/nsw' };
   const results = await Promise.all([cache.get(a), cache.get(a), cache.get(b)]);
   assert.equal(calls, 2); assert.equal(results[0].path, results[1].path); assert.notEqual(results[0].path, results[2].path);
+  assert.equal(cache.stats.peakDownloads, 2); assert.equal(cache.stats.activeDownloads, 0);
 });
 test('404 and 204 empty results are cached briefly, then retried', async t => {
   const dir = await setup(t);
@@ -55,6 +56,7 @@ test('timeout aborts a hung request and permits a later retry', async t => {
   } });
   const opts = { file: path.join(dir, 'tile.pbf'), url: 'https://example.test/tile' };
   await assert.rejects(cache.get(opts), { status: 504 });
+  assert.equal(cache.stats.activeDownloads, 0);
   await cache.get(opts); assert.equal(calls, 2);
 });
 test('expired positive files refresh on access even before cleanup', async t => {
