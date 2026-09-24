@@ -18,7 +18,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-turbo8-dev libgif-dev librsvg2-dev \
     && rm -rf /var/lib/apt/lists/*
 COPY package*.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci --include=dev
+# Build canvas against the same libpng as MapLibre; its prebuilt bundle ships
+# a conflicting libpng and can abort the renderer when sprites are decoded.
+RUN --mount=type=cache,target=/root/.npm npm ci --include=dev --ignore-scripts \
+    && npm rebuild @maplibre/maplibre-gl-native \
+    && npm rebuild canvas --build-from-source
 COPY styles/style.json styles/style.json
 COPY scripts/build_sprites.js scripts/build_sprites.js
 RUN npm run build:sprites && npm prune --omit=dev
@@ -27,7 +31,7 @@ FROM base
 COPY --from=dependencies /usr/src/app/node_modules ./node_modules
 COPY . .
 COPY --from=dependencies /usr/src/app/assets/sprites ./assets/sprites
-RUN chmod +x start.sh
+RUN chmod +x start.sh && node -e "require('@maplibre/maplibre-gl-native'); require('canvas')"
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
