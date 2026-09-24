@@ -20,6 +20,20 @@ async function server(t, dependencies = {}) {
   t.after(async () => { instance.close(); listener.closeAllConnections(); await new Promise(r => listener.close(r)); await fs.rm(dir, { recursive: true, force: true }); });
   return { ...instance, config, url };
 }
+test('browser preview loads its MapLibre module from an existing JavaScript asset', async t => {
+  const s = await server(t);
+  const html = await (await fetch(s.url + '/')).text();
+  const script = html.match(/<script\b[^>]*src="([^"]+)"[^>]*>/);
+  assert.ok(script, 'viewer entry script is present');
+  assert.match(script[0], /type="module"/);
+  const viewer = await fetch(new URL(script[1], s.url));
+  assert.equal(viewer.status, 200);
+  const imported = (await viewer.text()).match(/import \* as maplibregl from ['"]([^'"]+)['"]/);
+  assert.ok(imported, 'MapLibre is explicitly imported');
+  const library = await fetch(new URL(imported[1], s.url));
+  assert.equal(library.status, 200);
+  assert.match(library.headers.get('content-type'), /javascript/);
+});
 test('reject malformed coordinates and unknown providers before work is scheduled', async t => {
   const s = await server(t, { renderer: { render() { assert.fail('must not render'); }, close() {} } });
   for (const p of ['/raster/qld/3/8/0.png', '/vector/qld/NaN/0/0.pbf', '/raster/nsw/-1/0/0.png', '/raster/qld/1.5/0/0.png', '/vector/nsw/23/0/0.pbf']) assert.equal((await fetch(s.url + p)).status, 400);
