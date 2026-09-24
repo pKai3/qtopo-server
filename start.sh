@@ -19,7 +19,9 @@ if [[ "$(id -u)" == 0 && -n "${PUID:-}" ]]; then
 fi
 mkdir -p "$VECTOR_DIR" "$RASTER_DIR" "$STYLE_DIR"
 export DISPLAY="${DISPLAY:-:99}"
-Xvfb "$DISPLAY" -screen 0 1024x768x24 -nolisten tcp &
+# Workers connect only while rendering. Keep the display alive between jobs so
+# disconnecting the last worker does not reset it and recompile the keyboard map.
+Xvfb "$DISPLAY" -screen 0 1024x768x24 -nolisten tcp -noreset &
 xvfb_pid=$!
 app_pid=""
 cleanup() {
