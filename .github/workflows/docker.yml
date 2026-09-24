@@ -40,23 +40,28 @@ jobs:
           tags: qtopo:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Exercise native rendering at both tile sizes
+      - name: Exercise native rendering and neighbouring tile prefetch
         run: |
           mkdir -p test-results
-          for pixels in 512 256; do
-            docker run -d --name qtopo-smoke-$pixels -e TILE_PX=$pixels -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 qtopo:test
+          for pixels in 1024 512 256; do
+            docker run -d --name qtopo-smoke-$pixels -e TILE_PX=$pixels -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 -e PREFETCH_RADIUS=0 qtopo:test
             docker exec qtopo-smoke-$pixels node scripts/smoke.js
             docker cp qtopo-smoke-$pixels:/tmp/smoke/. test-results/
             docker stop qtopo-smoke-$pixels
           done
+          docker run -d --name qtopo-prefetch -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 qtopo:test
+          docker exec qtopo-prefetch node scripts/smoke-prefetch.js
+          docker cp qtopo-prefetch:/tmp/smoke/. test-results/
+          docker stop qtopo-prefetch
       - name: Container logs
         if: always()
         run: |
           mkdir -p test-results
-          for pixels in 512 256; do
+          for pixels in 1024 512 256; do
             docker cp qtopo-smoke-$pixels:/tmp/smoke/. test-results/ 2>/dev/null || true
             docker logs qtopo-smoke-$pixels > test-results/container-$pixels.log 2>&1 || true
           done
+          docker logs qtopo-prefetch > test-results/prefetch.log 2>&1 || true
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:

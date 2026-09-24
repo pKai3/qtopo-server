@@ -12,7 +12,7 @@ const { validateStyleMin } = require('@maplibre/maplibre-gl-style-spec');
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/YYbL4QAAAAASUVORK5CYII=', 'base64');
 async function server(t, dependencies = {}) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-app-test-'));
-  const config = loadConfig({ DATA_DIR: dir, PORT: '0', CLEANUP_INTERVAL_MINUTES: '0' });
+  const config = loadConfig({ DATA_DIR: dir, PORT: '0', CLEANUP_INTERVAL_MINUTES: '0', PREFETCH_RADIUS: '0' });
   const instance = await createApp(config, dependencies);
   const listener = await new Promise(resolve => { const s = instance.app.listen(0, '127.0.0.1', () => resolve(s)); });
   const url = 'http://127.0.0.1:' + listener.address().port;
@@ -76,6 +76,9 @@ test('NSW source imagery passes through the conversion queue and never the vecto
   assert.equal(jobs[0].kind, 'image'); assert.equal(jobs[0].size, 256); assert.equal(jobs[0].inputPath, '/example/source.jpeg');
 });
 test('configuration and ArcGIS tile order are explicit', () => {
+  assert.equal(loadConfig({}).tilePx, 1024);
+  assert.equal(loadConfig({ TILE_PX: '512' }).tilePx, 512);
+  assert.equal(loadConfig({ PREFETCH_RADIUS: '0' }).prefetchRadius, 0);
   assert.throws(() => loadConfig({ TILE_PX: '300' }), /TILE_PX/);
   assert.throws(() => loadConfig({ RENDER_CONCURRENCY: '-1' }), /RENDER_CONCURRENCY/);
   const config = loadConfig({ DATA_DIR: '/tmp/example', TILE_PX: '256', LABEL_SCALE: '1.4' });
@@ -95,7 +98,7 @@ test('the existing Gaia URL selects QLD and NSW vector rendering and combines bo
   assert.equal((await fetch(s.url + '/raster/qld/13/7578/4746.png')).status, 200);
   assert.equal(jobs.length, 1, 'QLD keeps using its existing rendered cache');
   assert.equal((await fetch(s.url + '/raster/13/7516/4911.png')).status, 200);
-  assert.equal(jobs.at(-1).kind, 'vector'); assert.equal(jobs.at(-1).size, 512);
+  assert.equal(jobs.at(-1).kind, 'vector'); assert.equal(jobs.at(-1).size, 1024);
   assert.match(jobs.at(-1).style.glyphs, /resources\/nsw\/fonts/);
   assert.ok(Object.values(jobs.at(-1).style.sources).every(src => src.tiles[0].includes('/vector/nsw/')));
   assert.equal(calls.length, 0, 'automatic maps must never download pre-rendered map sheets');

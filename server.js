@@ -12,6 +12,7 @@ const { createRenderer } = require('./lib/render');
 const { startCleaner } = require('./lib/cleaner');
 const { coverage, boundaryRevision } = require('./lib/coverage');
 const { createTileIndex } = require('./lib/tile-index');
+const { createPrefetch } = require('./lib/prefetch');
 
 async function createApp(config = loadConfig(), dependencies = {}) {
   process.umask(0o002);
@@ -24,6 +25,10 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   const nativeZoom = dependencies.nativeZoom || createTileIndex(config, cache);
   const stopCleaner = startCleaner(config, L);
   const app = express();
+  const prefetch = createPrefetch({
+    radius: config.prefetchRadius, limit: config.prefetchQueueLimit, logger: L,
+    render: (id, tile) => id === 'auto' ? automaticRasterFile(tile, true) : rasterFile(providers[id], tile, true),
+  });
   app.disable('x-powered-by');
   app.use((req, res, next) => {
     if (/^\/(raster|vector|tiles_raster|tiles_vector)\//.test(req.path)) {
@@ -75,13 +80,13 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     }
     return style;
   }
-  async function rasterFile(p, tile) {
+  async function rasterFile(p, tile, background = false) {
     const style = await styleForRaster(p, tile);
     const revision = styleRevision(style, config, p);
     const outPath = path.join(config.rasterDir, 'v2', p.id, revision, String(tile.z), String(tile.x), `${tile.y}.png`);
     if (!(await cachedRaster(outPath, config.rasterTTL, config.emptyTTL))) {
-      L.log('RDR', `Generating tile: ${outPath}`);
-      const job = { ...tile, outPath, size: p.type === 'raster' ? 256 : config.tilePx };
+      L.log(background ? 'PREFETCH' : 'RDR', `Generating tile: ${outPath}`);
+      const job = { ...tile, outPath, background, styleKey: revision, size: p.type === 'raster' ? 256 : config.tilePx };
       if (p.type === 'raster') {
         const image = await cache.get({
           file: path.join(config.resourceDir, 'v2', p.id, p.cacheId, String(tile.z), String(tile.x), `${tile.y}.image`),
@@ -94,7 +99,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
         Object.assign(job, { kind: 'vector', origin: internalOrigin, style: absoluteStyle(renderStyle(style, config.labelScale, p.id === 'qld'), internalOrigin) });
       }
       await renderer.render(job);
-    } else L.log('RDR', `Cached tile: ${outPath}`);
+    } else if (!background) L.log('RDR', `Cached tile: ${outPath}`);
     return outPath;
   }
   async function deliverRaster(res, outPath) {
@@ -105,24 +110,35 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   }
   async function raster(req, res) {
     const p = providerFor(req);
-    await deliverRaster(res, await rasterFile(p, coordinates(req, p)));
+    await serveRaster(req, res, p);
   }
   async function automaticRaster(req, res) {
-    const tile = coordinates(req, providers.qld);
+    await serveRaster(req, res);
+  }
+  async function serveRaster(req, res, p) {
+    const tile = coordinates(req, p || providers.qld);
+    const finish = prefetch.begin(p?.id || 'auto', tile);
+    let success = false;
+    try {
+      await deliverRaster(res, await (p ? rasterFile(p, tile) : automaticRasterFile(tile)));
+      success = true;
+    } finally { finish(success); }
+  }
+  async function automaticRasterFile(tile, background = false) {
     const area = coverage(tile);
-    L.log('AUTO', `${tile.z}/${tile.x}/${tile.y}: ${area.region === 'border' ? 'QLD + NSW border' : area.region.toUpperCase()} vectors`);
-    if (area.region === 'qld') return deliverRaster(res, await rasterFile(providers.qld, tile));
-    if (area.region === 'nsw') return deliverRaster(res, await rasterFile(providers.nsw, tile));
+    if (!background) L.log('AUTO', `${tile.z}/${tile.x}/${tile.y}: ${area.region === 'border' ? 'QLD + NSW border' : area.region.toUpperCase()} vectors`);
+    if (area.region === 'qld') return rasterFile(providers.qld, tile, background);
+    if (area.region === 'nsw') return rasterFile(providers.nsw, tile, background);
     const [qldStyle, nswStyle] = await Promise.all([styleForRaster(providers.qld, tile), styleForRaster(providers.nsw, tile)]);
     const revision = hash(JSON.stringify({ version: 2, boundaryRevision, qld: styleRevision(qldStyle, config, providers.qld), nsw: styleRevision(nswStyle, config, providers.nsw) }));
     const outPath = path.join(config.rasterDir, 'v2', 'auto', revision, String(tile.z), String(tile.x), `${tile.y}.png`);
     if (!(await cachedRaster(outPath, config.rasterTTL, config.emptyTTL))) {
-      L.log('RDR', `Generating border tile: ${outPath}`);
-      const [backgroundPath, foregroundPath] = await Promise.all([rasterFile(providers.qld, tile), rasterFile(providers.nsw, tile)]);
+      L.log(background ? 'PREFETCH' : 'RDR', `Generating border tile: ${outPath}`);
+      const [backgroundPath, foregroundPath] = await Promise.all([rasterFile(providers.qld, tile, background), rasterFile(providers.nsw, tile, background)]);
       const rect = [0, 0, config.tilePx, config.tilePx];
-      await renderer.render({ ...tile, outPath, size: config.tilePx, kind: 'composite', backgroundPath, images: [{ path: foregroundPath, source: rect, destination: rect }], clip: area.rings });
-    } else L.log('RDR', `Cached border tile: ${outPath}`);
-    await deliverRaster(res, outPath);
+      await renderer.render({ ...tile, outPath, background, size: config.tilePx, kind: 'composite', backgroundPath, images: [{ path: foregroundPath, source: rect, destination: rect }], clip: area.rings });
+    } else if (!background) L.log('RDR', `Cached border tile: ${outPath}`);
+    return outPath;
   }
 
   app.get('/api/providers', (req, res) => {
@@ -176,7 +192,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   app.use('/assets', express.static(path.join(config.root, 'assets')));
   app.use('/vendor/maplibre', express.static(path.join(config.root, 'node_modules/maplibre-gl/dist'), { maxAge: '1d', index: false }));
   app.get('/healthz', (_req, res) => res.type('text/plain').send('ok'));
-  app.get('/readyz', (_req, res) => res.json({ status: 'ok', providers: Object.keys(providers), renderer: renderer.stats, cache: cache.stats }));
+  app.get('/readyz', (_req, res) => res.json({ status: 'ok', providers: Object.keys(providers), renderer: renderer.stats, cache: cache.stats, prefetch: prefetch.stats }));
   app.get('/raster', (_req, res) => res.redirect(302, '/?mode=raster'));
   app.use(express.static(path.join(config.root, 'public')));
   app.use((err, req, res, next) => {
@@ -187,7 +203,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     if (status === 503) res.set('Retry-After', '3');
     res.status(status).json({ error: status === 400 || status === 404 ? err.message : 'Map service temporarily unavailable; please retry.' });
   });
-  return { app, providers, close() { stopCleaner(); renderer.close(); } };
+  return { app, providers, close() { prefetch.close(); stopCleaner(); renderer.close(); } };
 }
 async function main() {
   const config = loadConfig();

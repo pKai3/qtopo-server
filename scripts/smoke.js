@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const { createCanvas, loadImage } = require('canvas');
 const origin = 'http://127.0.0.1:' + (process.env.PORT || 8080);
-const size = Number(process.env.TILE_PX || 512);
+const size = Number(process.env.TILE_PX || 1024);
 function tile(lng, lat, z) {
   const n = 2 ** z, phi = lat * Math.PI / 180;
   return { z, x: Math.floor((lng + 180) / 360 * n), y: Math.floor((1 - Math.asinh(Math.tan(phi)) / Math.PI) / 2 * n) };
@@ -16,6 +16,7 @@ async function main() {
   assert.equal((await fetch(origin + '/raster/nsw/2/4/0.png')).status, 400);
   const samples = [
     ['qld', 153.03, -27.47, 13],
+    ['qld', 153.07, -27.47, 13],
     ['qld', 153.03, -27.47, 19],
     ['nsw', 150.31, -33.72, 12],
     ['nsw', 151.21, -33.87, 16],
@@ -77,6 +78,8 @@ async function main() {
   for (let i = 3; i < blankPixels.length; i += 4) assert.equal(blankPixels[i], 0);
   const catalog = await (await fetch(origin + '/api/providers')).json();
   assert.equal(catalog.providers.length, 3);
+  const status = await (await fetch(origin + '/readyz')).json();
+  assert.ok(status.renderer.spawned < samples.length, 'workers must be reused across native renders');
   console.log('All live map smoke checks passed');
 }
 main().catch(err => { console.error(err); process.exit(1); });
