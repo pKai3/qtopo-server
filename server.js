@@ -7,21 +7,24 @@ const { loadConfig } = require('./lib/config');
 const { createProviders, tileURL, parseTile, hash } = require('./lib/providers');
 const { createCache } = require('./lib/cache');
 const { cachedRaster, httpError } = require('./lib/utils');
-const { seedStyles, getStyle, absoluteStyle, renderStyle, styleRevision } = require('./lib/styles');
+const { seedStyles, createStyleCache, absoluteStyle, renderStyle } = require('./lib/styles');
 const { createRenderer } = require('./lib/render');
 const { startCleaner } = require('./lib/cleaner');
 const { coverage, boundaryRevision } = require('./lib/coverage');
 const { createTileIndex } = require('./lib/tile-index');
 const { createPrefetch } = require('./lib/prefetch');
 const { PRIORITY } = require('./lib/queue');
+const { createRequestMetrics } = require('./lib/metrics');
 
 async function createApp(config = loadConfig(), dependencies = {}) {
   process.umask(0o002);
   const providers = dependencies.providers || createProviders(config);
   await seedStyles(config, providers);
+  const styles = createStyleCache(config), requests = createRequestMetrics();
+  const startedAt = new Date().toISOString();
   for (const dir of [config.vectorDir, config.rasterDir, config.resourceDir]) await fs.mkdir(path.join(dir, 'v2'), { recursive: true });
   if (config.clearRaster) await fs.rm(path.join(config.rasterDir, 'v2'), { recursive: true, force: true });
-  const cache = dependencies.cache || createCache({ timeoutMs: config.upstreamTimeoutMs, emptyTTL: config.emptyTTL, logger: L });
+  const cache = dependencies.cache || createCache({ timeoutMs: config.upstreamTimeoutMs, emptyTTL: config.emptyTTL, concurrency: config.upstreamConcurrency, logger: L });
   const renderer = dependencies.renderer || createRenderer(config);
   const nativeZoom = dependencies.nativeZoom || createTileIndex(config, cache);
   const stopCleaner = startCleaner(config, L);
@@ -30,7 +33,10 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     radius: config.prefetchRadius, zoom: config.prefetchZoom, concurrency: config.prefetchConcurrency,
     limit: config.prefetchQueueLimit, logger: L,
     zoomRange: id => id === 'auto' ? { minzoom: 0, maxzoom: providers.qld.maxzoom } : providers[id],
-    render: (id, tile, priority, rank) => id === 'auto' ? automaticRasterFile(tile, priority, rank) : rasterFile(providers[id], tile, priority, rank),
+    render: async (id, tile, priority, rank) => {
+      const result = await (id === 'auto' ? automaticRasterFile(tile, priority, rank) : rasterFile(providers[id], tile, priority, rank));
+      requests.prefetched(result);
+    },
   });
   app.disable('x-powered-by');
   app.use((req, res, next) => {
@@ -45,6 +51,11 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     next();
   });
   const origin = req => config.publicUrl || `${req.protocol}://${req.get('host')}`;
+  const resourcePriority = req => {
+    const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+    const priority = Number(req.get('X-QTopo-Priority'));
+    return local && [PRIORITY.NEIGHBOUR, PRIORITY.ZOOM].includes(priority) ? priority : PRIORITY.REQUEST;
+  };
   function providerFor(req, type) {
     const id = req.params.provider || 'qld';
     const p = Object.hasOwn(providers, id) ? providers[id] : null;
@@ -66,35 +77,29 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     const { z, x, y } = coordinates(req, p);
     const result = await cache.get({
       file: path.join(config.vectorDir, 'v2', p.id, p.cacheId, String(z), String(x), `${y}.pbf`),
-      url: tileURL(p, z, x, y), ttl: config.vectorTTL, logTag: 'PBF',
+      url: tileURL(p, z, x, y), ttl: config.vectorTTL, logTag: 'PBF', priority: resourcePriority(req),
     });
     headers(res, result.empty ? Math.floor(config.emptyTTL / 1000) : 3600);
     if (result.empty) return res.status(204).end();
     await sendFile(res, result.path, 'application/x-protobuf');
   }
   async function styleForRaster(p, tile) {
-    const style = await getStyle(config, p);
-    if (p.tileMap) {
-      const zoom = await nativeZoom(p, tile);
-      if (zoom === null) return { version: 8, sources: {}, layers: [] };
-      // Indexed ArcGIS services omit children once the parent has all detail.
-      // Render that vector parent at the requested camera zoom, without scaling a PNG.
-      for (const source of Object.values(style.sources)) if (source.type === 'vector') source.maxzoom = Math.min(source.maxzoom, zoom);
-    }
-    return style;
+    const prepared = await styles.get(p);
+    return p.tileMap ? prepared.atZoom(await nativeZoom(p, tile)) : prepared;
   }
   const renderTag = priority => ['RDR', 'PREFETCH', 'PREFETCH-Z'][priority];
   async function rasterFile(p, tile, priority = PRIORITY.REQUEST, rank = 0) {
-    const style = await styleForRaster(p, tile);
-    const revision = styleRevision(style, config, p);
+    const { style, revision } = await styleForRaster(p, tile);
     const outPath = path.join(config.rasterDir, 'v2', p.id, revision, String(tile.z), String(tile.x), `${tile.y}.png`);
-    if (!(await cachedRaster(outPath, config.rasterTTL, config.emptyTTL))) {
+    let cached = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
+    const hit = !!cached;
+    if (!cached) {
       L.log(renderTag(priority), `Generating tile: ${outPath}`);
       const job = { ...tile, outPath, priority, rank, styleKey: revision, size: p.type === 'raster' ? 256 : config.tilePx };
       if (p.type === 'raster') {
         const image = await cache.get({
           file: path.join(config.resourceDir, 'v2', p.id, p.cacheId, String(tile.z), String(tile.x), `${tile.y}.image`),
-          url: tileURL(p, tile.z, tile.x, tile.y), ttl: config.rasterTTL, kind: 'image', logTag: 'IMG',
+          url: tileURL(p, tile.z, tile.x, tile.y), ttl: config.rasterTTL, kind: 'image', logTag: 'IMG', priority,
         });
         Object.assign(job, { kind: 'image', inputPath: image.empty ? null : image.path });
       } else {
@@ -103,14 +108,15 @@ async function createApp(config = loadConfig(), dependencies = {}) {
         Object.assign(job, { kind: 'vector', origin: internalOrigin, style: absoluteStyle(renderStyle(style, config.labelScale, p.id === 'qld'), internalOrigin) });
       }
       await renderer.render(job);
+      cached = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
     } else if (priority === PRIORITY.REQUEST) L.log('RDR', `Cached tile: ${outPath}`);
-    return outPath;
+    if (!cached) throw httpError('Rendered tile is unavailable');
+    return { path: outPath, empty: cached.empty, hit };
   }
-  async function deliverRaster(res, outPath) {
-    const result = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
-    if (result?.empty) L.log('RDR', `Empty tile: ${outPath}`);
-    headers(res, result?.empty ? Math.floor(config.emptyTTL / 1000) : 3600);
-    await sendFile(res, outPath, 'image/png');
+  async function deliverRaster(res, result) {
+    if (result.empty) L.log('RDR', `Empty tile: ${result.path}`);
+    headers(res, result.empty ? Math.floor(config.emptyTTL / 1000) : 3600);
+    await sendFile(res, result.path, 'image/png');
   }
   async function raster(req, res) {
     const p = providerFor(req);
@@ -121,10 +127,15 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   }
   async function serveRaster(req, res, p) {
     const tile = coordinates(req, p || providers.qld);
+    const measured = requests.begin();
+    res.once('finish', () => measured.finish(res.statusCode, false, res.statusCode === 304 ? 0 : res.getHeader('content-length')));
+    res.once('close', () => { if (!res.writableFinished) measured.finish(res.statusCode, true); });
     const finish = prefetch.begin(p?.id || 'auto', tile);
     let success = false;
     try {
-      await deliverRaster(res, await (p ? rasterFile(p, tile) : automaticRasterFile(tile)));
+      const result = await (p ? rasterFile(p, tile) : automaticRasterFile(tile));
+      measured.ready(result);
+      await deliverRaster(res, result);
       success = true;
     } finally { finish(success); }
   }
@@ -134,15 +145,19 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     if (area.region === 'qld') return rasterFile(providers.qld, tile, priority, rank);
     if (area.region === 'nsw') return rasterFile(providers.nsw, tile, priority, rank);
     const [qldStyle, nswStyle] = await Promise.all([styleForRaster(providers.qld, tile), styleForRaster(providers.nsw, tile)]);
-    const revision = hash(JSON.stringify({ version: 2, boundaryRevision, qld: styleRevision(qldStyle, config, providers.qld), nsw: styleRevision(nswStyle, config, providers.nsw) }));
+    const revision = hash(JSON.stringify({ version: 2, boundaryRevision, qld: qldStyle.revision, nsw: nswStyle.revision }));
     const outPath = path.join(config.rasterDir, 'v2', 'auto', revision, String(tile.z), String(tile.x), `${tile.y}.png`);
-    if (!(await cachedRaster(outPath, config.rasterTTL, config.emptyTTL))) {
+    let cached = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
+    const hit = !!cached;
+    if (!cached) {
       L.log(renderTag(priority), `Generating border tile: ${outPath}`);
       const [backgroundPath, foregroundPath] = await Promise.all([rasterFile(providers.qld, tile, priority, rank), rasterFile(providers.nsw, tile, priority, rank)]);
       const rect = [0, 0, config.tilePx, config.tilePx];
-      await renderer.render({ ...tile, outPath, priority, rank, size: config.tilePx, kind: 'composite', backgroundPath, images: [{ path: foregroundPath, source: rect, destination: rect }], clip: area.rings });
+      await renderer.render({ ...tile, outPath, priority, rank, size: config.tilePx, kind: 'composite', backgroundPath: backgroundPath.path, images: [{ path: foregroundPath.path, source: rect, destination: rect }], clip: area.rings });
+      cached = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
     } else if (priority === PRIORITY.REQUEST) L.log('RDR', `Cached border tile: ${outPath}`);
-    return outPath;
+    if (!cached) throw httpError('Rendered border tile is unavailable');
+    return { path: outPath, empty: cached.empty, hit };
   }
 
   app.get('/api/providers', (req, res) => {
@@ -159,7 +174,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   });
   async function style(req, res) {
     const p = providerFor(req);
-    res.set('Cache-Control', 'no-cache').json(absoluteStyle(await getStyle(config, p), origin(req)));
+    res.set('Cache-Control', 'no-cache').json(absoluteStyle((await styles.get(p)).style, origin(req)));
   }
   app.get('/style.json', style);
   app.get('/styles/:provider.json', style);
@@ -181,7 +196,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     if (!match || Number(match[1]) % 256 || Number(match[2]) !== Number(match[1]) + 255 || Number(match[2]) > 65535 || !/^[\p{L}\p{N} ,_-]{1,200}$/u.test(fontstack)) throw httpError('Invalid font resource', 400);
     const url = `${p.resourceBase}/fonts/${encodeURIComponent(fontstack)}/${range}.pbf`;
     const file = path.join(config.resourceDir, 'v2', p.id, hash(url), `${range}.pbf`);
-    const result = await cache.get({ file, url, ttl: config.resourceTTL, allowEmpty: false });
+    const result = await cache.get({ file, url, ttl: config.resourceTTL, allowEmpty: false, priority: resourcePriority(req) });
     headers(res); await sendFile(res, result.path, 'application/x-protobuf');
   });
   app.get('/resources/:provider/sprites/:file', async (req, res) => {
@@ -190,13 +205,20 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     if (!/^sprite(@2x)?\.(png|json)$/.test(name)) throw httpError('Invalid sprite resource', 400);
     const url = `${p.resourceBase}/sprites/${name}`;
     const kind = name.endsWith('.png') ? 'image' : 'json';
-    const result = await cache.get({ file: path.join(config.resourceDir, 'v2', p.id, hash(url), name), url, ttl: config.resourceTTL, kind, allowEmpty: false });
+    const result = await cache.get({ file: path.join(config.resourceDir, 'v2', p.id, hash(url), name), url, ttl: config.resourceTTL, kind, allowEmpty: false, priority: resourcePriority(req) });
     headers(res); await sendFile(res, result.path, kind === 'image' ? 'image/png' : 'application/json');
   });
   app.use('/assets', express.static(path.join(config.root, 'assets')));
   app.use('/vendor/maplibre', express.static(path.join(config.root, 'node_modules/maplibre-gl/dist'), { maxAge: '1d', index: false }));
   app.get('/healthz', (_req, res) => res.type('text/plain').send('ok'));
-  app.get('/readyz', (_req, res) => res.json({ status: 'ok', providers: Object.keys(providers), renderer: renderer.stats, cache: cache.stats, prefetch: prefetch.stats }));
+  app.get('/readyz', (_req, res) => res.set('Cache-Control', 'no-store').json({
+    status: 'ok', startedAt, version: require('./package.json').version,
+    revision: process.env.BUILD_REVISION || 'development',
+    settings: { tilePx: config.tilePx, pngCompression: config.pngCompression, renderConcurrency: config.renderConcurrency, renderQueueLimit: config.renderQueueLimit, upstreamConcurrency: config.upstreamConcurrency, prefetchConcurrency: config.prefetchConcurrency, prefetchRadius: config.prefetchRadius, prefetchZoom: config.prefetchZoom },
+    providers: Object.keys(providers), renderer: renderer.stats, cache: cache.stats, prefetch: prefetch.stats,
+    requests: requests.stats, styles: styles.stats,
+  }));
+  app.get('/status', (_req, res) => res.sendFile(path.join(config.root, 'public/status.html')));
   app.get('/raster', (_req, res) => res.redirect(302, '/?mode=raster'));
   app.use(express.static(path.join(config.root, 'public')));
   app.use((err, req, res, next) => {
@@ -207,7 +229,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     if (status === 503) res.set('Retry-After', '3');
     res.status(status).json({ error: status === 400 || status === 404 ? err.message : 'Map service temporarily unavailable; please retry.' });
   });
-  return { app, providers, close() { prefetch.close(); stopCleaner(); renderer.close(); } };
+  return { app, providers, close() { prefetch.close(); stopCleaner(); renderer.close(); cache.close?.(); } };
 }
 async function main() {
   const config = loadConfig();

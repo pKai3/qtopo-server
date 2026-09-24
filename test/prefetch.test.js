@@ -9,20 +9,34 @@ test('adjacent prefetch stays within the XYZ grid and includes diagonals', () =>
   assert.equal(neighbours({ z: 0, x: 0, y: 0 }, 1).length, 0);
   assert.equal(neighbours({ z: 3, x: 0, y: 0 }, 1).length, 3);
 });
-test('prefetch waits for requests, stays bounded, deduplicates and never expands recursively', async t => {
+test('neighbour prefetch proceeds during outstanding requests, stays bounded and never expands recursively', async t => {
   const seen = [];
   const prefetch = createPrefetch({ radius: 1, zoom: false, limit: 8, delayMs: 1, render: async (provider, tile) => seen.push(`${provider}/${tile.z}/${tile.x}/${tile.y}`) });
   t.after(() => prefetch.close());
   const tile = { z: 3, x: 4, y: 4 };
   const finish = prefetch.begin('auto', tile), other = prefetch.begin('auto', tile);
-  finish(true); await wait(15); assert.equal(seen.length, 0);
-  other(true);
+  finish(true);
   for (let i = 0; i < 100 && seen.length < 8; i++) await wait(5);
   assert.equal(seen.length, 8); assert.equal(new Set(seen).size, 8);
+  assert.equal(prefetch.stats.requests, 1, 'one outstanding request must not block spare workers');
+  other(true);
   await wait(15); assert.equal(seen.length, 8);
   prefetch.begin('auto', tile)(true); await wait(15); assert.equal(seen.length, 8);
   for (let x = 1; x < 7; x++) prefetch.begin('auto', { z: 3, x, y: 1 })(true);
   assert.ok(prefetch.stats.queued <= 8);
+});
+test('zoom prefetch waits for outstanding requests while neighbours use spare capacity', async t => {
+  const seen = [];
+  const prefetch = createPrefetch({ delayMs: 1, concurrency: 3, render: async (_provider, _tile, priority) => seen.push(priority) });
+  t.after(() => prefetch.close());
+  const pending = prefetch.begin('auto', { z: 6, x: 40, y: 40 });
+  prefetch.begin('auto', { z: 6, x: 10, y: 10 })(true);
+  for (let i = 0; i < 100 && seen.length < 8; i++) await wait(5);
+  assert.equal(seen.length, 8); assert.ok(seen.every(priority => priority === 1));
+  await wait(15); assert.equal(seen.length, 8);
+  pending(false);
+  for (let i = 0; i < 100 && seen.length < 13; i++) await wait(5);
+  assert.equal(seen.length, 13); assert.ok(seen.slice(8).every(priority => priority === 2));
 });
 test('disabled or failed requests do not schedule speculative work', async t => {
   for (const radius of [0, 1]) {

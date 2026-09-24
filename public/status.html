@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>QTopo · Server activity</title>
+  <link rel="icon" href="/assets/icons/favicon.ico">
+  <link rel="stylesheet" href="/status.css">
+  <script src="/status.js" defer></script>
+</head>
+<body>
+  <main>
+    <header><div><a class="brand" href="/">QTopo <span>↗ Open map</span></a><h1>Server activity</h1><p>Live tile delivery, rendering and prefetch.</p></div><div class="update"><span id="activity" class="badge">Connecting…</span><p id="updated" role="status">Updates every 5 seconds</p></div></header>
+    <p id="error" role="alert" hidden></p>
+    <section class="cards" aria-label="Current activity">
+      <article><h2>Render workers</h2><strong id="workers">—</strong><p id="workers-detail">Waiting for activity</p><div class="meter" aria-hidden="true"><i id="workers-meter"></i></div></article>
+      <article><h2>Served from cache</h2><strong id="hit-rate">—</strong><p id="cache-detail">Successful tile responses</p></article>
+      <article><h2>Waiting to render</h2><strong id="queued">—</strong><p id="queue-detail">Foreground and prefetch</p></article>
+      <article><h2>Upstream downloads</h2><strong id="downloads">—</strong><p id="download-detail">Government map resources</p></article>
+    </section>
+    <div class="columns">
+      <section class="panel"><h2>Where the time goes</h2><p class="hint">Median is the typical response. 95th percentile shows the slower end.</p>
+        <table><thead><tr><th scope="col">Stage</th><th scope="col">Median</th><th scope="col">95th percentile</th></tr></thead><tbody id="timings"></tbody></table>
+        <p class="hint" id="samples">Waiting for timing samples.</p><p class="hint">Ready time ends before the PNG is sent. Response time includes sending it from this server, not Gaia displaying it. Resource waiting and CPU time can overlap; do not add the rows together.</p>
+      </section>
+      <section class="panel"><h2>Work in progress</h2><table><thead><tr><th scope="col">Priority</th><th scope="col">Running</th><th scope="col">Queued</th></tr></thead><tbody id="priorities"></tbody></table>
+        <h3>Prefetch</h3><p id="prefetch">—</p><p id="prefetch-use" class="hint">—</p>
+        <h3>This session</h3><dl id="session"></dl>
+      </section>
+    </div>
+    <section class="panel settings"><h2>Running configuration</h2><dl id="settings"></dl><p class="hint">Counters reset on restart. This page observes activity without requesting map tiles or testing upstream services.</p></section>
+    <footer><span id="release">Release —</span><a href="/readyz">View raw status</a></footer>
+  </main>
+</body>
+</html>

@@ -38,13 +38,16 @@ jobs:
           platforms: linux/amd64
           load: true
           tags: qtopo:test
+          build-args: BUILD_REVISION=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Exercise native rendering and neighbouring tile prefetch
         run: |
           mkdir -p test-results
           for pixels in 1024 512 256; do
-            docker run -d --name qtopo-smoke-$pixels -e TILE_PX=$pixels -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 -e PREFETCH_RADIUS=0 qtopo:test
+            compression=3
+            if [ "$pixels" = 256 ]; then compression=6; fi
+            docker run -d --name qtopo-smoke-$pixels -e TILE_PX=$pixels -e PNG_COMPRESSION_LEVEL=$compression -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 -e PREFETCH_RADIUS=0 qtopo:test
             docker exec qtopo-smoke-$pixels node scripts/smoke.js
             docker cp qtopo-smoke-$pixels:/tmp/smoke/. test-results/
             docker stop qtopo-smoke-$pixels
