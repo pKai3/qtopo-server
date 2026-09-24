@@ -20,6 +20,10 @@ async function main() {
     ['nsw', 150.31, -33.72, 12],
     ['nsw', 151.21, -33.87, 16],
     ['nsw-topo', 150.31, -33.72, 13],
+    ['auto', 153.03, -27.47, 13],
+    ['auto', 150.31, -33.72, 13],
+    ['auto', 150.31, -33.72, 18],
+    ['auto', 153.539, -28.166, 14],
   ];
   await fs.mkdir('/tmp/smoke', { recursive: true });
   const contact = createCanvas(512 * samples.length, 554), ctx = contact.getContext('2d');
@@ -27,7 +31,7 @@ async function main() {
   let col = 0;
   const timings = [];
   for (const [provider, lng, lat, z] of samples) {
-    const t = tile(lng, lat, z), url = `${origin}/raster/${provider}/${t.z}/${t.x}/${t.y}.png`;
+    const t = tile(lng, lat, z), url = `${origin}/raster/${provider === 'auto' ? '' : provider + '/'}${t.z}/${t.x}/${t.y}.png`;
     console.log('Rendering', url);
     const started = performance.now();
     const r = await fetch(url, { signal: AbortSignal.timeout(120000) });
@@ -47,7 +51,11 @@ async function main() {
     }
     assert.ok(visible > 0 && colors.size > 20, `${provider} z${z} is empty or lacks map detail (${colors.size} colors)`);
     if (provider === 'nsw') assert.equal(opaque, expected * expected, 'NSW standalone maps must have an opaque background');
-    await fs.writeFile(`/tmp/smoke/${provider}-z${z}-${size}.png`, data);
+    await fs.writeFile(`/tmp/smoke/${provider}-z${z}-${size}-${t.x}-${t.y}.png`, data);
+    if (provider === 'auto' && lat > -28) {
+      const qld = await fetch(`${origin}/raster/qld/${t.z}/${t.x}/${t.y}.png`);
+      assert.deepEqual(Buffer.from(await qld.arrayBuffer()), data, 'automatic QLD pixels must remain unchanged');
+    }
     const cachedStarted = performance.now();
     const cached = await fetch(url); assert.deepEqual(Buffer.from(await cached.arrayBuffer()), data);
     const cachedMs = Math.round(performance.now() - cachedStarted);

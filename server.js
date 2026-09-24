@@ -10,6 +10,7 @@ const { cachedRaster, httpError } = require('./lib/utils');
 const { seedStyles, getStyle, absoluteStyle, renderStyle, styleRevision } = require('./lib/styles');
 const { createRenderer } = require('./lib/render');
 const { startCleaner } = require('./lib/cleaner');
+const { coverage, imageParts, boundaryRevision } = require('./lib/coverage');
 
 async function createApp(config = loadConfig(), dependencies = {}) {
   process.umask(0o002);
@@ -50,9 +51,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     if (result.empty) return res.status(204).end();
     await sendFile(res, result.path, 'application/x-protobuf');
   }
-  async function raster(req, res) {
-    const p = providerFor(req);
-    const tile = coordinates(req, p);
+  async function rasterFile(p, tile) {
     const style = await getStyle(config, p);
     const revision = styleRevision(style, config, p);
     const outPath = path.join(config.rasterDir, 'v2', p.id, revision, String(tile.z), String(tile.x), `${tile.y}.png`);
@@ -71,14 +70,45 @@ async function createApp(config = loadConfig(), dependencies = {}) {
       }
       await renderer.render(job);
     }
+    return outPath;
+  }
+  async function deliverRaster(res, outPath) {
     const result = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
     headers(res, result?.empty ? Math.floor(config.emptyTTL / 1000) : 3600);
     await sendFile(res, outPath, 'image/png');
+  }
+  async function raster(req, res) {
+    const p = providerFor(req);
+    await deliverRaster(res, await rasterFile(p, coordinates(req, p)));
+  }
+  async function automaticRaster(req, res) {
+    const tile = coordinates(req, providers.qld);
+    const area = coverage(tile);
+    if (area.region === 'qld') return deliverRaster(res, await rasterFile(providers.qld, tile));
+    const qldStyle = await getStyle(config, providers.qld);
+    const revision = hash(JSON.stringify({ version: 1, boundaryRevision, qld: styleRevision(qldStyle, config, providers.qld), nsw: providers['nsw-topo'].cacheId }));
+    const outPath = path.join(config.rasterDir, 'v2', 'auto', revision, String(tile.z), String(tile.x), `${tile.y}.png`);
+    if (!(await cachedRaster(outPath, config.rasterTTL, config.emptyTTL))) {
+      const [backgroundPath, images] = await Promise.all([
+        area.region === 'border' ? rasterFile(providers.qld, tile) : null,
+        Promise.all(imageParts(tile, config.tilePx, providers['nsw-topo'].maxzoom).map(async part => {
+          const p = providers['nsw-topo'];
+          const image = await cache.get({
+            file: path.join(config.resourceDir, 'v2', p.id, p.cacheId, String(part.z), String(part.x), `${part.y}.image`),
+            url: tileURL(p, part.z, part.x, part.y), ttl: config.rasterTTL, kind: 'image',
+          });
+          return { ...part, path: image.empty ? null : image.path };
+        })),
+      ]);
+      await renderer.render({ ...tile, outPath, size: config.tilePx, kind: 'composite', backgroundPath, images, clip: area.region === 'border' ? area.rings : null });
+    }
+    await deliverRaster(res, outPath);
   }
 
   app.get('/api/providers', (req, res) => {
     res.set('Cache-Control', 'no-cache').json({
       defaultProvider: config.defaultProvider,
+      automatic: { raster: `${origin(req)}/raster/{z}/{x}/{y}.png`, tileSize: config.tilePx, maxzoom: providers.qld.maxzoom, bounds: [137.8, -37.6, 162.7, -9], attribution: `${providers.qld.attribution}; ${providers['nsw-topo'].attribution}` },
       providers: Object.values(providers).map(p => ({
         id: p.id, name: p.name, type: p.type, bounds: p.bounds, center: p.center, zoom: p.zoom,
         minzoom: p.minzoom, maxzoom: p.maxzoom, tileSize: p.type === 'raster' ? 256 : config.tilePx,
@@ -96,7 +126,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   app.get('/vector/:provider/:z/:x/:y.pbf', vector);
   app.get('/vector/:z/:x/:y.pbf', vector);
   app.get('/raster/:provider/:z/:x/:y.png', raster);
-  app.get('/raster/:z/:x/:y.png', raster);
+  app.get('/raster/:z/:x/:y.png', automaticRaster);
   for (const [old, current, extension] of [['tiles_raster', 'raster', 'png'], ['tiles_vector', 'vector', 'pbf']]) {
     app.get(`/${old}/:z/:x/:y.${extension}`, (req, res) => {
       if (!parseTile(req.params)) throw httpError('Invalid tile coordinates', 400);

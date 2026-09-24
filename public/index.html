@@ -14,12 +14,15 @@
   <details class="panel" open>
     <summary><strong>QTopo</strong><span>Queensland & New South Wales</span></summary>
     <div class="controls">
+      <p class="hint">One tile source for Gaia and other GPS apps. QLD and NSW maps are selected automatically by location.</p>
+      <button id="copy-url" type="button">Copy QLD + NSW tile URL</button>
+      <details><summary>Advanced previews</summary>
       <label for="provider">Map</label><select id="provider" aria-label="Map provider"></select>
       <label for="mode">View</label>
       <select id="mode"><option value="vector">Interactive map</option><option value="raster">Raster tiles / GPS preview</option></select>
       <fieldset id="layers"><legend>Show on map</legend></fieldset>
+      </details>
       <label class="check"><input id="regions" type="checkbox"> Regions of interest</label>
-      <button id="copy-url" type="button">Copy tile URL for GPS app</button>
       <p id="tile-size" class="hint"></p>
       <p id="status" role="status" aria-live="polite">Loading maps…</p>
     </div>

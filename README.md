@@ -1,6 +1,6 @@
 # qtopo-server
 
-Queensland and NSW topographic maps for browsers and GPS apps. Downloads and caches vector tiles, renders PNG tiles on demand, and serves NSW's traditional topographic map sheets.
+One XYZ tile source for Gaia GPS and other mapping apps, covering Queensland and NSW automatically. Queensland uses your editable vector style; NSW uses the official NSW Topo Map sheets. The browser is a preview of that same tile source.
 
 ## Release channels
 
@@ -30,11 +30,15 @@ Existing `/data/styles/style.json` edits are retained. NSW's style is seeded int
 
 If switching an existing root-owned installation to PUID/PGID, set `FIX_PERMISSIONS=1` for the first start to change ownership of the configured data directories, then remove it. Without PUID/PGID, the container retains the previous root behavior. Stop the old container before starting a replacement against the same data directory.
 
-Open `http://<unraid-host>:<host-port>/`. Select a map and use **Copy tile URL for GPS app**. To roll back, change the Unraid repository to `pkai3/qtopo-server:stable` and update the container; the same mount and port still work.
+Keep using `http://<unraid-host>:<host-port>/raster/{z}/{x}/{y}.png` in Gaia or your existing mapping app. No provider selection is required. Open the browser preview and use **Copy QLD + NSW tile URL** when setting up a new app. To roll back, change the Unraid repository to `pkai3/qtopo-server:stable` and update the container; the same mount and port still work.
 
 ## Maps and tile URLs
 
-All client tile URLs use XYZ order: zoom, column, row. ArcGIS row/column ordering is handled internally.
+Use **`/raster/{z}/{x}/{y}.png`** for the automatic QLD + NSW map, at zooms 0–19. It selects maps by location and combines both sources within tiles that cross the state boundary. Output is always TILE_PX (512 by default), with the same XYZ grid as before. Keep the tile-size setting that already works for QLD in your GPS app.
+
+NSW 512px output assembles four native 256px tiles when available. Above the sheet service's cached zoom 16, it crops and enlarges the correct parent tile; this preserves coverage but adds no new map detail. QLD-only tiles reuse the existing QLD cache without changing their pixels. Previously downloaded blank NSW tiles in a GPS app may need refreshing.
+
+All client tile URLs use XYZ order: zoom, column, row. ArcGIS row/column ordering is handled internally. The provider-specific routes below remain available for advanced use:
 
 | Map | Provider | Raster URL |
 |---|---|---|
@@ -46,7 +50,7 @@ NSW map sheets preserve the published cartography and always output 256px PNGs (
 
 NSW's published vector style is an overlay, so the viewer and raster output add a light background for standalone GPS use. An explicit background in your edited NSW style takes precedence. QLD retains its previous transparent-background behavior. Genuinely empty QLD raster tiles remain transparent and expire after EMPTY_TILE_TTL_MINUTES.
 
-Existing `/raster/{z}/{x}/{y}.png`, `/vector/{z}/{x}/{y}.pbf`, and `/style.json` remain QLD aliases, regardless of DEFAULT_PROVIDER.
+The existing `/raster/{z}/{x}/{y}.png` URL now provides automatic QLD + NSW coverage. `/vector/{z}/{x}/{y}.pbf` and `/style.json` remain QLD-only interfaces; use the PNG URL for the combined GPS map.
 
 Additional endpoints:
 
@@ -68,7 +72,7 @@ Additional endpoints:
 | VECTOR_DIR / RASTER_DIR / STYLE_DIR | Under DATA_DIR | Optional directory overrides |
 | STYLE_PATH | /data/styles/style.json | Editable QLD style |
 | FONT_DIR | Bundled fonts | Local QLD glyph directory |
-| DEFAULT_PROVIDER | qld | Initial viewer map: qld, nsw, nsw-topo |
+| DEFAULT_PROVIDER | qld | Initial viewer location: qld, nsw, nsw-topo; automatic GPS coverage is always enabled |
 | PUBLIC_URL | Request origin | External origin, e.g. https://maps.example.com, when using an HTTPS reverse proxy |
 | TILE_PX | 512 | 256 or 512 output pixels for vector-to-raster maps |
 | LABEL_SCALE | 1 | Raster text/icon scale, 0.5–3; try 1.4 for a GPS app |
@@ -117,3 +121,5 @@ The live rendering checks depend on public government services. If an upstream s
 - QLD point symbols use [Maki](https://github.com/mapbox/maki); its license is included with the generated sprites. NSW uses its published symbol atlas and Public Sans glyphs.
 
 The bundled NSW style is a snapshot of its published service style, with its source URL recorded in metadata. Existing local styles are never overwritten by an update.
+
+Automatic state selection uses a bundled [ABS ASGS 2021 State and Territory boundary](https://geo.abs.gov.au/arcgis/rest/services/ASGS2021/STE/MapServer/0), simplified to approximately 5 metres and rounded to six decimal places. © Australian Bureau of Statistics, CC BY 4.0. NSW topographic coverage also includes the ACT. The boundary is used to combine map imagery, not as a surveyed boundary.
