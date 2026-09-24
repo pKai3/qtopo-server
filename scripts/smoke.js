@@ -48,6 +48,15 @@ async function main() {
     console.log(provider, z, expected, 'pixels;', colors.size, 'colors');
   }
   await fs.writeFile('/tmp/smoke/contact-' + size + '.png', contact.toBuffer('image/png'));
+  // A valid tile outside QLD must remain transparent, and have a short cache lifetime.
+  const blank = await fetch(origin + '/raster/qld/5/1/1.png');
+  assert.equal(blank.status, 200);
+  assert.equal(blank.headers.get('cache-control'), 'public, max-age=1800');
+  const blankImage = await loadImage(Buffer.from(await blank.arrayBuffer()));
+  const blankCanvas = createCanvas(size, size), blankContext = blankCanvas.getContext('2d');
+  blankContext.drawImage(blankImage, 0, 0);
+  const blankPixels = blankContext.getImageData(0, 0, size, size).data;
+  for (let i = 3; i < blankPixels.length; i += 4) assert.equal(blankPixels[i], 0);
   const catalog = await (await fetch(origin + '/api/providers')).json();
   assert.equal(catalog.providers.length, 3);
   console.log('All live map smoke checks passed');

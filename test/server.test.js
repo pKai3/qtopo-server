@@ -49,7 +49,7 @@ test('styles resolve provider tiles, fonts, sprites and attribution consistently
   const s = await server(t);
   for (const p of Object.values(s.providers)) {
     const style = await getStyle(s.config, p);
-    for (const scaled of [style, renderStyle(style, 1.4)]) {
+    for (const scaled of [style, renderStyle(style, 1.4, p.id === 'qld')]) {
       assert.deepEqual(validateStyleMin(scaled).map(e => e.message), [], p.id);
     }
     const absolute = absoluteStyle(style, 'https://maps.example.test');
@@ -57,6 +57,7 @@ test('styles resolve provider tiles, fonts, sprites and attribution consistently
   }
   const response = await fetch(s.url + '/styles/nsw.json'); const style = await response.json();
   assert.ok(style.glyphs.includes('/resources/nsw/fonts/')); assert.ok(style.sprite.includes('/resources/nsw/sprites/'));
+  assert.deepEqual(renderStyle(style, 1, false).layers.filter(l => l.type === 'background'), style.layers.filter(l => l.type === 'background'));
   assert.equal((await fetch(s.url + '/tiles_raster/3/7/4.png', { redirect: 'manual' })).status, 308);
   assert.equal((await fetch(s.url + '/api/providers')).status, 200);
   assert.equal((await fetch(s.url + '/healthz')).status, 200);

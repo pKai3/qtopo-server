@@ -67,7 +67,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
       } else {
         const internalOrigin = app.locals.internalOrigin;
         if (!internalOrigin) throw httpError('Renderer not ready', 503);
-        Object.assign(job, { kind: 'vector', origin: internalOrigin, style: absoluteStyle(renderStyle(style, config.labelScale), internalOrigin) });
+        Object.assign(job, { kind: 'vector', origin: internalOrigin, style: absoluteStyle(renderStyle(style, config.labelScale, p.id === 'qld'), internalOrigin) });
       }
       await renderer.render(job);
     }
