@@ -55,7 +55,7 @@ async function refresh() {
     $('activity').textContent = 'Unavailable';
     $('error').textContent = `Could not refresh server activity (${error.message}). Any figures shown are from the last successful update.`;
     $('error').hidden = false;
-  } finally { loading = false; if (!document.hidden) timer = setTimeout(refresh, 5000); }
+  } finally { loading = false; if (!document.hidden) timer = setTimeout(refresh, 500); }
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) clearTimeout(timer); else refresh(); });
 refresh();
