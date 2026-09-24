@@ -82,7 +82,7 @@ test('configuration and ArcGIS tile order are explicit', () => {
   assert.equal(parseTile({ z: '3', x: '8', y: '0' }), null);
   assert.notEqual(styleRevision({}, config, p.qld), styleRevision({}, { ...config, tilePx: 512 }, p.qld));
 });
-test('the existing Gaia URL selects QLD, NSW imagery and both sides of a border tile', async t => {
+test('the existing Gaia URL selects QLD and NSW vector rendering and combines border tiles', async t => {
   const calls = [], jobs = [];
   const s = await server(t, {
     cache: { stats: {}, async get(opts) { calls.push(opts); return { path: '/example/source.jpeg', empty: false }; } },
@@ -93,13 +93,16 @@ test('the existing Gaia URL selects QLD, NSW imagery and both sides of a border 
   assert.equal((await fetch(s.url + '/raster/qld/13/7578/4746.png')).status, 200);
   assert.equal(jobs.length, 1, 'QLD keeps using its existing rendered cache');
   assert.equal((await fetch(s.url + '/raster/13/7516/4911.png')).status, 200);
-  assert.equal(jobs.at(-1).kind, 'composite'); assert.equal(jobs.at(-1).size, 512);
-  assert.equal(jobs.at(-1).images.length, 4); assert.equal(jobs.at(-1).backgroundPath, null);
-  assert.ok(calls.every(c => c.url.includes('/NSW_Topo_Map/MapServer/tile/14/')));
+  assert.equal(jobs.at(-1).kind, 'vector'); assert.equal(jobs.at(-1).size, 512);
+  assert.match(jobs.at(-1).style.glyphs, /resources\/nsw\/fonts/);
+  assert.ok(Object.values(jobs.at(-1).style.sources).every(src => src.tiles[0].includes('/vector/nsw/')));
+  assert.equal(calls.length, 0, 'automatic maps must never download pre-rendered map sheets');
   const count = jobs.length;
   await fetch(s.url + '/raster/13/7516/4911.png'); assert.equal(jobs.length, count, 'automatic tiles are cached');
   assert.equal((await fetch(s.url + '/raster/14/15179/9528.png')).status, 200);
   assert.equal(jobs.at(-1).kind, 'composite'); assert.ok(jobs.at(-1).backgroundPath); assert.ok(jobs.at(-1).clip.length);
+  assert.equal(jobs.at(-1).images.length, 1);
+  assert.equal(calls.length, 0);
   const catalog = await (await fetch(s.url + '/api/providers')).json();
   assert.equal(catalog.automatic.raster, s.url + '/raster/{z}/{x}/{y}.png');
 });

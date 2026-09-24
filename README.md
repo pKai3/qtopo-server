@@ -1,6 +1,6 @@
 # qtopo-server
 
-One XYZ tile source for Gaia GPS and other mapping apps, covering Queensland and NSW automatically. Queensland uses your editable vector style; NSW uses the official NSW Topo Map sheets. The browser is a preview of that same tile source.
+One XYZ tile source for Gaia GPS and other mapping apps, covering Queensland and NSW automatically. Queensland uses your editable vector style; NSW uses the official NSW vector basemap. Both are rendered into PNG tiles for the GPS client. The browser is a preview of that same tile source.
 
 ## Release channels
 
@@ -34,9 +34,9 @@ Keep using `http://<unraid-host>:<host-port>/raster/{z}/{x}/{y}.png` in Gaia or 
 
 ## Maps and tile URLs
 
-Use **`/raster/{z}/{x}/{y}.png`** for the automatic QLD + NSW map, at zooms 0–19. It selects maps by location and combines both sources within tiles that cross the state boundary. Output is always TILE_PX (512 by default), with the same XYZ grid as before. Keep the tile-size setting that already works for QLD in your GPS app.
+Use **`/raster/{z}/{x}/{y}.png`** for the automatic QLD + NSW map, at zooms 0–19. It selects the QLD or NSW vector service by location, renders the selected vector data to PNG, and combines both renders within tiles that cross the state boundary. Output is always TILE_PX (512 by default), with the same XYZ grid as before. Keep the tile-size setting that already works for QLD in your GPS app.
 
-NSW 512px output assembles four native 256px tiles when available. Above the sheet service's cached zoom 16, it crops and enlarges the correct parent tile; this preserves coverage but adds no new map detail. QLD-only tiles reuse the existing QLD cache without changing their pixels. Previously downloaded blank NSW tiles in a GPS app may need refreshing.
+Both states render directly at the configured output resolution; the automatic route does not use scanned map sheets. QLD-only tiles reuse the existing QLD cache without changing their pixels. Previously downloaded blank NSW tiles in a GPS app may need refreshing.
 
 All client tile URLs use XYZ order: zoom, column, row. ArcGIS row/column ordering is handled internally. The provider-specific routes below remain available for advanced use:
 
@@ -122,4 +122,4 @@ The live rendering checks depend on public government services. If an upstream s
 
 The bundled NSW style is a snapshot of its published service style, with its source URL recorded in metadata. Existing local styles are never overwritten by an update.
 
-Automatic state selection uses a bundled [ABS ASGS 2021 State and Territory boundary](https://geo.abs.gov.au/arcgis/rest/services/ASGS2021/STE/MapServer/0), simplified to approximately 5 metres and rounded to six decimal places. © Australian Bureau of Statistics, CC BY 4.0. NSW topographic coverage also includes the ACT. The boundary is used to combine map imagery, not as a surveyed boundary.
+Automatic state selection uses a bundled [ABS ASGS 2021 State and Territory boundary](https://geo.abs.gov.au/arcgis/rest/services/ASGS2021/STE/MapServer/0), simplified to approximately 5 metres and rounded to six decimal places. © Australian Bureau of Statistics, CC BY 4.0. The NSW vector basemap also covers the ACT. The boundary is used to combine map imagery, not as a surveyed boundary.

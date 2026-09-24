@@ -10,7 +10,7 @@ const { cachedRaster, httpError } = require('./lib/utils');
 const { seedStyles, getStyle, absoluteStyle, renderStyle, styleRevision } = require('./lib/styles');
 const { createRenderer } = require('./lib/render');
 const { startCleaner } = require('./lib/cleaner');
-const { coverage, imageParts, boundaryRevision } = require('./lib/coverage');
+const { coverage, boundaryRevision } = require('./lib/coverage');
 
 async function createApp(config = loadConfig(), dependencies = {}) {
   process.umask(0o002);
@@ -85,22 +85,14 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     const tile = coordinates(req, providers.qld);
     const area = coverage(tile);
     if (area.region === 'qld') return deliverRaster(res, await rasterFile(providers.qld, tile));
-    const qldStyle = await getStyle(config, providers.qld);
-    const revision = hash(JSON.stringify({ version: 1, boundaryRevision, qld: styleRevision(qldStyle, config, providers.qld), nsw: providers['nsw-topo'].cacheId }));
+    if (area.region === 'nsw') return deliverRaster(res, await rasterFile(providers.nsw, tile));
+    const [qldStyle, nswStyle] = await Promise.all([getStyle(config, providers.qld), getStyle(config, providers.nsw)]);
+    const revision = hash(JSON.stringify({ version: 2, boundaryRevision, qld: styleRevision(qldStyle, config, providers.qld), nsw: styleRevision(nswStyle, config, providers.nsw) }));
     const outPath = path.join(config.rasterDir, 'v2', 'auto', revision, String(tile.z), String(tile.x), `${tile.y}.png`);
     if (!(await cachedRaster(outPath, config.rasterTTL, config.emptyTTL))) {
-      const [backgroundPath, images] = await Promise.all([
-        area.region === 'border' ? rasterFile(providers.qld, tile) : null,
-        Promise.all(imageParts(tile, config.tilePx, providers['nsw-topo'].maxzoom).map(async part => {
-          const p = providers['nsw-topo'];
-          const image = await cache.get({
-            file: path.join(config.resourceDir, 'v2', p.id, p.cacheId, String(part.z), String(part.x), `${part.y}.image`),
-            url: tileURL(p, part.z, part.x, part.y), ttl: config.rasterTTL, kind: 'image',
-          });
-          return { ...part, path: image.empty ? null : image.path };
-        })),
-      ]);
-      await renderer.render({ ...tile, outPath, size: config.tilePx, kind: 'composite', backgroundPath, images, clip: area.region === 'border' ? area.rings : null });
+      const [backgroundPath, foregroundPath] = await Promise.all([rasterFile(providers.qld, tile), rasterFile(providers.nsw, tile)]);
+      const rect = [0, 0, config.tilePx, config.tilePx];
+      await renderer.render({ ...tile, outPath, size: config.tilePx, kind: 'composite', backgroundPath, images: [{ path: foregroundPath, source: rect, destination: rect }], clip: area.rings });
     }
     await deliverRaster(res, outPath);
   }
@@ -108,7 +100,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   app.get('/api/providers', (req, res) => {
     res.set('Cache-Control', 'no-cache').json({
       defaultProvider: config.defaultProvider,
-      automatic: { raster: `${origin(req)}/raster/{z}/{x}/{y}.png`, tileSize: config.tilePx, maxzoom: providers.qld.maxzoom, bounds: [137.8, -37.6, 162.7, -9], attribution: `${providers.qld.attribution}; ${providers['nsw-topo'].attribution}` },
+      automatic: { raster: `${origin(req)}/raster/{z}/{x}/{y}.png`, tileSize: config.tilePx, maxzoom: providers.qld.maxzoom, bounds: [137.8, -37.6, 162.7, -9], attribution: `${providers.qld.attribution}; ${providers.nsw.attribution}` },
       providers: Object.values(providers).map(p => ({
         id: p.id, name: p.name, type: p.type, bounds: p.bounds, center: p.center, zoom: p.zoom,
         minzoom: p.minzoom, maxzoom: p.maxzoom, tileSize: p.type === 'raster' ? 256 : config.tilePx,
