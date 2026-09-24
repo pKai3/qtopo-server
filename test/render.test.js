@@ -54,3 +54,22 @@ test('reuse workers across tiles, deduplicate requests, and replace failed worke
   assert.notEqual(await fs.readFile(tile(2).recordPid, 'utf8'), await fs.readFile(tile(3).recordPid, 'utf8'));
   assert.equal(renderer.stats.spawned, 2);
 });
+
+test('concurrency eight actually starts eight separate workers simultaneously', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-parallel-test-'));
+  const renderer = createRenderer({ renderConcurrency: 8, renderQueueLimit: 16, rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 10000 }, path.join(__dirname, 'fixtures/render-worker.js'));
+  t.after(async () => { renderer.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const gate = path.join(root, 'go');
+  const jobs = Array.from({ length: 8 }, (_, i) => renderer.render({ outPath: path.join(root, `${i}.png`), recordPid: path.join(root, `${i}.pid`), gate }));
+  const complete = Promise.all(jobs);
+  try {
+    for (let i = 0; i < 200; i++) {
+      if ((await fs.readdir(root)).filter(name => name.endsWith('.pid')).length === 8) break;
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    const pids = await Promise.all(Array.from({ length: 8 }, (_, i) => fs.readFile(path.join(root, `${i}.pid`), 'utf8')));
+    assert.equal(new Set(pids).size, 8);
+    assert.equal(renderer.stats.active, 8);
+    assert.equal(renderer.stats.peakActive, 8);
+  } finally { await fs.writeFile(gate, 'go'); await complete; }
+});

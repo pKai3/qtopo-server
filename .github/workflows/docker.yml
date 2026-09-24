@@ -49,7 +49,7 @@ jobs:
             docker cp qtopo-smoke-$pixels:/tmp/smoke/. test-results/
             docker stop qtopo-smoke-$pixels
           done
-          docker run -d --name qtopo-prefetch -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 qtopo:test
+          docker run -d --name qtopo-prefetch -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 -e RENDER_CONCURRENCY=4 qtopo:test
           docker exec qtopo-prefetch node scripts/smoke-prefetch.js
           docker cp qtopo-prefetch:/tmp/smoke/. test-results/
           docker stop qtopo-prefetch

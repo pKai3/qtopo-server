@@ -13,6 +13,7 @@ const { startCleaner } = require('./lib/cleaner');
 const { coverage, boundaryRevision } = require('./lib/coverage');
 const { createTileIndex } = require('./lib/tile-index');
 const { createPrefetch } = require('./lib/prefetch');
+const { PRIORITY } = require('./lib/queue');
 
 async function createApp(config = loadConfig(), dependencies = {}) {
   process.umask(0o002);
@@ -26,8 +27,10 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   const stopCleaner = startCleaner(config, L);
   const app = express();
   const prefetch = createPrefetch({
-    radius: config.prefetchRadius, limit: config.prefetchQueueLimit, logger: L,
-    render: (id, tile) => id === 'auto' ? automaticRasterFile(tile, true) : rasterFile(providers[id], tile, true),
+    radius: config.prefetchRadius, zoom: config.prefetchZoom, concurrency: config.prefetchConcurrency,
+    limit: config.prefetchQueueLimit, logger: L,
+    zoomRange: id => id === 'auto' ? { minzoom: 0, maxzoom: providers.qld.maxzoom } : providers[id],
+    render: (id, tile, priority, rank) => id === 'auto' ? automaticRasterFile(tile, priority, rank) : rasterFile(providers[id], tile, priority, rank),
   });
   app.disable('x-powered-by');
   app.use((req, res, next) => {
@@ -80,13 +83,14 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     }
     return style;
   }
-  async function rasterFile(p, tile, background = false) {
+  const renderTag = priority => ['RDR', 'PREFETCH', 'PREFETCH-Z'][priority];
+  async function rasterFile(p, tile, priority = PRIORITY.REQUEST, rank = 0) {
     const style = await styleForRaster(p, tile);
     const revision = styleRevision(style, config, p);
     const outPath = path.join(config.rasterDir, 'v2', p.id, revision, String(tile.z), String(tile.x), `${tile.y}.png`);
     if (!(await cachedRaster(outPath, config.rasterTTL, config.emptyTTL))) {
-      L.log(background ? 'PREFETCH' : 'RDR', `Generating tile: ${outPath}`);
-      const job = { ...tile, outPath, background, styleKey: revision, size: p.type === 'raster' ? 256 : config.tilePx };
+      L.log(renderTag(priority), `Generating tile: ${outPath}`);
+      const job = { ...tile, outPath, priority, rank, styleKey: revision, size: p.type === 'raster' ? 256 : config.tilePx };
       if (p.type === 'raster') {
         const image = await cache.get({
           file: path.join(config.resourceDir, 'v2', p.id, p.cacheId, String(tile.z), String(tile.x), `${tile.y}.image`),
@@ -99,7 +103,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
         Object.assign(job, { kind: 'vector', origin: internalOrigin, style: absoluteStyle(renderStyle(style, config.labelScale, p.id === 'qld'), internalOrigin) });
       }
       await renderer.render(job);
-    } else if (!background) L.log('RDR', `Cached tile: ${outPath}`);
+    } else if (priority === PRIORITY.REQUEST) L.log('RDR', `Cached tile: ${outPath}`);
     return outPath;
   }
   async function deliverRaster(res, outPath) {
@@ -124,20 +128,20 @@ async function createApp(config = loadConfig(), dependencies = {}) {
       success = true;
     } finally { finish(success); }
   }
-  async function automaticRasterFile(tile, background = false) {
+  async function automaticRasterFile(tile, priority = PRIORITY.REQUEST, rank = 0) {
     const area = coverage(tile);
-    if (!background) L.log('AUTO', `${tile.z}/${tile.x}/${tile.y}: ${area.region === 'border' ? 'QLD + NSW border' : area.region.toUpperCase()} vectors`);
-    if (area.region === 'qld') return rasterFile(providers.qld, tile, background);
-    if (area.region === 'nsw') return rasterFile(providers.nsw, tile, background);
+    if (priority === PRIORITY.REQUEST) L.log('AUTO', `${tile.z}/${tile.x}/${tile.y}: ${area.region === 'border' ? 'QLD + NSW border' : area.region.toUpperCase()} vectors`);
+    if (area.region === 'qld') return rasterFile(providers.qld, tile, priority, rank);
+    if (area.region === 'nsw') return rasterFile(providers.nsw, tile, priority, rank);
     const [qldStyle, nswStyle] = await Promise.all([styleForRaster(providers.qld, tile), styleForRaster(providers.nsw, tile)]);
     const revision = hash(JSON.stringify({ version: 2, boundaryRevision, qld: styleRevision(qldStyle, config, providers.qld), nsw: styleRevision(nswStyle, config, providers.nsw) }));
     const outPath = path.join(config.rasterDir, 'v2', 'auto', revision, String(tile.z), String(tile.x), `${tile.y}.png`);
     if (!(await cachedRaster(outPath, config.rasterTTL, config.emptyTTL))) {
-      L.log(background ? 'PREFETCH' : 'RDR', `Generating border tile: ${outPath}`);
-      const [backgroundPath, foregroundPath] = await Promise.all([rasterFile(providers.qld, tile, background), rasterFile(providers.nsw, tile, background)]);
+      L.log(renderTag(priority), `Generating border tile: ${outPath}`);
+      const [backgroundPath, foregroundPath] = await Promise.all([rasterFile(providers.qld, tile, priority, rank), rasterFile(providers.nsw, tile, priority, rank)]);
       const rect = [0, 0, config.tilePx, config.tilePx];
-      await renderer.render({ ...tile, outPath, background, size: config.tilePx, kind: 'composite', backgroundPath, images: [{ path: foregroundPath, source: rect, destination: rect }], clip: area.rings });
-    } else if (!background) L.log('RDR', `Cached border tile: ${outPath}`);
+      await renderer.render({ ...tile, outPath, priority, rank, size: config.tilePx, kind: 'composite', backgroundPath, images: [{ path: foregroundPath, source: rect, destination: rect }], clip: area.rings });
+    } else if (priority === PRIORITY.REQUEST) L.log('RDR', `Cached border tile: ${outPath}`);
     return outPath;
   }
 
@@ -211,6 +215,7 @@ async function main() {
   const server = instance.app.listen(config.port, '0.0.0.0', () => {
     instance.app.locals.internalOrigin = `http://127.0.0.1:${server.address().port}`;
     L.sys(`Listening on port ${server.address().port}; /raster/{z}/{x}/{y}.png serves QLD + NSW vectors automatically (${config.tilePx}px)`);
+    L.sys(`Render concurrency ${config.renderConcurrency}; prefetch ${config.prefetchRadius ? `up to ${config.prefetchConcurrency} tiles, radius ${config.prefetchRadius}, zoom ${config.prefetchZoom ? '±1' : 'off'}` : 'off'}`);
   });
   let stopping = false;
   const stop = () => {
