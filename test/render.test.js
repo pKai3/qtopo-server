@@ -31,4 +31,11 @@ test('empty raster tiles expire even when positive cache lifetime is unlimited',
   await assert.rejects(fs.stat(blank), { code: 'ENOENT' });
   await assert.rejects(fs.stat(blank + '.empty'), { code: 'ENOENT' });
   assert.equal(await fs.readFile(good, 'utf8'), 'good');
+  const pending = path.join(root, 'pending.png.empty');
+  await atomicWrite(pending, '1');
+  await prune(root, 0, 1000);
+  assert.equal(await fs.readFile(pending, 'utf8'), '1', 'keep a marker while its PNG is being written');
+  await fs.utimes(pending, new Date(0), new Date(0));
+  await prune(root, 0, 1000);
+  await assert.rejects(fs.stat(pending), { code: 'ENOENT' });
 });
