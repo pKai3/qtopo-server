@@ -1,0 +1,22 @@
+name: Preserve pre-NSW release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preserve:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: docker/setup-buildx-action@v4.4.1
+      - uses: docker/login-action@v4.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Preserve both existing images and freeze stable
+        run: |
+          docker buildx imagetools create --tag pkai3/qtopo-server:stable-before-nsw pkai3/qtopo-server@sha256:0c4a8c41d00acc916411c84bc3c9c41c73cc65a8c81233103d91fc39cbae1778
+          docker buildx imagetools create --tag pkai3/qtopo-server:pre-nsw --tag pkai3/qtopo-server:stable pkai3/qtopo-server@sha256:c321de21fd723fea8d30e9cee16043fb662c3a5df66bdae54acfb3439c9731eb
+          docker buildx imagetools inspect pkai3/qtopo-server:stable

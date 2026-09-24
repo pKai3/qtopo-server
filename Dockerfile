@@ -1,55 +1,38 @@
 # syntax=docker/dockerfile:1.7
+FROM node:24-bookworm-slim AS node
 
-############################
-# 1) Base OS deps layer
-############################
-FROM ubuntu:22.04 AS base
-
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Use BuildKit cache for apt (speeds rebuilds)
-RUN --mount=type=cache,target=/var/cache/apt \
-    apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl xz-utils \
-      xvfb libgl1 libpng-dev \
-      libjpeg-turbo8 libjpeg-turbo8-dev libjpeg-dev \
-      libfreetype6 libfreetype6-dev \
-      libcurl4-openssl-dev libglfw3-dev libuv1-dev libicu-dev libwebp-dev \
-      build-essential python3 pkg-config unzip \
-    && rm -rf /var/lib/apt/lists/*
-
-############################
-# 2) Fetch Node once (cacheable by version)
-############################
-FROM base AS nodefetch
-
-ARG NODE_VERSION=18.20.8
-RUN curl -fsSLo /tmp/node.tar.xz https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz \
- && mkdir -p /opt/node \
- && tar -xJf /tmp/node.tar.xz -C /opt/node --strip-components=1
-
-############################
-# 3) Final runtime image
-############################
-FROM base
-
-# Bring in Node from the nodefetch stage
-COPY --from=nodefetch /opt/node /opt/node
-ENV PATH=/opt/node/bin:$PATH
-ENV NODE_ENV=production
-
+# MapLibre's Linux native binary targets Ubuntu and requires libjpeg.so.8.
+FROM ubuntu:24.04 AS base
+ENV DEBIAN_FRONTEND=noninteractive NODE_ENV=production LIBGL_ALWAYS_SOFTWARE=1
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates xvfb libgl1 libegl1 libopengl0 libgles2 libglfw3 libcurl4t64 libuv1t64 libicu74 libwebp7 \
+    libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libjpeg-turbo8 libgif7 librsvg2-2 \
+    tini gosu \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
+COPY --from=node /usr/local /usr/local
 WORKDIR /usr/src/app
 
-# ---- deps layer (cacheable) ----
+FROM base AS dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-turbo8-dev libgif-dev librsvg2-dev \
+    && rm -rf /var/lib/apt/lists/*
 COPY package*.json ./
-# Cache npm downloads between builds
-RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
+# Build canvas against the same libpng as MapLibre; its prebuilt bundle ships
+# a conflicting libpng and can abort the renderer when sprites are decoded.
+RUN --mount=type=cache,target=/root/.npm npm ci --include=dev --ignore-scripts \
+    && npm rebuild @maplibre/maplibre-gl-native \
+    && npm rebuild canvas --build-from-source
+COPY styles/style.json styles/style.json
+COPY scripts/build_sprites.js scripts/build_sprites.js
+RUN npm run build:sprites && npm prune --omit=dev
 
-# ---- app code (small diffs here) ----
+FROM base
+COPY --from=dependencies /usr/src/app/node_modules ./node_modules
 COPY . .
-
-# Make sure your launcher is executable
-RUN chmod +x /usr/src/app/start.sh
-
+COPY --from=dependencies /usr/src/app/assets/sprites ./assets/sprites
+RUN chmod +x start.sh && node -e "require('@maplibre/maplibre-gl-native'); require('canvas')"
 EXPOSE 8080
-ENTRYPOINT ["/usr/src/app/start.sh"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/usr/src/app/start.sh"]

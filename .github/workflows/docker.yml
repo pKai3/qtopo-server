@@ -1,39 +1,78 @@
-name: Build & Push (Docker Hub)
-
+name: Test, build and publish
 on:
   push:
-    branches: [ master, stable ]   # include what you use
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  docker:
-    runs-on: ubuntu-latest
+  test:
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/qtopo-server
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=stable,enable=${{ github.ref == 'refs/heads/stable' }}
-            type=sha,format=short
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm test
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
+  container:
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: docker/setup-buildx-action@v4.4.1
+      - name: Build the Unraid image
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           platforms: linux/amd64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          load: true
+          tags: qtopo:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Exercise native rendering at both tile sizes
+        run: |
+          mkdir -p test-results
+          for pixels in 512 256; do
+            docker run -d --name qtopo-smoke-$pixels -e TILE_PX=$pixels -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 qtopo:test
+            docker exec qtopo-smoke-$pixels node scripts/smoke.js
+            docker cp qtopo-smoke-$pixels:/tmp/smoke/. test-results/
+            docker stop qtopo-smoke-$pixels
+          done
+      - name: Container logs
+        if: always()
+        run: |
+          mkdir -p test-results
+          for pixels in 512 256; do
+            docker cp qtopo-smoke-$pixels:/tmp/smoke/. test-results/ 2>/dev/null || true
+            docker logs qtopo-smoke-$pixels > test-results/container-$pixels.log 2>&1 || true
+          done
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: map-render-checks
+          path: test-results/
+      - uses: docker/login-action@v4.6.0
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Publish the tested image to latest only
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        run: |
+          docker buildx imagetools inspect pkai3/qtopo-server:stable | grep -E '^Digest: +sha256:c321de21fd723fea8d30e9cee16043fb662c3a5df66bdae54acfb3439c9731eb$'
+          docker tag qtopo:test pkai3/qtopo-server:sha-${GITHUB_SHA::7}
+          docker tag qtopo:test pkai3/qtopo-server:latest
+          docker push pkai3/qtopo-server:sha-${GITHUB_SHA::7}
+          docker push pkai3/qtopo-server:latest
+          docker buildx imagetools inspect pkai3/qtopo-server:latest

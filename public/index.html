@@ -1,202 +1,29 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>QTopo-BC Vector Tiles Viewer</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="https://unpkg.com/maplibre-gl@3.3.0/dist/maplibre-gl.js"></script>
-  <link href="https://unpkg.com/maplibre-gl@3.3.0/dist/maplibre-gl.css" rel="stylesheet" />
-  <style>
-    body, html { margin: 0; height: 100%; }
-    #map { width: 100%; height: 100%; }
-    #menu {
-      position: absolute;
-      background: white;
-      padding: 8px;
-      top: 10px;
-      left: 10px;
-      z-index: 1;
-      font-family: sans-serif;
-      font-size: 14px;
-      max-height: 90%;
-      overflow-y: auto;
-    }
-    #zoom-display,
-    #pointer-coords,
-    #bounds-display {
-      position: absolute;
-      left: 10px;
-      background: rgba(255,255,255,0.9);
-      padding: 4px 8px;
-      font-family: monospace;
-      z-index: 1;
-    }
-    #zoom-display { bottom: 10px; }
-    #pointer-coords { bottom: 40px; }
-    #bounds-display { bottom: 70px; white-space: pre; }
-    #tile-coords {
-      bottom: 140px;
-      left: 10px;
-      background: rgba(255,255,255,0.9);
-      padding: 4px 8px;
-      position: absolute;
-      font-family: monospace;
-      z-index: 1;
-    }
-  </style>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>QTopo · Queensland & NSW maps</title>
+  <link rel="icon" href="/assets/icons/favicon.ico">
+  <link rel="stylesheet" href="/vendor/maplibre/maplibre-gl.css">
+  <link rel="stylesheet" href="/viewer.css">
+  <script src="/vendor/maplibre/maplibre-gl.js" defer></script>
+  <script src="/viewer.js" defer></script>
 </head>
 <body>
-<div id="map"></div>
-<div id="menu">
-  <label><input type="checkbox" id="contours" checked> Contours</label><br/>
-  <label><input type="checkbox" id="trails" checked> Trails</label><br/>
-  <label><input type="checkbox" id="roads" checked> Roads</label><br/>
-  <label><input type="checkbox" id="parks-and-forests" checked> Parks and Forests</label><br/>
-  <label><input type="checkbox" id="mountains" checked> Mountains</label><br/>
-
-  <label><input type="checkbox" id="regions" checked> Regions of Interest</label><br/>
-
-</div>
-
-<div id="tile-coords">z: –, x: –, y: –</div>
-
-<div id="zoom-display">Zoom:  </div>
-<div id="pointer-coords">Lat: –, Lng: –</div>
-<div id="bounds-display">Bounds: –</div>
-
-<script>
-  const map = new maplibregl.Map({
-    container: 'map',
-    style: '/style.json',
-    center: [153.03, -27.47],
-    zoom: 12,
-    minZoom: 4,
-    maxZoom: 19,
-    // maxBounds: [ [152.5, -28.5], [153.5, -26.5] ] // Limit Extents
-  });
-
-  // Add scale bar to bottom-left
-  map.addControl(
-    new maplibregl.ScaleControl({
-      maxWidth: 250,
-      unit: 'metric' // or 'imperial'
-    }),
-    'bottom-right'
-  );
-
-  //inject regions
-  map.on('load', () => {
-    // 👇 Inject your regions here
-    map.addSource('regions', {
-      type: 'geojson',
-      data: '/regions.geojson'
-    });
-
-    map.addLayer({
-      id: 'regions-fill',
-      type: 'fill',
-      source: 'regions',
-      paint: {
-        'fill-color': '#FF0000',
-        'fill-opacity': 0.1
-      }
-    });
-
-    map.addLayer({
-      id: 'regions-outline',
-      type: 'line',
-      source: 'regions',
-      paint: {
-        'line-color': '#FF0000',
-        'line-width': 2,
-        'line-opacity': 0.7
-      }
-    });
-
-    map.addLayer({
-      id: 'regions-label',
-      type: 'symbol',
-      source: 'regions',
-      layout: {
-        'text-field': ['get', 'name'],
-        'text-size': 12
-      },
-      paint: {
-        'text-color': '#FF0000',
-        'text-halo-color': '#FFFFFF',
-        'text-halo-width': 1
-      }
-    });
-
-    updateBoundsDisplay();
-
-  });
-
-  map.on('error', function (e) {
-    console.error('Maplibre error:', e.error);
-  });
-
-  map.addControl(new maplibregl.GeolocateControl({
-    positionOptions: { enableHighAccuracy: true },
-    trackUserLocation: true,
-    showAccuracyCircle: false
-  }));
-
-  // map.fitBounds([[153.1, -28.253], [153.11, -28.25]]); //Razorback Zoom
-  map.fitBounds([[151.8606, -28.9447], [155.4287, -27.1886]]); // SE QLD Zoom
-
-
-  const groupedLayers = {
-    'contours': ['contour-large', 'contour-medium', 'contour-small', 'contour-large-label', 'contour-medium-label', 'contour-small-label', 'aux-contour-large', 'aux-contour-medium', 'aux-contour-small', 'aux-contour-small-label'],
-    'trails': ['paths', 'trails', 'paths-label', 'trails-label'],
-    'roads': ['roads-low', 'roads-medium', 'roads-high', 'road-bridge-overpass', 'roads-medium-label', 'roads-high-label', 'road-bridge-overpass-label'],
-    'parks-and-forests': ['national-park', 'state-forest', 'nature-refuge', 'conservation-area', 'forest-plantation', 'national-park-label', 'nature-refuge-label', 'conservation-area-label'],
-    'mountains': ['mountains', 'mountain-label'],
-
-    'regions': ['regions-outline', 'regions-fill', 'regions-label']
-    //'watercourses': ['watercourses-large', 'watercourses-small', 'watercourses-large-label', 'watercourses-small-label', 'watercourse-areas', 'watercourse-areas-label'],
-    //'urban': ['urban-area', 'building-areas-geoscape'],
-
-  };
-
-  Object.keys(groupedLayers).forEach(group => {
-    document.getElementById(group).addEventListener('change', (e) => {
-      groupedLayers[group].forEach(id =>
-        map.setLayoutProperty(id, 'visibility', e.target.checked ? 'visible' : 'none')
-      );
-    });
-  });
-
-  map.on('zoom', () => {
-    document.getElementById('zoom-display').innerText = `Zoom: ${map.getZoom().toFixed(2)}`;
-  });
-
-  map.on('mousemove', (e) => {
-    const { lng, lat } = e.lngLat;
-    document.getElementById('pointer-coords').innerText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
-  });
-
-  const tileDisplay = document.getElementById('tile-coords');
-
-  map.on('mousemove', (e) => {
-    const zoom = Math.floor(map.getZoom());
-    const tileX = Math.floor((e.lngLat.lng + 180) / 360 * Math.pow(2, zoom));
-    const tileY = Math.floor(
-      (1 - Math.log(Math.tan(e.lngLat.lat * Math.PI / 180) + 1 / Math.cos(e.lngLat.lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom)
-    );
-    tileDisplay.textContent = `z: ${zoom}, x: ${tileX}, y: ${tileY}`;
-  });
-
-  function updateBoundsDisplay() {
-    const b = map.getBounds();
-    const sw = b.getSouthWest();
-    const ne = b.getNorthEast();
-    document.getElementById('bounds-display').innerText =
-      `Bounds:\nSW: ${sw.lat.toFixed(4)}, ${sw.lng.toFixed(4)}\nNE: ${ne.lat.toFixed(4)}, ${ne.lng.toFixed(4)}`;
-  }
-
-  map.on('moveend', updateBoundsDisplay);
-  
-</script>
+  <main id="map" aria-label="Topographic map"></main>
+  <details class="panel" open>
+    <summary><strong>QTopo</strong><span>Queensland & New South Wales</span></summary>
+    <div class="controls">
+      <label for="provider">Map</label><select id="provider" aria-label="Map provider"></select>
+      <label for="mode">View</label>
+      <select id="mode"><option value="vector">Interactive map</option><option value="raster">Raster tiles / GPS preview</option></select>
+      <fieldset id="layers"><legend>Show on map</legend></fieldset>
+      <label class="check"><input id="regions" type="checkbox"> Regions of interest</label>
+      <button id="copy-url" type="button">Copy tile URL for GPS app</button>
+      <p id="tile-size" class="hint"></p>
+      <p id="status" role="status" aria-live="polite">Loading maps…</p>
+    </div>
+  </details>
+  <div id="coordinates" aria-live="off"></div>
 </body>
 </html>
