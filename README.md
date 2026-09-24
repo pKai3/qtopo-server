@@ -96,6 +96,8 @@ Invalid configuration fails at startup. Cache expiry is checked on access, not j
 
 A failed download or render returns an uncached 502/504 response. A full render queue returns 503 with Retry-After. Failures are never saved as successful blank tiles. Concurrent requests for the same resource are combined; providers remain isolated.
 
+Container logs include tile requests (`REQ`), automatic state selection (`AUTO`), vector downloads and cache saves (`PBF-GET`/`PBF`), rendering and cache hits (`RDR`), and response status with elapsed time (`RES`). Transparent tiles are explicitly logged as empty. These messages appear in the Unraid container log without any extra configuration.
+
 The viewer serves its JavaScript locally. Map data and uncached NSW glyphs/sprites still require internet access. Upstream resources are fetched from fixed provider URLs; this is not a general-purpose proxy.
 
 ## Development and verification

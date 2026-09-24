@@ -19,12 +19,23 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   await seedStyles(config, providers);
   for (const dir of [config.vectorDir, config.rasterDir, config.resourceDir]) await fs.mkdir(path.join(dir, 'v2'), { recursive: true });
   if (config.clearRaster) await fs.rm(path.join(config.rasterDir, 'v2'), { recursive: true, force: true });
-  const cache = dependencies.cache || createCache({ timeoutMs: config.upstreamTimeoutMs, emptyTTL: config.emptyTTL });
+  const cache = dependencies.cache || createCache({ timeoutMs: config.upstreamTimeoutMs, emptyTTL: config.emptyTTL, logger: L });
   const renderer = dependencies.renderer || createRenderer(config);
   const nativeZoom = dependencies.nativeZoom || createTileIndex(config, cache);
   const stopCleaner = startCleaner(config, L);
   const app = express();
   app.disable('x-powered-by');
+  app.use((req, res, next) => {
+    if (/^\/(raster|vector|tiles_raster|tiles_vector)\//.test(req.path)) {
+      const started = Date.now();
+      L.log('REQ', `${req.method} ${req.path}`);
+      res.once('finish', () => L.log('RES', `${res.statusCode} ${req.path} (${Date.now() - started} ms)`));
+      res.once('close', () => {
+        if (!res.writableFinished) L.warn('RES', `Disconnected: ${req.path} (${Date.now() - started} ms)`);
+      });
+    }
+    next();
+  });
   const origin = req => config.publicUrl || `${req.protocol}://${req.get('host')}`;
   function providerFor(req, type) {
     const id = req.params.provider || 'qld';
@@ -47,7 +58,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     const { z, x, y } = coordinates(req, p);
     const result = await cache.get({
       file: path.join(config.vectorDir, 'v2', p.id, p.cacheId, String(z), String(x), `${y}.pbf`),
-      url: tileURL(p, z, x, y), ttl: config.vectorTTL,
+      url: tileURL(p, z, x, y), ttl: config.vectorTTL, logTag: 'PBF',
     });
     headers(res, result.empty ? Math.floor(config.emptyTTL / 1000) : 3600);
     if (result.empty) return res.status(204).end();
@@ -69,11 +80,12 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     const revision = styleRevision(style, config, p);
     const outPath = path.join(config.rasterDir, 'v2', p.id, revision, String(tile.z), String(tile.x), `${tile.y}.png`);
     if (!(await cachedRaster(outPath, config.rasterTTL, config.emptyTTL))) {
+      L.log('RDR', `Generating tile: ${outPath}`);
       const job = { ...tile, outPath, size: p.type === 'raster' ? 256 : config.tilePx };
       if (p.type === 'raster') {
         const image = await cache.get({
           file: path.join(config.resourceDir, 'v2', p.id, p.cacheId, String(tile.z), String(tile.x), `${tile.y}.image`),
-          url: tileURL(p, tile.z, tile.x, tile.y), ttl: config.rasterTTL, kind: 'image',
+          url: tileURL(p, tile.z, tile.x, tile.y), ttl: config.rasterTTL, kind: 'image', logTag: 'IMG',
         });
         Object.assign(job, { kind: 'image', inputPath: image.empty ? null : image.path });
       } else {
@@ -82,11 +94,12 @@ async function createApp(config = loadConfig(), dependencies = {}) {
         Object.assign(job, { kind: 'vector', origin: internalOrigin, style: absoluteStyle(renderStyle(style, config.labelScale, p.id === 'qld'), internalOrigin) });
       }
       await renderer.render(job);
-    }
+    } else L.log('RDR', `Cached tile: ${outPath}`);
     return outPath;
   }
   async function deliverRaster(res, outPath) {
     const result = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
+    if (result?.empty) L.log('RDR', `Empty tile: ${outPath}`);
     headers(res, result?.empty ? Math.floor(config.emptyTTL / 1000) : 3600);
     await sendFile(res, outPath, 'image/png');
   }
@@ -97,16 +110,18 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   async function automaticRaster(req, res) {
     const tile = coordinates(req, providers.qld);
     const area = coverage(tile);
+    L.log('AUTO', `${tile.z}/${tile.x}/${tile.y}: ${area.region === 'border' ? 'QLD + NSW border' : area.region.toUpperCase()} vectors`);
     if (area.region === 'qld') return deliverRaster(res, await rasterFile(providers.qld, tile));
     if (area.region === 'nsw') return deliverRaster(res, await rasterFile(providers.nsw, tile));
     const [qldStyle, nswStyle] = await Promise.all([styleForRaster(providers.qld, tile), styleForRaster(providers.nsw, tile)]);
     const revision = hash(JSON.stringify({ version: 2, boundaryRevision, qld: styleRevision(qldStyle, config, providers.qld), nsw: styleRevision(nswStyle, config, providers.nsw) }));
     const outPath = path.join(config.rasterDir, 'v2', 'auto', revision, String(tile.z), String(tile.x), `${tile.y}.png`);
     if (!(await cachedRaster(outPath, config.rasterTTL, config.emptyTTL))) {
+      L.log('RDR', `Generating border tile: ${outPath}`);
       const [backgroundPath, foregroundPath] = await Promise.all([rasterFile(providers.qld, tile), rasterFile(providers.nsw, tile)]);
       const rect = [0, 0, config.tilePx, config.tilePx];
       await renderer.render({ ...tile, outPath, size: config.tilePx, kind: 'composite', backgroundPath, images: [{ path: foregroundPath, source: rect, destination: rect }], clip: area.rings });
-    }
+    } else L.log('RDR', `Cached border tile: ${outPath}`);
     await deliverRaster(res, outPath);
   }
 
@@ -179,7 +194,7 @@ async function main() {
   const instance = await createApp(config);
   const server = instance.app.listen(config.port, '0.0.0.0', () => {
     instance.app.locals.internalOrigin = `http://127.0.0.1:${server.address().port}`;
-    L.sys(`Listening on port ${server.address().port}; default map ${config.defaultProvider}`);
+    L.sys(`Listening on port ${server.address().port}; /raster/{z}/{x}/{y}.png serves QLD + NSW vectors automatically (${config.tilePx}px)`);
   });
   let stopping = false;
   const stop = () => {
