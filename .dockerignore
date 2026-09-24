@@ -1,5 +1,11 @@
-server_raster/tiles_raster
-server_raster/tiles_raster_backup
-server_vector/tiles_vector
+.git
+.github
 node_modules
-failed_tiles.log
+.DS_Store
+**/.DS_Store
+*.log
+coverage
+test-results
+server_raster
+server_vector
+data
