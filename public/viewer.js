@@ -1,4 +1,5 @@
 import * as maplibregl from '/vendor/maplibre/maplibre-gl.mjs';
+import { createStateSelector, selectPreview } from './preview.mjs';
 (async () => {
   const $ = id => document.getElementById(id);
   const params = new URLSearchParams(location.search);
@@ -12,20 +13,23 @@ import * as maplibregl from '/vendor/maplibre/maplibre-gl.mjs';
     if (!response.ok) throw new Error('Could not load the map list.');
     const catalog = await response.json();
     const initial = catalog.providers.find(p => p.id === catalog.defaultProvider);
-    catalog.providers.unshift({ ...catalog.automatic, id: 'auto', name: 'QLD + NSW — automatic', type: 'raster', center: initial.center, zoom: initial.zoom });
+    catalog.providers.unshift({ ...catalog.automatic, id: 'auto', name: 'QLD + NSW — automatic', type: 'vector', center: initial.center, zoom: initial.zoom });
     let provider = catalog.providers.find(p => p.id === params.get('provider')) || catalog.providers[0];
+    let selection, currentStyle, revision = 0, stateSelector;
     for (const p of catalog.providers) $('provider').add(new Option(p.name, p.id));
     $('provider').value = provider.id;
     $('mode').value = params.get('mode') === 'raster' ? 'raster' : 'vector';
-    function previewStyle() {
-      if ($('mode').value !== 'raster' && provider.type !== 'raster') return provider.style;
+    function previewStyle({ provider: selected, mode }) {
+      if (mode === 'vector') return selected.style;
       return {
         version: 8, glyphs: location.origin + '/fonts/{fontstack}/{range}.pbf',
-        sources: { topo: { type: 'raster', tiles: [provider.raster], tileSize: provider.id === 'nsw-topo' ? 256 : 512, bounds: provider.bounds, maxzoom: provider.maxzoom, attribution: provider.attribution } },
+        sources: { topo: { type: 'raster', tiles: [selected.raster], tileSize: selected.id === 'nsw-topo' ? 256 : 512, bounds: selected.bounds, maxzoom: selected.maxzoom, attribution: selected.attribution } },
         layers: [{ id: 'topographic-map', type: 'raster', source: 'topo' }],
       };
     }
-    const map = new maplibregl.Map({ container: 'map', style: previewStyle(), center: provider.center, zoom: provider.zoom, hash: true, maxZoom: 22 });
+    // Resolve the actual camera after MapLibre restores the shared URL hash.
+    // Start empty so automatic vector mode never briefly requests PNG tiles.
+    const map = new maplibregl.Map({ container: 'map', style: { version: 8, sources: {}, layers: [] }, center: provider.center, zoom: provider.zoom, hash: true, maxZoom: 22 });
     map.addControl(new maplibregl.NavigationControl(), 'top-right');
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-right');
     map.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }), 'top-right');
@@ -44,31 +48,54 @@ import * as maplibregl from '/vendor/maplibre/maplibre-gl.mjs';
       }
     }
     function syncUI() {
-      const raster = $('mode').value === 'raster' || provider.type === 'raster';
+      const raster = selection.mode === 'raster', selected = selection.provider;
+      $('mode').value = selection.mode;
       $('mode').disabled = provider.type === 'raster';
       $('layers').disabled = raster;
       $('layers').style.opacity = raster ? '0.45' : '1';
-      $('tile-size').textContent = `${provider.tileSize} × ${provider.tileSize} raster tiles · ${provider.attribution}`;
+      $('tile-size').textContent = raster ? `${selected.tileSize} × ${selected.tileSize} raster tiles · ${selected.attribution}`
+        : `Interactive vectors · ${selected.name}${provider.id === 'auto' ? ' · selected by map centre' : ''} · ${selected.attribution}`;
       $('status').textContent = ''; $('status').className = '';
       params.set('provider', provider.id); params.set('mode', $('mode').value);
       history.replaceState(null, '', '?' + params.toString() + location.hash);
     }
     async function showRegions() {
-      if (!map.isStyleLoaded()) return;
+      if (!selection || !map.isStyleLoaded()) return;
       if ($('regions').checked && !map.getSource('regions')) {
         map.addSource('regions', { type: 'geojson', data: '/regions.geojson' });
         map.addLayer({ id: 'regions-outline', type: 'line', source: 'regions', paint: { 'line-color': '#aa4938', 'line-width': 2 } });
-        map.addLayer({ id: 'regions-label', type: 'symbol', source: 'regions', layout: { 'text-field': ['get', 'name'], 'text-size': 12, 'text-font': provider.id === 'nsw' && $('mode').value !== 'raster' ? ['Public Sans Regular'] : ['Open Sans Regular', 'Arial Unicode MS Regular'] }, paint: { 'text-color': '#aa4938', 'text-halo-color': '#ffffff', 'text-halo-width': 1 } });
+        map.addLayer({ id: 'regions-label', type: 'symbol', source: 'regions', layout: { 'text-field': ['get', 'name'], 'text-size': 12, 'text-font': selection.provider.id === 'nsw' && selection.mode === 'vector' ? ['Public Sans Regular'] : ['Open Sans Regular', 'Arial Unicode MS Regular'] }, paint: { 'text-color': '#aa4938', 'text-halo-color': '#ffffff', 'text-halo-width': 1 } });
       }
       for (const id of ['regions-outline', 'regions-label']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', $('regions').checked ? 'visible' : 'none');
     }
-    function switchStyle() {
-      syncUI();
-      map.setStyle(previewStyle());
+    async function switchStyle() {
+      const request = ++revision, selected = provider, mode = $('mode').value, center = map.getCenter();
+      try {
+        let selectState;
+        if (selected.id === 'auto' && mode === 'vector') {
+          stateSelector ||= fetch('/assets/nsw-coverage.geojson').then(async response => {
+            if (!response.ok) throw new Error('Could not load the state boundary.');
+            return createStateSelector(await response.json());
+          }).catch(error => { stateSelector = null; throw error; });
+          selectState = await stateSelector;
+        }
+        if (request !== revision) return;
+        selection = selectPreview(selected, mode, catalog.providers, center, selectState);
+        const key = `${selection.provider.id}/${selection.mode}`;
+        if (key === currentStyle) { syncUI(); return; }
+        syncUI();
+        // Keep the camera and layer preferences when the selected state changes.
+        map.setStyle(previewStyle(selection));
+        currentStyle = key;
+      } catch (error) {
+        if (request !== revision) return;
+        $('status').textContent = error.message; $('status').className = 'error';
+      }
     }
     map.on('style.load', () => { applyLayers(); showRegions(); });
     map.on('error', e => { console.error(e.error); $('status').textContent = 'Some map data could not load. Please try again shortly.'; $('status').className = 'error'; });
     map.on('mousemove', e => { $('coordinates').textContent = `${e.lngLat.lat.toFixed(5)}, ${e.lngLat.lng.toFixed(5)} · zoom ${map.getZoom().toFixed(1)}`; });
+    map.on('moveend', () => { if (provider.id === 'auto' && $('mode').value === 'vector') switchStyle(); });
     $('provider').addEventListener('change', () => {
       provider = catalog.providers.find(p => p.id === $('provider').value); switchStyle();
       const c = map.getCenter(), b = provider.bounds;
@@ -80,7 +107,7 @@ import * as maplibregl from '/vendor/maplibre/maplibre-gl.mjs';
       try { await navigator.clipboard.writeText(catalog.automatic.raster); $('status').textContent = 'QLD + NSW tile URL copied.'; }
       catch { window.prompt('Copy this QLD + NSW URL into Gaia or your GPS app:', catalog.automatic.raster); }
     });
-    syncUI();
+    await switchStyle();
     if (innerWidth < 600) document.querySelector('details').open = false;
   } catch (err) { $('status').textContent = err.message; $('status').className = 'error'; }
 })();
