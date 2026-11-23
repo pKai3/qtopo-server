@@ -10,6 +10,36 @@ const { PRIORITY } = require('../lib/queue');
 const { atomicWrite, cachedRaster } = require('../lib/utils');
 const { prune } = require('../lib/cleaner');
 const logger = require('../lib/logger');
+const { createRequestFocus } = require('../lib/request-focus');
+
+test('queued metatiles follow live focus and retain priority for another client sharing a sibling', async t => {
+  for (const sharedClient of [false, true]) {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-focus-render-'));
+    const renderer = createRenderer({ renderConcurrency: 1, renderQueueLimit: 8, rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 10000 }, path.join(__dirname, 'fixtures/render-worker.js'));
+    t.after(async () => { renderer.close(); await fs.rm(root, { recursive: true, force: true }); });
+    const focus = createRequestFocus(), order = [], gate = path.join(root, 'go');
+    const blocker = renderer.render({ outPath: path.join(root, 'blocker.png'), gate });
+    const tile = { z: 6, x: 10, y: 10 }, outputs = [0, 1, 2, 3].map(i => ({ outPath: path.join(root, `${i}.png`) }));
+    const old = { ...tile, renderKey: 'shared-grid', outputs, outPath: outputs[0].outPath, priority: PRIORITY.NEIGHBOUR };
+    const initial = renderer.render(old, focus.observe('a', tile).forTile(tile));
+    assert.equal(renderer.render({ ...old, priority: PRIORITY.REQUEST }, focus.observe('a', tile).forTile(tile)), initial);
+    const oldDone = initial.then(() => order.push('old area'));
+    const latest = { z: 7, x: 20, y: 20, outPath: path.join(root, 'latest.png') };
+    const newDone = renderer.render(latest, focus.observe('a', latest).forTile(latest)).then(() => order.push('latest zoom'));
+    let sibling;
+    if (sharedClient) {
+      const otherTile = { z: 6, x: 11, y: 11 };
+      sibling = renderer.render({ ...old, outPath: outputs[3].outPath, priority: PRIORITY.REQUEST }, focus.observe('b', otherTile).forTile(otherTile));
+    }
+    await fs.writeFile(gate, 'go');
+    await Promise.all([blocker, oldDone, newDone, sibling]);
+    for (let i = 0; i < 100 && renderer.stats.active; i++) await new Promise(resolve => setTimeout(resolve, 5));
+    assert.deepEqual(order, sharedClient ? ['old area', 'latest zoom'] : ['latest zoom', 'old area']);
+    assert.equal(renderer.stats.completed, 3, 'the shared grid is rendered only once');
+    assert.equal(renderer.stats.completedTiles, 6);
+    assert.equal(renderer.stats.spawned, 1);
+  }
+});
 test('grid requests share one worker, promote prefetch, and receive each tile before the grid completes', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-grid-test-'));
   const renderer = createRenderer({ renderConcurrency: 2, prefetchConcurrency: 1, renderQueueLimit: 4, rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 10000 }, path.join(__dirname, 'fixtures/render-worker.js'));

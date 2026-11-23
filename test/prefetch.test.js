@@ -1,7 +1,22 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { createPrefetch, neighbours, zoomNeighbours } = require('../lib/prefetch');
+const { createRequestFocus } = require('../lib/request-focus');
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+test('prefetch revisits the latest zoom without losing old queued tiles or following late completions', async t => {
+  const focus = createRequestFocus(), seen = [];
+  const prefetch = createPrefetch({ zoom: false, delayMs: 1, render: async (_provider, tile) => seen.push(tile) });
+  t.after(() => prefetch.close());
+  const first = { z: 6, x: 10, y: 10 }, second = { z: 7, x: 20, y: 20 };
+  const finishOld = prefetch.begin('qld', first, focus.observe('a', first));
+  prefetch.begin('qld', second, focus.observe('a', second))(true);
+  focus.observe('a', first); // A cached request can change focus without adding a render.
+  finishOld(true);
+  for (let i = 0; i < 100 && seen.length < 16; i++) await wait(5);
+  assert.equal(seen.length, 16);
+  assert.ok(seen.slice(0, 8).every(tile => tile.z === 6), 'existing jobs follow current zoom rather than enqueue rank');
+  assert.ok(seen.slice(8).every(tile => tile.z === 7), 'the old zoom remains queued and eventually completes');
+});
 test('adjacent prefetch stays within the XYZ grid and includes diagonals', () => {
   const tiles = neighbours({ z: 3, x: 4, y: 4 }, 1);
   assert.equal(tiles.length, 8);
