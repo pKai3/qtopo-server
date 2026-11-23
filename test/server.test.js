@@ -13,6 +13,7 @@ const { getStyle, renderStyle, absoluteStyle, styleRevision } = require('../lib/
 const { validateStyleMin } = require('@maplibre/maplibre-gl-style-spec');
 const logger = require('../lib/logger');
 const { setTimeout: sleep } = require('node:timers/promises');
+const { createRenderFlyby } = require('../lib/render-flyby');
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/YYbL4QAAAAASUVORK5CYII=', 'base64');
 async function server(t, dependencies = {}, env = {}) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-app-test-'));
@@ -61,9 +62,11 @@ test('public status is read-only: web controls are absent even with spoofed prox
   }
   const data = await (await fetch(s.url + '/readyz')).json();
   assert.equal(data.logsAvailable, false);
+  assert.equal(data.flybyAvailable, false);
   assert.equal(data.actions, undefined);
   assert.equal(data.renderer.lastRender, undefined);
   assert.equal((await fetch(s.url + '/api/logs')).status, 403);
+  assert.equal((await fetch(s.url + '/api/render-flyby')).status, 403);
   for (const [route, body] of [['tile-test/start', { width: 1, height: 1 }], ['tile-test/stop', {}], ['cache/clear', { confirm: 'clear-rendered-tiles' }]]) {
     assert.equal((await webAction(s, route, body)).status, 404, route);
     assert.equal((await webAction(s, route, body, { ...actionHeaders, 'X-Forwarded-For': '127.0.0.1', 'X-Real-IP': '127.0.0.1' })).status, 404);
@@ -93,6 +96,22 @@ test('private logs still require explicit networks and hostnames; local HTTP can
     { 'X-Forwarded-For': '127.0.0.1' }, { 'X-Forwarded-Host': 'localhost' }, { 'X-Real-IP': '127.0.0.1' },
   ]) assert.equal(await statusWithHeaders(s.url + '/api/logs', headers), 403, JSON.stringify(headers));
   assert.equal((await webAction(s, 'tile-test/stop', {}, { ...actionHeaders, Origin: s.url })).status, 404);
+});
+test('previews require management access, validate cursors and never initiate rendering', async t => {
+  let renders = 0;
+  const flyby = createRenderFlyby();
+  const s = await server(t, { flyby, renderer: { stats: {}, close() {}, render() { renders++; } } });
+  const first = await fetch(s.url + '/api/render-flyby');
+  assert.equal(first.headers.get('cache-control'), 'no-store');
+  assert.equal(first.headers.get('access-control-allow-origin'), null);
+  const cursor = await first.json();
+  flyby.publish('/9j/AA==', { z: 16, profile: 'readable' });
+  const result = await (await fetch(s.url + '/api/render-flyby?after=0&session=' + cursor.session)).json();
+  assert.equal(result.entries.length, 1);
+  for (const query of ['after=-1', 'after=Infinity', 'after=1&after=2', 'session=' + 'a'.repeat(65)]) assert.equal((await fetch(s.url + '/api/render-flyby?' + query)).status, 400);
+  for (const headers of [{ Host: 'attacker.example' }, { 'X-Forwarded-For': '127.0.0.1' }]) assert.equal(await statusWithHeaders(s.url + '/api/render-flyby', headers), 403);
+  const status = await (await fetch(s.url + '/readyz')).json();
+  assert.equal(status.flybyAvailable, true); assert.equal(status.entries, undefined); assert.equal(renders, 0);
 });
 test('a trusted proxy must supply an allowed actual client to read logs, but cannot enable web actions', async t => {
   const s = await server(t, {}, { TRUSTED_PROXIES: '127.0.0.1/32', ADMIN_ALLOWED_NETWORKS: '192.0.2.0/24,2001:db8:1::/64' });

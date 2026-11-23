@@ -21,6 +21,7 @@ const { createStatusActions } = require('./lib/status-actions');
 const { createAdminAccess } = require('./lib/admin-access');
 const { listenControl, socketPath } = require('./lib/local-control');
 const { createRequestFocus } = require('./lib/request-focus');
+const { createRenderFlyby } = require('./lib/render-flyby');
 
 async function createApp(config = loadConfig(), dependencies = {}) {
   const admin = createAdminAccess(config);
@@ -35,7 +36,8 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   for (const dir of [config.vectorDir, config.rasterDir, config.resourceDir]) await fs.mkdir(path.join(dir, 'v2'), { recursive: true });
   if (config.clearRaster) await fs.rm(path.join(config.rasterDir, 'v2'), { recursive: true, force: true });
   const cache = dependencies.cache || createCache({ timeoutMs: config.upstreamTimeoutMs, emptyTTL: config.emptyTTL, concurrency: config.upstreamConcurrency, logger: L });
-  const renderer = dependencies.renderer || createRenderer(config);
+  const flyby = dependencies.flyby || createRenderFlyby();
+  const renderer = dependencies.renderer || createRenderer(config, undefined, flyby);
   const requestFocus = createRequestFocus({ distance: config.requestPanThreshold });
   const nativeZoom = dependencies.nativeZoom || createTileIndex(config, cache);
   const stopCleaner = startCleaner(config, L);
@@ -156,7 +158,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     const hit = !!cached;
     if (!cached) {
       L.log(renderTag(priority), `Generating tile: ${outPath}`);
-      const job = { ...tile, outPath, priority, rank, styleKey: revision, size: p.type === 'raster' ? 256 : config.tilePx };
+      const job = { ...tile, outPath, priority, rank, profile: profile.id, styleKey: revision, size: p.type === 'raster' ? 256 : config.tilePx };
       if (p.type === 'raster') {
         const image = await cache.get({
           file: path.join(config.resourceDir, 'v2', p.id, p.cacheId, String(tile.z), String(tile.x), `${tile.y}.image`),
@@ -232,7 +234,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
       L.log(renderTag(priority), `Generating border tile: ${outPath}`);
       const [backgroundPath, foregroundPath] = await Promise.all([rasterFile(providers.qld, tile, priority, rank, interest, profile), rasterFile(providers.nsw, tile, priority, rank, interest, profile)]);
       const rect = [0, 0, config.tilePx, config.tilePx];
-      await renderer.render({ ...tile, outPath, priority, rank, size: config.tilePx, kind: 'composite', backgroundPath: backgroundPath.path, images: [{ path: foregroundPath.path, source: rect, destination: rect }], clip: area.rings }, interest);
+      await renderer.render({ ...tile, outPath, priority, rank, profile: profile.id, size: config.tilePx, kind: 'composite', backgroundPath: backgroundPath.path, images: [{ path: foregroundPath.path, source: rect, destination: rect }], clip: area.rings }, interest);
       cached = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
     } else if (priority === PRIORITY.REQUEST) L.log('RDR', `Cached border tile: ${outPath}`);
     if (!cached) throw httpError('Rendered border tile is unavailable');
@@ -315,7 +317,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     // Aggregate activity is public; individual tile locations and test areas
     // must not be disclosed through the read-only dashboard.
     const { lastRender, ...renderStats } = data.renderer || {};
-    res.json({ ...data, renderer: renderStats, logsAvailable: admin.canReadLogs(req) });
+    res.json({ ...data, renderer: renderStats, logsAvailable: admin.canReadLogs(req), flybyAvailable: admin.canReadLogs(req) });
   });
   // Retired web controls fail for every client, including localhost and
   // trusted proxies. Maintenance is exposed only on the private Unix socket.
@@ -327,6 +329,11 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     const after = req.query.after ?? '0', session = req.query.session;
     if (typeof after !== 'string' || !/^\d+$/.test(after) || !Number.isSafeInteger(Number(after)) || (session != null && (typeof session !== 'string' || session.length > 64))) throw httpError('Invalid log cursor', 400);
     res.set('Cache-Control', 'no-store').json(L.read(Number(after), session));
+  });
+  app.get('/api/render-flyby', admin.authorize, (req, res) => {
+    const after = req.query.after ?? '0', session = req.query.session;
+    if (typeof after !== 'string' || !/^\d+$/.test(after) || !Number.isSafeInteger(Number(after)) || (session != null && (typeof session !== 'string' || session.length > 64))) throw httpError('Invalid preview cursor', 400);
+    res.set('Cache-Control', 'no-store').json(flyby.read(Number(after), session));
   });
   app.get('/raster', (_req, res) => res.redirect(302, '/?mode=raster'));
   app.use(express.static(path.join(config.root, 'public')));
