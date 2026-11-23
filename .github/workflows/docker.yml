@@ -50,6 +50,7 @@ jobs:
             if [ "$pixels" = 256 ]; then compression=6; fi
             docker run -d --name qtopo-smoke-$pixels -e ADMIN_ALLOWED_NETWORKS=127.0.0.1/32 -e TILE_PX=$pixels -e PNG_COMPRESSION_LEVEL=$compression -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 -e PREFETCH_RADIUS=0 qtopo:test
             docker exec qtopo-smoke-$pixels node scripts/smoke.js
+            docker exec qtopo-smoke-$pixels node scripts/smoke-png.js
             if [ "$pixels" = 1024 ]; then
               docker exec qtopo-smoke-$pixels node scripts/smoke-metatile.js
               docker exec qtopo-smoke-$pixels node scripts/smoke-profiles.js
