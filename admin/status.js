@@ -79,6 +79,7 @@ async function refresh() {
     rows($('settings'), [['Tile resolution', `${s.tilePx} × ${s.tilePx}`], ['Vector render grid', `${s.metatileSize} × ${s.metatileSize} tiles`], ['Render border', `${s.renderBufferPx * s.tilePx / 512}px at this resolution`], ['PNG compression', `${s.pngCompression} / 9 · lossless`], ['Render concurrency', number(s.renderConcurrency)], ['Prefetch concurrency', number(s.prefetchConcurrency)], ['Render queue limit', number(s.renderQueueLimit)], ['Pan threshold', `${number(s.requestPanThreshold)} tiles`], ['Download concurrency', number(s.upstreamConcurrency)], ['Zoom prefetch', s.prefetchZoom && s.prefetchRadius ? 'Enabled · lowest priority' : 'Disabled'], ['Started', new Date(data.startedAt).toLocaleString()]], true);
     $('release').textContent = `QTopo ${data.version} · ${data.revision.slice(0, 12)}`;
     $('logs-panel').hidden = !data.logsAvailable;
+    setFlybyAccess(!!data.flybyAvailable);
   } catch (error) {
     $('activity').textContent = 'Unavailable';
     $('error').textContent = `Could not refresh server activity (${error.message}). Any figures shown are from the last successful update.`;
@@ -124,4 +125,73 @@ $('logs-pause').addEventListener('click', () => {
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) clearTimeout(logTimer); else refreshLogs(); });
 
+let flybyWanted = false;
+try { flybyWanted = localStorage.getItem('qtopo-tile-flyby') === 'on'; } catch {}
+let flybyAllowed = false, flybyTimer, flybyController, flybySession, flybyCursor = 0;
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+function stopFlyby() {
+  clearTimeout(flybyTimer);
+  flybyController?.abort(); flybyController = null;
+  $('flyby-tiles').replaceChildren();
+  flybySession = undefined; flybyCursor = 0;
+}
+function setFlybyAccess(allowed) {
+  if (flybyAllowed === allowed) return;
+  flybyAllowed = allowed;
+  $('flyby-toggle').disabled = !allowed;
+  updateFlyby();
+}
+function updateFlyby() {
+  stopFlyby();
+  const enabled = flybyWanted && flybyAllowed;
+  $('flyby-toggle').checked = enabled;
+  $('flyby-lane').hidden = !enabled;
+  document.body.classList.toggle('flyby-enabled', enabled);
+  text($('flyby-status'), !flybyAllowed ? 'Tile flyby is available on your management connection.' : enabled ? 'Waiting for fresh renders… Cached tiles do not appear here.' : 'Show newly rendered tiles drifting up the right edge.');
+  if (enabled && !document.hidden) refreshFlyby();
+}
+function showTile(entry) {
+  const lane = $('flyby-tiles');
+  while (lane.children.length >= (reducedMotion.matches ? 3 : 12)) lane.firstElementChild.remove();
+  const card = document.createElement('figure'), image = document.createElement('img'), caption = document.createElement('figcaption');
+  card.className = 'flyby-tile ' + (['requested', 'nearby', 'zoom'].includes(entry.priority) ? entry.priority : 'requested');
+  card.style.setProperty('--tilt', `${(entry.id % 5 - 2) * 1.5}deg`);
+  image.alt = ''; image.width = 160; image.height = 160;
+  image.src = entry.image;
+  caption.textContent = `z${entry.zoom} · ${entry.profile}`;
+  card.append(image, caption); lane.append(card);
+  card.addEventListener('animationend', () => card.remove(), { once: true });
+  setTimeout(() => card.remove(), 4500);
+}
+async function refreshFlyby() {
+  clearTimeout(flybyTimer);
+  if (!flybyWanted || !flybyAllowed || document.hidden || flybyController) return;
+  const controller = new AbortController(); flybyController = controller;
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const params = new URLSearchParams({ after: String(flybyCursor) });
+    if (flybySession) params.set('session', flybySession);
+    const response = await fetch('/api/render-flyby?' + params, { cache: 'no-store', signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (controller.signal.aborted) return;
+    flybySession = data.session; flybyCursor = data.next;
+    for (const entry of data.entries) showTile(entry);
+    if (data.entries.length) text($('flyby-status'), 'Live · a sample of fresh renders. Cached tiles do not appear here.');
+  } catch (error) {
+    if (!controller.signal.aborted) text($('flyby-status'), 'Tile flyby is temporarily unavailable.');
+  } finally {
+    clearTimeout(timeout);
+    if (flybyController === controller) {
+      flybyController = null;
+      if (flybyWanted && flybyAllowed && !document.hidden) flybyTimer = setTimeout(refreshFlyby, 500);
+    }
+  }
+}
+$('flyby-toggle').addEventListener('change', () => {
+  flybyWanted = $('flyby-toggle').checked;
+  try { localStorage.setItem('qtopo-tile-flyby', flybyWanted ? 'on' : 'off'); } catch {}
+  updateFlyby();
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopFlyby(); else updateFlyby(); });
 refresh();
