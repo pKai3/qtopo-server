@@ -81,7 +81,7 @@ jobs:
         if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
         run: |
           docker buildx imagetools inspect pkai3/qtopo-server:fallback | grep -E '^Digest: +sha256:c321de21fd723fea8d30e9cee16043fb662c3a5df66bdae54acfb3439c9731eb$'
-          docker buildx imagetools inspect pkai3/qtopo-server:stable | grep -E '^Digest: +sha256:084289494298734ba34fc894f119bf956e2228e1e50ad3c9574f2721dcdd24e1$'
+          docker buildx imagetools inspect pkai3/qtopo-server:stable | grep -E '^Digest: +sha256:0393cd2d9e38100f05c9ab47a6a537becb8c9cecdec4f55ec1153d5c1c1647e3$'
           docker tag qtopo:test pkai3/qtopo-server:sha-${GITHUB_SHA::7}
           docker tag qtopo:test pkai3/qtopo-server:latest
           docker push pkai3/qtopo-server:sha-${GITHUB_SHA::7}
