@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { createProfileCatalog, validateProfile, readProfile, syncProfile } = require('../lib/profile-files');
+const { createProfileCatalog, validateProfile, readProfile, syncProfile, migrateLegacyProfiles } = require('../lib/profile-files');
 const { createStyleCache } = require('../lib/styles');
 const { createProviders } = require('../lib/providers');
 const { loadConfig } = require('../lib/config');
@@ -61,7 +61,7 @@ test('live reload preserves in-flight snapshots, rejects bad files and isolates 
   assert.notEqual(catalog.get('test-mobile').token, current.token, 'recover after a valid upload');
 });
 test('committed profiles are defaults; live overrides survive image changes and can be exported', async t => {
-  const { config, input } = await setup(t), bundled = path.join(config.root, 'profiles');
+  const { config, input } = await setup(t), bundled = path.join(config.root, 'styles');
   await fs.mkdir(bundled, { recursive: true });
   await fs.writeFile(path.join(bundled, 'test-mobile.json'), JSON.stringify(document()));
   const catalog = createProfileCatalog(config); await catalog.refresh(true);
@@ -78,7 +78,7 @@ test('committed profiles are defaults; live overrides survive image changes and 
   assert.equal(catalog.get('test-mobile').styles.qld.layers[0].paint['line-color'], '#000000');
 });
 test('profile inputs cannot replace Classic, escape their directory or add network source types', async t => {
-  for (const id of ['classic', '../escape', 'api', 'raster', 'constructor', 'A', 'a'.repeat(49)]) assert.throws(() => validateProfile(document(id)), /name/);
+  for (const id of ['classic', 'style', 'profiles', '../escape', 'api', 'raster', 'constructor', 'A', 'a'.repeat(49)]) assert.throws(() => validateProfile(document(id)), /name/);
   const missing = document(); delete missing.styles.nsw; assert.throws(() => validateProfile(missing), /qld and nsw/);
   const bad = document(); bad.styles.qld.layers[0].paint['line-width'] = 'huge'; assert.throws(() => validateProfile(bad), /qld/);
   const remote = document(); remote.styles.qld.sources.map = { type: 'geojson', data: 'https://example.invalid/private' };
@@ -101,4 +101,44 @@ test('CLI accepts bounded stdin and exports JSON for SSH streaming', async t => 
   const prepared = await createStyleCache(config).get(createProviders(config).qld, catalog.get(official.id));
   assert.equal(prepared.style.sprite, '/resources/qld/sprites/sprite');
   assert.equal(prepared.style.glyphs, '/resources/qld/fonts/{fontstack}/{range}.pbf');
+});
+
+test('upgrade moves live profiles and history into styles while preserving render identities and originals', async t => {
+  const { config } = await setup(t), legacy = path.join(config.dataDir, 'profiles');
+  assert.equal(config.profileDir, config.styleDir);
+  const oldConfig = { ...config, profileDir: legacy };
+  await syncProfile(oldConfig, document('test-mobile', '#abcdef'));
+  await syncProfile(oldConfig, document('test-mobile', '#123456'));
+  const original = '{"version":8,"sources":{},"layers":[]}\n';
+  await fs.mkdir(config.styleDir, { recursive: true });
+  await fs.writeFile(path.join(config.styleDir, 'style.json'), original);
+  await fs.writeFile(path.join(config.styleDir, 'custom-map.json'), original);
+  const oldCatalog = createProfileCatalog(oldConfig); await oldCatalog.refresh(true);
+  const before = oldCatalog.get('test-mobile');
+  const warnings = [], catalog = createProfileCatalog(config, { warn: (...args) => warnings.push(args) });
+  await catalog.refresh(true);
+  assert.equal(catalog.get('test-mobile').token, before.token);
+  const styles = createStyleCache(config), provider = createProviders(config).qld;
+  assert.equal((await styles.get(provider, before)).revision, (await styles.get(provider, catalog.get('test-mobile'))).revision);
+  assert.equal(await fs.readFile(path.join(config.styleDir, 'style.json'), 'utf8'), original);
+  assert.equal((await fs.readdir(path.join(config.styleDir, 'history'))).length, 1);
+  await assert.rejects(fs.stat(legacy), { code: 'ENOENT' });
+  assert.deepEqual(warnings, []);
+});
+
+test('migration keeps newer styles, archives conflicting legacy edits and respects custom directories', async t => {
+  const { config } = await setup(t), legacy = path.join(config.dataDir, 'profiles');
+  const old = document('test-mobile', '#abcdef'), current = document('test-mobile', '#123456');
+  await fs.mkdir(legacy, { recursive: true }); await fs.mkdir(config.styleDir, { recursive: true });
+  await fs.writeFile(path.join(legacy, 'test-mobile.json'), JSON.stringify(old));
+  await fs.writeFile(path.join(config.styleDir, 'test-mobile.json'), JSON.stringify(current));
+  await migrateLegacyProfiles({ ...config, profileDir: path.join(config.dataDir, 'custom') });
+  assert.ok(await fs.stat(path.join(legacy, 'test-mobile.json')));
+  await migrateLegacyProfiles(config);
+  assert.deepEqual(await readProfile(path.join(config.styleDir, 'test-mobile.json')), current);
+  const history = await fs.readdir(path.join(config.styleDir, 'history'));
+  assert.equal(history.length, 1);
+  assert.deepEqual(await readProfile(path.join(config.styleDir, 'history', history[0])), old);
+  await migrateLegacyProfiles(config); // Safe to repeat on subsequent CLI calls.
+  assert.equal((await fs.readdir(path.join(config.styleDir, 'history'))).length, 1);
 });

@@ -4,7 +4,7 @@ export DATA_DIR="${DATA_DIR:-/data}"
 export VECTOR_DIR="${VECTOR_DIR:-$DATA_DIR/vector}"
 export RASTER_DIR="${RASTER_DIR:-$DATA_DIR/raster}"
 export STYLE_DIR="${STYLE_DIR:-$DATA_DIR/styles}"
-export PROFILE_DIR="${PROFILE_DIR:-$DATA_DIR/profiles}"
+export PROFILE_DIR="${PROFILE_DIR:-$STYLE_DIR}"
 # Numeric Unraid users may not have a writable home directory. Share compiled
 # shaders across workers in the mounted data directory instead.
 export MESA_SHADER_CACHE_DIR="${MESA_SHADER_CACHE_DIR:-$DATA_DIR/resources/mesa}"
