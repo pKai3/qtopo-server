@@ -47,6 +47,30 @@ test('browser preview loads its MapLibre module from an existing JavaScript asse
   assert.equal(library.status, 200);
   assert.match(library.headers.get('content-type'), /javascript/);
 });
+test('public map endpoints support cross-origin clients without exposing status or logs', async t => {
+  const s = await server(t, { renderer: { close() {}, async render(job) { await atomicWrite(job.outPath, PNG); } } });
+  const headers = { Origin: 'https://www.gaiagps.com' };
+  for (const route of ['/raster/qld/3/7/4.png', '/styles/qld.json', '/api/providers', '/fonts/Open%20Sans%20Regular,Arial%20Unicode%20MS%20Regular/0-255.pbf', '/fonts/Open%20Sans%20Regular,Arial%20Unicode%20MS%20Regular/8192-8447.pbf']) {
+    const result = await fetch(s.url + route, { headers });
+    assert.equal(result.status, 200); assert.equal(result.headers.get('access-control-allow-origin'), '*');
+    assert.equal(result.headers.get('access-control-allow-credentials'), null);
+    await result.arrayBuffer();
+  }
+  const preflight = await fetch(s.url + '/raster/3/7/4.png', { method: 'OPTIONS', headers: { ...headers, 'Access-Control-Request-Method': 'GET', 'Access-Control-Request-Headers': 'If-None-Match' } });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get('access-control-allow-methods'), 'GET, HEAD, OPTIONS');
+  assert.match(preflight.headers.get('access-control-allow-headers'), /If-None-Match/);
+  const invalid = await fetch(s.url + '/raster/qld/3/99/0.png', { headers });
+  assert.equal(invalid.status, 400); assert.equal(invalid.headers.get('access-control-allow-origin'), '*');
+  for (const route of ['/readyz', '/api/logs']) {
+    const result = await fetch(s.url + route, { headers });
+    assert.equal(result.headers.get('access-control-allow-origin'), null); await result.arrayBuffer();
+  }
+  const ordinary = await fetch(s.url + '/raster/13/7578/4746.png', { headers });
+  const short = await fetch(s.url + '/13/7578/4746.png', { headers });
+  assert.equal(short.status, 200); assert.equal(short.headers.get('access-control-allow-origin'), '*');
+  assert.deepEqual(Buffer.from(await short.arrayBuffer()), Buffer.from(await ordinary.arrayBuffer()));
+});
 test('reject malformed coordinates and unknown providers before work is scheduled', async t => {
   const s = await server(t, { renderer: { render() { assert.fail('must not render'); }, close() {} } });
   for (const p of ['/raster/qld/3/8/0.png', '/vector/qld/NaN/0/0.pbf', '/raster/nsw/-1/0/0.png', '/raster/qld/1.5/0/0.png', '/vector/nsw/23/0/0.pbf']) assert.equal((await fetch(s.url + p)).status, 400);

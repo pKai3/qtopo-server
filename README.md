@@ -53,6 +53,10 @@ NSW's published vector style is an overlay, so the viewer and raster output add 
 
 The existing `/raster/{z}/{x}/{y}.png` URL now provides automatic QLD + NSW coverage. `/vector/{z}/{x}/{y}.pbf` and `/style.json` remain QLD-only interfaces; use the PNG URL for the combined GPS map.
 
+The shorter `/{z}/{x}/{y}.png` URL is an alias for the same automatic raster source and shares its cache. For example, an HTTPS proxy can expose `https://topo.example.com/{z}/{x}/{y}.png`.
+
+Public map endpoints send CORS headers so Gaia and other browser clients can fetch tiles directly without a CORS proxy. The status and log endpoints do not allow cross-origin reads. Gaia's HTTPS website may still block an HTTP tile URL as mixed content: keep its **Route Through CORS Proxy** option enabled for that URL, or use an HTTPS reverse proxy for direct access. Leave **Reversed Y Coordinate** off; this server uses XYZ coordinates.
+
 In the browser, **Automatic + Interactive vector map** loads PBF tiles and renders them on your device. The map centre selects the QLD or NSW style using the same state boundary as the server. Panning across the border switches the displayed state after the pan, retaining the camera and layer preferences. This vector preview shows one state's style at a time; **Raster tiles / GPS preview** shows the combined, border-clipped PNGs used by Gaia. NSW map sheets are always raster and the URL and selector reflect that. The on-screen caption identifies the active vector state or raster tile resolution.
 
 Additional endpoints:
@@ -152,6 +156,7 @@ The live rendering checks depend on public government services. If an upstream s
 - [NSW vector basemap](https://portal.spatial.nsw.gov.au/vectortileservices/rest/services/Hosted/NSW_BaseMap_VectorTile/VectorTileServer), © State of New South Wales (Spatial Services).
 - [NSW topographic map sheets](https://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Topo_Map/MapServer), © State of New South Wales (Spatial Services).
 - QLD point symbols use [Maki](https://github.com/mapbox/maki); its license is included with the generated sprites. NSW uses its published symbol atlas and Public Sans glyphs.
+- The complete bundled default QLD glyph stack comes from [MapLibre demotiles](https://github.com/maplibre/demotiles); its source revision and license are included under `assets/fonts`. The original Latin glyph range is retained unchanged, with the remaining Unicode ranges included for expanded render areas.
 
 The bundled NSW style is a snapshot of its published service style, with its source URL recorded in metadata. Existing local styles are never overwritten by an update.
 

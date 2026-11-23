@@ -40,8 +40,22 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     },
   });
   app.disable('x-powered-by');
+  const shortTile = /^\/(\d+)\/(\d+)\/(\d+)\.png$/;
+  // Public map data can be used directly by Gaia and other browser clients.
+  // Keep status/log endpoints outside this policy, and never enable credentials.
+  app.use(['/raster', '/vector', '/tiles_raster', '/tiles_vector', '/styles', '/style.json', '/fonts', '/resources', '/assets', '/api/providers', shortTile], (req, res, next) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Expose-Headers', 'ETag, Retry-After');
+    if (req.method === 'OPTIONS') {
+      res.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      res.set('Access-Control-Allow-Headers', 'Accept, Content-Type, If-None-Match, If-Modified-Since, Range');
+      res.set('Access-Control-Max-Age', '600');
+      return res.status(204).end();
+    }
+    next();
+  });
   app.use((req, res, next) => {
-    if (/^\/(raster|vector|tiles_raster|tiles_vector)\//.test(req.path)) {
+    if (shortTile.test(req.path) || /^\/(raster|vector|tiles_raster|tiles_vector)\//.test(req.path)) {
       const started = Date.now();
       L.log('REQ', `${req.method} ${req.path}`);
       res.once('finish', () => L.log('RES', `${res.statusCode} ${req.path} (${Date.now() - started} ms)`));
@@ -194,6 +208,10 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   app.get('/vector/:z/:x/:y.pbf', vector);
   app.get('/raster/:provider/:z/:x/:y.png', raster);
   app.get('/raster/:z/:x/:y.png', automaticRaster);
+  app.get(shortTile, (req, res) => {
+    req.params = { z: req.params[0], x: req.params[1], y: req.params[2] };
+    return automaticRaster(req, res);
+  });
   for (const [old, current, extension] of [['tiles_raster', 'raster', 'png'], ['tiles_vector', 'vector', 'pbf']]) {
     app.get(`/${old}/:z/:x/:y.${extension}`, (req, res) => {
       if (!parseTile(req.params)) throw httpError('Invalid tile coordinates', 400);
