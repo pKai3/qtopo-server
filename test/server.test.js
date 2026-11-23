@@ -428,3 +428,65 @@ test('the existing Gaia URL selects QLD and NSW vector rendering and combines bo
   const catalog = await (await fetch(s.url + '/api/providers')).json();
   assert.equal(catalog.automatic.raster, s.url + '/raster/{z}/{x}/{y}.png');
 });
+
+test('named profile URLs isolate renders and aliases follow the configured default', async t => {
+  const jobs = [];
+  const s = await server(t, { nativeZoom: async () => 12, renderer: { stats: {}, close() {}, async render(job) {
+    jobs.push(job); for (const output of job.outputs || [job]) await atomicWrite(output.outPath, PNG);
+  } } }, { DEFAULT_PROFILE: 'readable' });
+  const catalog = await (await fetch(s.url + '/api/providers')).json();
+  assert.equal(catalog.defaultProfile, 'readable');
+  assert.deepEqual(catalog.profiles.map(p => p.id), ['classic', 'readable', 'size-2x', 'size-3x', 'mobile-2x', 'mobile-3x']);
+  const tile = '/13/7578/4746.png';
+  for (const profile of catalog.profiles) {
+    const response = await fetch(s.url + '/' + profile.id + tile);
+    assert.equal(response.status, 200); assert.equal(response.headers.get('access-control-allow-origin'), '*');
+    await response.arrayBuffer();
+    assert.equal((await fetch(s.url + '/' + profile.id + tile, { method: 'OPTIONS' })).status, 204);
+  }
+  assert.equal(jobs.length, 6); assert.equal(new Set(jobs.map(j => j.outPath)).size, 6);
+  const oldRevision = styleRevision(await getStyle(s.config, s.providers.qld), s.config, s.providers.qld);
+  assert.ok(jobs[0].outPath.includes('/qld/' + oldRevision + '/'), 'Classic retains its existing cache path');
+  for (const prefix of ['', '/raster', '/raster/qld', '/raster/readable/qld', '/readable']) {
+    assert.equal((await fetch(s.url + prefix + tile)).status, 200);
+  }
+  assert.equal(jobs.length, 6, 'default aliases must reuse Readable, not render another copy');
+  const original = await (await fetch(s.url + '/styles/classic/qld.json')).json();
+  const mobile = await (await fetch(s.url + '/styles/mobile-3x/qld.json')).json();
+  assert.deepEqual(await (await fetch(s.url + '/style.json')).json(), await (await fetch(s.url + '/styles/readable/qld.json')).json());
+  assert.notDeepEqual(original.layers, mobile.layers);
+  for (const prefix of ['/unknown', '/constructor', '/classic-v1']) assert.equal((await fetch(s.url + prefix + tile)).status, 404);
+  assert.equal((await fetch(s.url + '/mobile-2x/25/1/1.png')).status, 400);
+  assert.equal((await fetch(s.url + '/styles/unknown/qld.json')).status, 404);
+  // NSW and the border must carry the profile through source-zoom selection
+  // and both halves of a composite, rather than accidentally using the default.
+  for (const profile of ['classic', 'mobile-3x']) {
+    for (const tile of ['/12/3758/2455.png', '/14/15179/9529.png']) {
+      assert.equal((await fetch(s.url + '/' + profile + tile)).status, 200);
+    }
+  }
+  const nswJobs = jobs.filter(j => j.kind === 'vector' && j.outPath.includes('/nsw/'));
+  assert.ok(nswJobs.length >= 2);
+  assert.ok(nswJobs.every(j => Object.values(j.style.sources).every(source => source.maxzoom === 12)), 'profile retains NSW indexed parent zoom');
+  assert.deepEqual(new Set(nswJobs.map(j => j.style.layers.find(l => l.layout?.['icon-image']).layout['icon-size'] ?? 1)), new Set([1, 3]));
+  assert.ok(jobs.some(j => j.kind === 'composite'), 'exercise automatic border composition');
+});
+
+test('prefetch keeps the requested profile for neighbouring tiles', async t => {
+  const jobs = [];
+  const s = await server(t, { renderer: { stats: {}, close() {}, async render(job) {
+    jobs.push(job); for (const output of job.outputs || [job]) await atomicWrite(output.outPath, PNG);
+  } } }, { PREFETCH_RADIUS: '1', PREFETCH_ZOOM: '0', PREFETCH_QUEUE_LIMIT: '8' });
+  for (const profile of ['classic', 'mobile-2x']) {
+    assert.equal((await fetch(s.url + '/' + profile + '/13/7578/4746.png')).status, 200);
+    for (let i = 0; i < 100; i++) {
+      const state = await (await fetch(s.url + '/readyz')).json();
+      if (!state.prefetch.queued && !state.prefetch.active) break;
+      await sleep(20);
+    }
+  }
+  const background = jobs.filter(j => j.priority === 1);
+  assert.ok(background.length > 0);
+  const sizes = new Set(background.map(j => j.style.layers.find(l => l.id === 'homesteads').layout['text-size']));
+  assert.deepEqual(sizes, new Set([10, 20]));
+});

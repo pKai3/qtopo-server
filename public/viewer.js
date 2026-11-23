@@ -15,15 +15,19 @@ import { createStateSelector, selectPreview } from './preview.mjs';
     const initial = catalog.providers.find(p => p.id === catalog.defaultProvider);
     catalog.providers.unshift({ ...catalog.automatic, id: 'auto', name: 'QLD + NSW — automatic', type: 'vector', center: initial.center, zoom: initial.zoom });
     let provider = catalog.providers.find(p => p.id === params.get('provider')) || catalog.providers[0];
+    let profile = catalog.profiles.find(p => p.id === params.get('profile')) || catalog.profiles.find(p => p.id === catalog.defaultProfile);
+    for (const p of catalog.profiles) $('profile').add(new Option(p.name, p.id));
+    $('profile').value = profile.id;
     let selection, currentStyle, revision = 0, stateSelector;
     for (const p of catalog.providers) $('provider').add(new Option(p.name, p.id));
     $('provider').value = provider.id;
     $('mode').value = params.get('mode') === 'raster' ? 'raster' : 'vector';
     function previewStyle({ provider: selected, mode }) {
-      if (mode === 'vector') return selected.style;
+      if (mode === 'vector') return `/styles/${profile.id}/${selected.id}.json`;
+      const rasterURL = selected.id === 'auto' ? profile.raster : `${location.origin}/raster/${profile.id}/${selected.id}/{z}/{x}/{y}.png`;
       return {
         version: 8, glyphs: location.origin + '/fonts/{fontstack}/{range}.pbf',
-        sources: { topo: { type: 'raster', tiles: [selected.raster], tileSize: selected.id === 'nsw-topo' ? 256 : 512, bounds: selected.bounds, maxzoom: selected.maxzoom, attribution: selected.attribution } },
+        sources: { topo: { type: 'raster', tiles: [rasterURL], tileSize: selected.id === 'nsw-topo' ? 256 : 512, bounds: selected.bounds, maxzoom: selected.maxzoom, attribution: selected.attribution } },
         layers: [{ id: 'topographic-map', type: 'raster', source: 'topo' }],
       };
     }
@@ -51,12 +55,13 @@ import { createStateSelector, selectPreview } from './preview.mjs';
       const raster = selection.mode === 'raster', selected = selection.provider;
       $('mode').value = selection.mode;
       $('mode').disabled = provider.type === 'raster';
+      $('profile').disabled = provider.type === 'raster';
       $('layers').disabled = raster;
       $('layers').style.opacity = raster ? '0.45' : '1';
       $('tile-size').textContent = raster ? `${selected.tileSize} × ${selected.tileSize} raster tiles · ${selected.attribution}`
         : `Interactive vectors · ${selected.name}${provider.id === 'auto' ? ' · selected by map centre' : ''} · ${selected.attribution}`;
       $('status').textContent = ''; $('status').className = '';
-      params.set('provider', provider.id); params.set('mode', $('mode').value);
+      params.set('profile', profile.id); params.set('provider', provider.id); params.set('mode', $('mode').value);
       history.replaceState(null, '', '?' + params.toString() + location.hash);
     }
     async function showRegions() {
@@ -81,7 +86,7 @@ import { createStateSelector, selectPreview } from './preview.mjs';
         }
         if (request !== revision) return;
         selection = selectPreview(selected, mode, catalog.providers, center, selectState);
-        const key = `${selection.provider.id}/${selection.mode}`;
+        const key = `${selection.provider.id}/${selection.mode}/${profile.id}`;
         if (key === currentStyle) { syncUI(); return; }
         syncUI();
         // Keep the camera and layer preferences when the selected state changes.
@@ -102,10 +107,11 @@ import { createStateSelector, selectPreview } from './preview.mjs';
       if (c.lng < b[0] || c.lng > b[2] || c.lat < b[1] || c.lat > b[3]) map.flyTo({ center: provider.center, zoom: provider.zoom });
     });
     $('mode').addEventListener('change', switchStyle);
+    $('profile').addEventListener('change', () => { profile = catalog.profiles.find(p => p.id === $('profile').value); switchStyle(); });
     $('regions').addEventListener('change', showRegions);
     $('copy-url').addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(catalog.automatic.raster); $('status').textContent = 'QLD + NSW tile URL copied.'; }
-      catch { window.prompt('Copy this QLD + NSW URL into Gaia or your GPS app:', catalog.automatic.raster); }
+      try { await navigator.clipboard.writeText(profile.raster); $('status').textContent = `${profile.name} QLD + NSW tile URL copied.`; }
+      catch { window.prompt('Copy this QLD + NSW URL into Gaia or your GPS app:', profile.raster); }
     });
     await switchStyle();
     if (innerWidth < 600) document.querySelector('details').open = false;

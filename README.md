@@ -52,6 +52,25 @@ Use **`/raster/{z}/{x}/{y}.png`** for the automatic QLD + NSW map, at zooms 0–
 
 NSW’s published tile index selects the available vector parent at high zooms, avoiding requests for nonexistent child tiles. The renderer draws those vectors at the requested zoom. Both states render directly at the configured output resolution; the automatic route does not use scanned map sheets. QLD-only tiles reuse the existing QLD cache without changing their pixels. Previously downloaded blank NSW tiles in a GPS app may need refreshing.
 
+### Appearance profiles
+
+The unqualified `/{z}/{x}/{y}.png` and `/raster/{z}/{x}/{y}.png` URLs follow `DEFAULT_PROFILE`, initially `classic`. Choose an **Appearance** in the viewer and use **Copy QLD + NSW tile URL** to add that profile as a separate Gaia source.
+
+| URL path | Appearance |
+|---|---|
+| `/classic/{z}/{x}/{y}.png` | Existing colours, symbols and desktop sizing |
+| `/readable/{z}/{x}/{y}.png` | Revised colours, water masking and icon-label placement, at original desktop size |
+| `/size-2x/{z}/{x}/{y}.png` | Original colours with text, symbols and strokes enlarged 2× |
+| `/size-3x/{z}/{x}/{y}.png` | Original colours with text, symbols and strokes enlarged 3× |
+| `/mobile-2x/{z}/{x}/{y}.png` | Revised colours and placement, 2× features with gentler contours |
+| `/mobile-3x/{z}/{x}/{y}.png` | Revised colours and placement, 3× features with gentler contours |
+
+These names always select the current recipe; no version suffix is required. QLD/NSW selection remains automatic. The PNG dimensions, XYZ geography, source zoom thresholds and upstream features stay the same. Source data, fonts and sprites are shared; prepared styles, rendered tiles and prefetch groups are isolated by profile. Classic retains the previous cache revision exactly. Saved style files are never overwritten. Recipe changes get fresh server cache revisions without clearing any existing cache; Gaia's own saved/offline tiles still require a refresh or download to see changes.
+
+Readable and Mobile use softer land/contour colours and stronger text halos. In QLD, opaque water polygons cover waterway skeleton lines inside permanent water bodies while keeping external creek segments and drawing shorelines, roads and bridges above them. QLD point symbols that previously centred icon and text together let their label choose a clear side; the icon remains at its actual location. Existing custom label offsets are respected. NSW uses its own published ordering and collision rules, with larger features and revised water/contour colours. Pre-rendered NSW map sheets cannot be restyled.
+
+Advanced clients can request `/raster/{profile}/{provider}/{z}/{x}/{y}.png` or `/styles/{profile}/{provider}.json`. Legacy provider-specific routes follow the configured default. `/api/providers` lists all profiles and absolute tile templates; `/?profile=mobile-2x&mode=raster` opens a matching preview.
+
 All client tile URLs use XYZ order: zoom, column, row. ArcGIS row/column ordering is handled internally. The provider-specific routes below remain available for advanced use:
 
 | Map | Provider | Raster URL |
@@ -97,13 +116,14 @@ Additional endpoints:
 | VECTOR_DIR / RASTER_DIR / STYLE_DIR | Under DATA_DIR | Optional directory overrides |
 | STYLE_PATH | /data/styles/style.json | Editable QLD style |
 | FONT_DIR | Bundled fonts | Local QLD glyph directory |
+| DEFAULT_PROFILE | classic | Appearance for unqualified raster/style URLs; classic, readable, size-2x, size-3x, mobile-2x or mobile-3x. Named URLs remain independent of this choice. |
 | DEFAULT_PROVIDER | qld | Initial viewer location: qld, nsw, nsw-topo; automatic GPS coverage is always enabled |
 | PUBLIC_URL | Request origin | External origin, e.g. https://maps.example.com, when using an HTTPS reverse proxy |
 | TILE_PX | 1024 | 256, 512 or 1024 output pixels for vector-to-raster maps |
 | METATILE_SIZE | 2 | Render a fixed 2×2 vector grid together; set 1 for single-tile rendering. PNG dimensions and URLs stay the same. |
 | RENDER_BUFFER_PX | 64 | Border around the render area, in logical pixels at 512px per tile (128 output pixels at TILE_PX=1024). Even values 0–256; cropped before saving. Set 0 with METATILE_SIZE=1 to use the previous unpadded renderer. |
 | PNG_COMPRESSION_LEVEL | 3 | Lossless PNG compression, 0–9. Try 6 for slightly smaller files at the cost of more encoding CPU; resolution and colours are unchanged. Applies to newly rendered tiles only. |
-| LABEL_SCALE | 1 | Raster text/icon scale, 0.5–3; try 1.4 for a GPS app |
+| LABEL_SCALE | 1 | Legacy extra raster text/icon multiplier, 0.5–3, applied on top of every profile; keep 1 when comparing named profiles. |
 | VECTOR_UPSTREAM | QLD service | Optional QLD template containing {z}, {x}, {y} |
 | RENDER_CONCURRENCY | 2 | Maximum simultaneous reusable native workers, 1–16 |
 | RENDER_QUEUE_LIMIT | 64 | Maximum queued distinct renders |
