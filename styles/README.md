@@ -23,3 +23,13 @@ variants match the validated terrain revision activated on 23 November 2026.
 The follow-up contour label revision enlarges QLD elevation labels by another
 25%: Readable 12.5 px, Mobile 2x 20 px and Mobile 3x 27.5 px. Linework and zoom
 thresholds are unchanged.
+
+Light choices: `readable-light.json` uses desktop sizing and `mobile-light.json`
+uses Mobile 3x sizing. They omit buildings, utilities, parcel detail and minor
+urban POIs. Contours, tracks, water, road hierarchy, locality names, outdoor
+landmarks and emergency/transit navigation features are retained. The detailed
+Readable and Mobile files stay available and are the source of truth.
+
+Run `node scripts/build-light-styles.js` after editing the detailed styles to
+regenerate both light choices. This changes style files only; it does not build
+or deploy a container. The default source remains Classic.
