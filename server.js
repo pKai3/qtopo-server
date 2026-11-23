@@ -16,6 +16,7 @@ const { createPrefetch } = require('./lib/prefetch');
 const { PRIORITY } = require('./lib/queue');
 const { createRequestMetrics } = require('./lib/metrics');
 const { metatileLayout } = require('./lib/metatile');
+const { createStatusActions } = require('./lib/status-actions');
 
 async function createApp(config = loadConfig(), dependencies = {}) {
   process.umask(0o002);
@@ -30,6 +31,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   const nativeZoom = dependencies.nativeZoom || createTileIndex(config, cache);
   const stopCleaner = startCleaner(config, L);
   const app = express();
+  let activeRasterRequests = 0;
   const prefetch = createPrefetch({
     radius: config.prefetchRadius, zoom: config.prefetchZoom, concurrency: config.prefetchConcurrency,
     limit: config.prefetchQueueLimit, logger: L,
@@ -38,6 +40,11 @@ async function createApp(config = loadConfig(), dependencies = {}) {
       const result = await (id === 'auto' ? automaticRasterFile(tile, priority, rank) : rasterFile(providers[id], tile, priority, rank));
       requests.prefetched(result);
     },
+  });
+  const actions = createStatusActions({
+    origin: () => app.locals.internalOrigin, rasterDir: path.join(config.rasterDir, 'v2'), maxzoom: providers.qld.maxzoom,
+    busy: () => { const render = renderer.stats; return activeRasterRequests || render?.active || render?.queued || prefetch.stats.active; },
+    pause: () => prefetch.pause(), resume: () => prefetch.resume(), logger: L,
   });
   app.disable('x-powered-by');
   const shortTile = /^\/(\d+)\/(\d+)\/(\d+)\.png$/;
@@ -152,7 +159,9 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     await serveRaster(req, res);
   }
   async function serveRaster(req, res, p) {
+    if (actions.cacheBusy) throw httpError('Rendered tiles are being cleared; please retry shortly.', 503);
     const tile = coordinates(req, p || providers.qld);
+    activeRasterRequests++;
     const measured = requests.begin();
     res.once('finish', () => measured.finish(res.statusCode, false, res.statusCode === 304 ? 0 : res.getHeader('content-length')));
     res.once('close', () => { if (!res.writableFinished) measured.finish(res.statusCode, true); });
@@ -163,7 +172,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
       measured.ready(result);
       await deliverRaster(res, result);
       success = true;
-    } finally { finish(success); }
+    } finally { activeRasterRequests--; finish(success); }
   }
   async function automaticRasterFile(tile, priority = PRIORITY.REQUEST, rank = 0) {
     const area = coverage(tile);
@@ -246,8 +255,25 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     revision: process.env.BUILD_REVISION || 'development',
     settings: { tilePx: config.tilePx, metatileSize: config.metatileSize, renderBufferPx: config.renderBufferPx, pngCompression: config.pngCompression, renderConcurrency: config.renderConcurrency, renderQueueLimit: config.renderQueueLimit, upstreamConcurrency: config.upstreamConcurrency, prefetchConcurrency: config.prefetchConcurrency, prefetchQueueLimit: config.prefetchQueueLimit, prefetchRadius: config.prefetchRadius, prefetchZoom: config.prefetchZoom },
     providers: Object.keys(providers), renderer: renderer.stats, cache: cache.stats, prefetch: prefetch.stats,
-    requests: requests.stats, styles: styles.stats,
+    requests: requests.stats, styles: styles.stats, actions: actions.stats,
   }));
+  // These explicit POST actions are outside the public map CORS policy.
+  // A custom header and JSON body prevent cross-site form/image requests;
+  // cross-origin scripts cannot pass the required preflight.
+  const controls = express.Router();
+  controls.use((req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    if (req.method !== 'POST' || req.get('X-QTopo-Action') !== 'status-page' || !req.is('application/json') || req.get('Sec-Fetch-Site') === 'cross-site') return res.status(403).json({ error: 'Use the controls on this server’s status page.' });
+    next();
+  }, express.json({ limit: '2kb' }));
+  controls.post('/tile-test/start', (req, res) => res.status(202).json(actions.start(req.body)));
+  controls.post('/tile-test/stop', (_req, res) => res.json(actions.stop()));
+  controls.post('/cache/clear', (req, res) => {
+    if (req.body?.confirm !== 'clear-rendered-tiles') throw httpError('Confirm clearing rendered tiles first.', 400);
+    res.status(202).json(actions.clear());
+  });
+  controls.use((error, _req, res, _next) => res.status(error.status || 500).json({ error: error.status ? error.message : 'Could not perform this action.' }));
+  app.use('/api/actions', controls);
   app.get('/status', (_req, res) => res.sendFile(path.join(config.root, 'public/status.html')));
   app.get('/api/logs', (req, res) => {
     const after = req.query.after ?? '0', session = req.query.session;
@@ -264,7 +290,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     if (status === 503) res.set('Retry-After', '3');
     res.status(status).json({ error: status === 400 || status === 404 ? err.message : 'Map service temporarily unavailable; please retry.' });
   });
-  return { app, providers, close() { prefetch.close(); stopCleaner(); renderer.close(); cache.close?.(); } };
+  return { app, providers, close() { actions.close(); prefetch.close(); stopCleaner(); renderer.close(); cache.close?.(); } };
 }
 async function main() {
   const config = loadConfig();

@@ -76,6 +76,7 @@ async function refresh() {
     rows($('session'), [['Active tile requests', number(q.active)], ['Completed responses', number(q.completed)], ['Recent delivery rate', rate], ['PNG data sent', bytes(q.bytes)], ['Failed responses', number(q.errors)], ['Client disconnects', number(q.disconnected)]], true);
     rows($('settings'), [['Tile resolution', `${s.tilePx} × ${s.tilePx}`], ['Vector render grid', `${s.metatileSize} × ${s.metatileSize} tiles`], ['Render border', `${s.renderBufferPx * s.tilePx / 512}px at this resolution`], ['PNG compression', `${s.pngCompression} / 9 · lossless`], ['Render concurrency', number(s.renderConcurrency)], ['Prefetch concurrency', number(s.prefetchConcurrency)], ['Render queue limit', number(s.renderQueueLimit)], ['Download concurrency', number(s.upstreamConcurrency)], ['Zoom prefetch', s.prefetchZoom && s.prefetchRadius ? 'Enabled · lowest priority' : 'Disabled'], ['Started', new Date(data.startedAt).toLocaleString()]], true);
     $('release').textContent = `QTopo ${data.version} · ${data.revision.slice(0, 12)}`;
+    if (data.actions) renderActions(data.actions);
   } catch (error) {
     $('activity').textContent = 'Unavailable';
     $('error').textContent = `Could not refresh server activity (${error.message}). Any figures shown are from the last successful update.`;
@@ -83,7 +84,6 @@ async function refresh() {
   } finally { loading = false; if (!document.hidden) timer = setTimeout(refresh, refreshMs); }
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) clearTimeout(timer); else refresh(); });
-refresh();
 
 let logTimer, logLoading = false, logPaused = false, logCursor = 0, logSession, logEntries = [];
 async function refreshLogs() {
@@ -121,3 +121,71 @@ $('logs-pause').addEventListener('click', () => {
   if (!logPaused) refreshLogs();
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) clearTimeout(logTimer); else refreshLogs(); });
+
+let actionPending = false, actionState = { test: { phase: 'idle' }, clearing: { phase: 'idle' } }, testSession;
+const testBusy = () => ['running', 'stopping'].includes(actionState.test.phase);
+const clearingBusy = () => ['waiting', 'clearing'].includes(actionState.clearing.phase);
+function updateArea() {
+  const values = Object.fromEntries(['width', 'height', 'concurrency'].map(key => [key, $('test-form').elements.namedItem(key).value]));
+  text($('test-area'), `${number(Number(values.width) * Number(values.height))} tiles · up to ${values.concurrency} requests at once`);
+}
+function renderActions(state) {
+  actionState = state;
+  const t = state.test, c = state.clearing, busy = testBusy(), clearing = clearingBusy();
+  // Restore the active test after a reload or when another browser starts it.
+  if (t.startedAt && t.startedAt !== testSession) {
+    testSession = t.startedAt;
+    for (const [key, value] of Object.entries(t.settings)) {
+      if ($('test-form').elements.namedItem(key)) $('test-form').elements.namedItem(key).value = value;
+    }
+    updateArea();
+  }
+  $('test-fields').disabled = busy || clearing || actionPending;
+  $('test-start').disabled = busy || clearing || actionPending;
+  $('test-stop').disabled = t.phase !== 'running' || actionPending;
+  $('cache-clear').disabled = busy || clearing || actionPending;
+  $('cache-confirm-clear').disabled = busy || clearing || actionPending;
+  text($('test-phase'), { idle: 'Ready', running: 'Running', stopping: 'Finishing requests', complete: 'Finished', stopped: 'Stopped', error: 'Failed' }[t.phase]);
+  const p = t.result || t.progress;
+  if (p) {
+    const finished = p.succeeded + p.failed;
+    $('test-progress').max = p.requested;
+    $('test-progress').value = finished;
+    text($('test-message'), `${finished} of ${p.requested} finished · ${p.succeeded} received · ${p.failed} failed${p.skipped ? ` · ${p.skipped} skipped` : ''}${busy ? ` · ${p.active || 0} requests in flight` : ''}${t.phase === 'stopping' ? ' · no new requests will start' : ''}`);
+    rows($('test-results'), [['Elapsed', ms(p.elapsedMs)], ['PNG data received', bytes(p.bytes)], ['Peak parallel requests', number(p.peakRequests)], ['Peak busy render jobs observed', number(p.peakRenderJobsObserved)], ['Median response', ms(p.medianMs)], ['95th percentile response', ms(p.p95Ms)], ['Server cache hits during test', number(p.serverCacheHits)], ['Server cache misses during test', number(p.serverCacheMisses)]], true);
+  } else {
+    $('test-progress').value = 0; $('test-results').replaceChildren();
+    text($('test-message'), 'No test has been run. The request limit does not change the configured render worker count.');
+  }
+  if (t.error) text($('test-message'), `Test failed: ${t.error}`);
+  const failures = t.result?.failures || [];
+  text($('test-output'), [...(t.logs || []), ...failures.map(f => `${f.route}: ${f.error}`), failures.length ? 'Up to 10 failures shown.' : ''].filter(Boolean).join('\n') || 'No test output yet.');
+  text($('cache-message'), c.phase === 'waiting' ? 'Waiting for current requests and render jobs to finish…' : c.phase === 'clearing' ? `Clearing… ${number(c.removed)} tiles removed.` : c.phase === 'done' ? `Cleared ${number(c.removed)} rendered tiles (${bytes(c.bytes)}). New requests can render them again.` : c.phase === 'error' ? `Could not finish clearing: ${c.error}` : busy ? 'Stop the test and let its current requests finish before clearing the cache.' : '');
+}
+async function performAction(route, body = {}) {
+  actionPending = true; $('action-error').hidden = true; renderActions(actionState);
+  try {
+    const response = await fetch('/api/actions/' + route, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-QTopo-Action': 'status-page' }, body: JSON.stringify(body), signal: AbortSignal.timeout(10000) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    renderActions(data);
+  } catch (error) {
+    text($('action-error'), error.message); $('action-error').hidden = false;
+  } finally { actionPending = false; renderActions(actionState); refresh(); }
+}
+$('test-form').addEventListener('input', updateArea);
+$('test-form').addEventListener('submit', event => {
+  event.preventDefault();
+  if (actionPending || testBusy() || clearingBusy()) return;
+  const settings = Object.fromEntries([...new FormData($('test-form'))].map(([key, value]) => [key, Number(value)]));
+  performAction('tile-test/start', settings);
+});
+$('test-stop').addEventListener('click', () => performAction('tile-test/stop'));
+$('cache-clear').addEventListener('click', () => { $('cache-confirm').hidden = false; $('cache-cancel').focus(); });
+$('cache-cancel').addEventListener('click', () => { $('cache-confirm').hidden = true; $('cache-clear').focus(); });
+$('cache-confirm-clear').addEventListener('click', () => {
+  if (actionPending || testBusy() || clearingBusy()) return;
+  $('cache-confirm').hidden = true;
+  performAction('cache/clear', { confirm: 'clear-rendered-tiles' });
+});
+refresh();

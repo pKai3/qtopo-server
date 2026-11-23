@@ -27,10 +27,13 @@ function tilesFor(o) {
   return tiles.sort((a, b) => ((a.y % 2) * 2 + a.x % 2) - ((b.y % 2) * 2 + b.x % 2));
 }
 
-async function run(o, log = console.log) {
+async function run(o, log = console.log, { signal, onProgress = () => {} } = {}) {
   const tiles = tilesFor(o), latencies = [], failures = [];
   let cursor = 0, active = 0, peakRequests = 0, peakRenders = 0, peakQueued = 0, bytes = 0, lastProgress = 0;
   const started = performance.now(), stop = new AbortController();
+  const progress = () => onProgress({ requested: tiles.length, started: cursor, succeeded: latencies.length, failed: failures.length,
+    active, bytes, elapsedMs: Math.round(performance.now() - started), peakRequests,
+    peakRenderJobsObserved: peakRenders, peakQueuedJobsObserved: peakQueued });
   const status = async () => {
     try {
       const response = await fetch(o.url + '/readyz', { signal: AbortSignal.any([stop.signal, AbortSignal.timeout(2000)]) });
@@ -42,16 +45,18 @@ async function run(o, log = console.log) {
     } catch { /* Older servers and proxies may not expose status. */ }
   };
   const before = await status();
+  progress();
   log(`${tiles.length} tiles at z${o.z}, x${o.x}–${o.x + o.width - 1}, y${o.y}–${o.y + o.height - 1}; up to ${o.concurrency} HTTP requests at once.`);
   if (before) log(`Server render concurrency: ${before.settings?.renderConcurrency ?? before.renderer?.concurrency}; ${before.renderer?.active || 0} jobs already active.`);
   const monitor = (async () => {
     while (!stop.signal.aborted) {
       try { await sleep(250, undefined, { signal: stop.signal }); } catch { break; }
       await status();
+      progress();
     }
   })();
   await Promise.all(Array.from({ length: Math.min(o.concurrency, tiles.length) }, async () => {
-    while (cursor < tiles.length) {
+    while (cursor < tiles.length && !signal?.aborted) {
       const tile = tiles[cursor++], began = performance.now();
       active++; peakRequests = Math.max(peakRequests, active);
       const route = `/raster/${o.z}/${tile.x}/${tile.y}.png`;
@@ -62,7 +67,7 @@ async function run(o, log = console.log) {
         if (body.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') throw new Error('Response is not a PNG');
         bytes += body.length; latencies.push(performance.now() - began);
       } catch (error) { failures.push({ route, error: error.message }); }
-      finally { active--; }
+      finally { active--; progress(); }
       if (performance.now() - lastProgress >= 1000) {
         log(`${latencies.length + failures.length}/${tiles.length} finished; ${active} HTTP requests in flight; peak ${peakRenders} render jobs observed.`);
         lastProgress = performance.now();
@@ -75,7 +80,7 @@ async function run(o, log = console.log) {
   const percentile = p => latencies.length ? Math.round(latencies[Math.ceil(latencies.length * p) - 1]) : null;
   const sameSession = before && after && before.startedAt === after.startedAt;
   const delta = key => sameSession && Number.isFinite(before.requests?.[key]) && Number.isFinite(after.requests?.[key]) ? after.requests[key] - before.requests[key] : null;
-  const result = { requested: tiles.length, succeeded: latencies.length, failed: failures.length, elapsedMs, medianMs: percentile(0.5), p95Ms: percentile(0.95), bytes, peakRequests, peakRenderJobsObserved: before ? peakRenders : null, peakQueuedJobsObserved: before ? peakQueued : null, serverCacheHits: delta('hits'), serverCacheMisses: delta('misses'), failures };
+  const result = { requested: tiles.length, started: cursor, skipped: tiles.length - cursor, stopped: !!signal?.aborted, succeeded: latencies.length, failed: failures.length, elapsedMs, medianMs: percentile(0.5), p95Ms: percentile(0.95), bytes, peakRequests, peakRenderJobsObserved: before ? peakRenders : null, peakQueuedJobsObserved: before ? peakQueued : null, serverCacheHits: delta('hits'), serverCacheMisses: delta('misses'), failures };
   log(JSON.stringify(result, null, 2));
   log('Server counters include other clients and prefetch. Busy jobs include resource/IO waits; they are not CPU usage. This script does not change RENDER_CONCURRENCY.');
   log('Repeat the same area for cached delivery; choose a new area for rendering. No cache is cleared. Prefetch may continue after the HTTP batch ends.');

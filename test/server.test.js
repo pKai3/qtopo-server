@@ -10,6 +10,7 @@ const { createProviders, tileURL, parseTile } = require('../lib/providers');
 const { getStyle, renderStyle, absoluteStyle, styleRevision } = require('../lib/styles');
 const { validateStyleMin } = require('@maplibre/maplibre-gl-style-spec');
 const logger = require('../lib/logger');
+const { setTimeout: sleep } = require('node:timers/promises');
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/YYbL4QAAAAASUVORK5CYII=', 'base64');
 async function server(t, dependencies = {}) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-app-test-'));
@@ -21,6 +22,70 @@ async function server(t, dependencies = {}) {
   t.after(async () => { instance.close(); listener.closeAllConnections(); await new Promise(r => listener.close(r)); await fs.rm(dir, { recursive: true, force: true }); });
   return { ...instance, config, url };
 }
+const actionHeaders = { 'Content-Type': 'application/json', 'X-QTopo-Action': 'status-page' };
+const action = (s, route, body = {}, headers = actionHeaders) => fetch(s.url + '/api/actions/' + route, { method: 'POST', headers, body: JSON.stringify(body) });
+async function waitForActions(s, predicate) {
+  for (let i = 0; i < 150; i++) {
+    const state = (await (await fetch(s.url + '/readyz')).json()).actions;
+    if (predicate(state)) return state;
+    await sleep(20);
+  }
+  assert.fail('Status action did not reach the expected state');
+}
+test('status controls run one local tile test, reject unsafe inputs and stop without aborting accepted tiles', async t => {
+  let release, renders = 0;
+  const blocked = new Promise(resolve => { release = resolve; });
+  t.after(() => release());
+  const s = await server(t, { renderer: { close() {}, async render(job) { renders++; await blocked; await atomicWrite(job.outPath, PNG); } } });
+  assert.equal((await action(s, 'tile-test/start', {}, { 'Content-Type': 'application/json' })).status, 403);
+  assert.equal((await action(s, 'tile-test/start', {}, { ...actionHeaders, 'Sec-Fetch-Site': 'cross-site' })).status, 403);
+  assert.equal((await action(s, 'tile-test/start', { url: 'http://other-server/' })).status, 400);
+  assert.equal((await action(s, 'tile-test/start', { width: 1000 })).status, 400);
+  assert.equal((await action(s, 'tile-test/start', { z: 22 })).status, 400);
+  assert.equal((await action(s, 'tile-test/start', { width: 3, height: 2, concurrency: 2 })).status, 202);
+  assert.equal((await action(s, 'tile-test/start')).status, 409);
+  assert.equal((await action(s, 'cache/clear', { confirm: 'clear-rendered-tiles' })).status, 409);
+  for (let i = 0; i < 100 && renders < 2; i++) await sleep(10);
+  assert.equal(renders, 2);
+  assert.equal((await action(s, 'tile-test/stop')).status, 200);
+  release();
+  const state = await waitForActions(s, value => value.test.phase === 'stopped');
+  assert.equal(state.test.result.succeeded, 2); assert.equal(state.test.result.failed, 0);
+  assert.equal(state.test.result.skipped, 4); assert.equal(renders, 2);
+  assert.equal((await action(s, 'tile-test/start', { width: 1, height: 1 })).status, 202);
+  const completed = await waitForActions(s, value => value.test.phase === 'complete');
+  assert.equal(completed.test.result.succeeded, 1);
+  assert.equal(completed.test.result.serverCacheHits, 1);
+});
+test('cache clearing waits for metatile siblings, gates new requests and preserves downloads, user files and symlink targets', async t => {
+  let active = 1, output;
+  const s = await server(t, { renderer: { get stats() { return { active, queued: 0 }; }, close() {}, async render(job) { output = job.outPath; await atomicWrite(output, PNG); } } });
+  await (await fetch(s.url + '/raster/16/60500/37950.png')).arrayBuffer();
+  const retained = [path.join(s.config.vectorDir, 'v2/qld/test.pbf'), path.join(s.config.rasterDir, 'v2/readme.txt'), path.join(s.config.resourceDir, 'v2/sprite.png'), path.join(s.config.rasterDir, 'outside.png')];
+  for (const file of retained) await atomicWrite(file, PNG);
+  const root = path.join(s.config.rasterDir, 'v2');
+  await atomicWrite(path.join(root, 'old.png'), PNG);
+  await atomicWrite(path.join(root, 'old.png.empty'), 'empty');
+  await fs.symlink(s.config.resourceDir, path.join(root, 'linked-resources'));
+  assert.equal((await action(s, 'cache/clear')).status, 400);
+  const started = await action(s, 'cache/clear', { confirm: 'clear-rendered-tiles' });
+  assert.equal(started.status, 202);
+  assert.equal((await started.json()).clearing.phase, 'waiting');
+  await fs.access(output);
+  assert.equal((await action(s, 'cache/clear', { confirm: 'clear-rendered-tiles' })).status, 409);
+  assert.equal((await action(s, 'tile-test/start')).status, 409);
+  const gated = await fetch(s.url + '/raster/16/60501/37950.png');
+  assert.equal(gated.status, 503); assert.equal(gated.headers.get('retry-after'), '3');
+  active = 0;
+  const done = await waitForActions(s, value => value.clearing.phase === 'done');
+  assert.equal(done.clearing.removed, 2);
+  await assert.rejects(fs.access(output), { code: 'ENOENT' });
+  await assert.rejects(fs.access(path.join(root, 'old.png.empty')), { code: 'ENOENT' });
+  for (const file of retained) assert.deepEqual(await fs.readFile(file), PNG);
+  assert.equal((await fs.lstat(path.join(root, 'linked-resources'))).isSymbolicLink(), true);
+  assert.equal((await (await fetch(s.url + '/readyz')).json()).prefetch.paused, false);
+  assert.equal((await fetch(s.url + '/raster/16/60500/37950.png')).status, 200);
+});
 test('status log endpoint returns only new application messages and rejects invalid cursors', async t => {
   const s = await server(t);
   const cursor = logger.read();

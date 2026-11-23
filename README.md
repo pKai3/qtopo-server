@@ -133,7 +133,11 @@ The viewer serves its JavaScript locally. Map data and uncached NSW glyphs/sprit
 
 ## Development and verification
 
-For a bounded load test, open the QTopo container console in Unraid and run:
+Open `/status` → **Tile test** to run a bounded load test inside the container. Set the starting XYZ tile, width, height and parallel request count, then press **Start test**. The default is 64 tiles and eight requests at once. Progress and results refresh with the activity charts every 250ms; the test continues if the page is closed, and reopening it restores its progress. Only one UI test can run at a time. **Stop test** prevents further requests while allowing the current requests to finish. The results measure delivery inside the server, not transfer to Gaia or your browser.
+
+**Clear rendered tiles…** asks for confirmation, pauses prefetch and new raster requests, lets accepted requests and complete render grids finish, then removes rendered PNGs and their sidecars from the current `RASTER_DIR/v2` cache. Vector downloads, other resources, styles and files outside that cache are retained. It does not clear tiles already saved by Gaia. New raster requests receive a temporary 503 with Retry-After while clearing; ordinary operation resumes afterward. Stop any UI test before clearing. If work cannot drain within five minutes, clearing reports an error and service resumes without deleting files. These status-page actions use JSON POST requests, do not allow cross-origin access, and cannot target another server. Anyone allowed access to the status controls can use them; restrict that access at your reverse proxy when exposing public tile URLs.
+
+The same tester is available from the QTopo container console in Unraid:
 
 ```sh
 node scripts/load-tiles.js --z 16 --x 60500 --y 37950 --width 8 --height 8 --concurrency 8

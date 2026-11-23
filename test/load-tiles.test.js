@@ -33,3 +33,20 @@ test('load generator respects request concurrency, reports failures and makes ea
   assert.equal(result.peakRenderJobsObserved, null);
   assert.equal(result.serverCacheHits, null);
 });
+
+test('stopping a load test lets accepted requests finish and skips the remainder', async t => {
+  const stop = new AbortController();
+  let accepted = 0;
+  const server = http.createServer((req, res) => {
+    if (req.url === '/readyz') { res.writeHead(404); res.end(); return; }
+    if (++accepted === 2) stop.abort();
+    setTimeout(() => res.end(Buffer.from('89504e470d0a1a0a', 'hex')), 40);
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }));
+  const progress = [];
+  const result = await run(options(['--url', `http://127.0.0.1:${server.address().port}`, '--width', '3', '--height', '2', '--concurrency', '2']), () => {}, { signal: stop.signal, onProgress: value => progress.push(value) });
+  assert.equal(accepted, 2); assert.equal(result.started, 2); assert.equal(result.skipped, 4);
+  assert.equal(result.succeeded, 2); assert.equal(result.failed, 0); assert.equal(result.stopped, true);
+  assert.equal(progress.at(-1).active, 0);
+});
