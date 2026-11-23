@@ -17,7 +17,8 @@ const { PRIORITY } = require('./lib/queue');
 const { createRequestMetrics } = require('./lib/metrics');
 const { metatileLayout } = require('./lib/metatile');
 const { createStatusActions } = require('./lib/status-actions');
-const { createAdminAccess, sameOrigin } = require('./lib/admin-access');
+const { createAdminAccess } = require('./lib/admin-access');
+const { listenControl, socketPath } = require('./lib/local-control');
 
 async function createApp(config = loadConfig(), dependencies = {}) {
   const admin = createAdminAccess(config);
@@ -259,34 +260,23 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     revision: process.env.BUILD_REVISION || 'development',
     settings: { tilePx: config.tilePx, metatileSize: config.metatileSize, renderBufferPx: config.renderBufferPx, pngCompression: config.pngCompression, renderConcurrency: config.renderConcurrency, renderQueueLimit: config.renderQueueLimit, upstreamConcurrency: config.upstreamConcurrency, prefetchConcurrency: config.prefetchConcurrency, prefetchQueueLimit: config.prefetchQueueLimit, prefetchRadius: config.prefetchRadius, prefetchZoom: config.prefetchZoom },
     providers: Object.keys(providers), renderer: renderer.stats, cache: cache.stats, prefetch: prefetch.stats,
-    requests: requests.stats, styles: styles.stats, actions: actions.stats,
+    requests: requests.stats, styles: styles.stats,
   }; }
-  app.use(['/status', '/status.html', '/status.js', '/status.css', '/readyz', '/api/logs', '/api/actions'], admin.authorize);
-  app.get('/readyz', (_req, res) => res.json(status()));
-  // These explicit POST actions are outside the public map CORS policy.
-  // A custom header and JSON body prevent cross-site form/image requests;
-  // cross-origin scripts cannot pass the required preflight.
-  const controls = express.Router();
-  controls.use((req, res, next) => {
-    res.set('Cache-Control', 'no-store');
-    const site = req.get('Sec-Fetch-Site');
-    if (req.method !== 'POST' || req.get('X-QTopo-Action') !== 'status-page' || !req.is('application/json') || (site && !['same-origin', 'none'].includes(site)) || !sameOrigin(req)) return res.status(403).json({ error: 'Use the controls on this server’s status page.' });
-    next();
-  }, express.json({ limit: '2kb' }));
-  controls.post('/tile-test/start', (req, res) => res.status(202).json(actions.start(req.body)));
-  controls.post('/tile-test/stop', (_req, res) => res.json(actions.stop()));
-  controls.post('/cache/clear', (req, res) => {
-    if (req.body?.confirm !== 'clear-rendered-tiles') throw httpError('Confirm clearing rendered tiles first.', 400);
-    res.status(202).json(actions.clear());
+  app.use(['/status', '/status.html', '/status.js', '/status.css', '/readyz'], (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+  app.get('/readyz', (req, res) => {
+    const data = status();
+    // Aggregate activity is public; individual tile locations and test areas
+    // must not be disclosed through the read-only dashboard.
+    const { lastRender, ...renderStats } = data.renderer || {};
+    res.json({ ...data, renderer: renderStats, logsAvailable: admin.canReadLogs(req) });
   });
-  controls.use((error, _req, res, _next) => res.status(error.status || 500).json({ error: error.status ? error.message : 'Could not perform this action.' }));
-  app.use('/api/actions', controls);
-  // Keep management files outside the public static directory: encoded paths
-  // must not bypass the same access check used by the management APIs.
+  // Retired web controls fail for every client, including localhost and
+  // trusted proxies. Maintenance is exposed only on the private Unix socket.
+  app.use('/api/actions', (_req, res) => res.status(404).set('Cache-Control', 'no-store').json({ error: 'Web controls are unavailable. Use the container CLI.' }));
   for (const [routes, file] of [[['/status', '/status.html'], 'status.html'], ['/status.js', 'status.js'], ['/status.css', 'status.css']]) {
     app.get(routes, (_req, res) => res.sendFile(path.join(config.root, 'admin', file), { cacheControl: false }));
   }
-  app.get('/api/logs', (req, res) => {
+  app.get('/api/logs', admin.authorize, (req, res) => {
     const after = req.query.after ?? '0', session = req.query.session;
     if (typeof after !== 'string' || !/^\d+$/.test(after) || !Number.isSafeInteger(Number(after)) || (session != null && (typeof session !== 'string' || session.length > 64))) throw httpError('Invalid log cursor', 400);
     res.set('Cache-Control', 'no-store').json(L.read(Number(after), session));
@@ -301,22 +291,23 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     if (status === 503) res.set('Retry-After', '3');
     res.status(status).json({ error: status === 400 || status === 404 ? err.message : 'Map service temporarily unavailable; please retry.' });
   });
-  return { app, providers, close() { actions.close(); prefetch.close(); stopCleaner(); renderer.close(); cache.close?.(); } };
+  return { app, providers, actions, close() { actions.close(); prefetch.close(); stopCleaner(); renderer.close(); cache.close?.(); } };
 }
 async function main() {
   const config = loadConfig();
   const instance = await createApp(config);
+  const control = await listenControl(instance.actions, socketPath(config.port));
   const server = instance.app.listen(config.port, '0.0.0.0', () => {
     instance.app.locals.internalOrigin = `http://127.0.0.1:${server.address().port}`;
     L.sys(`Listening on port ${server.address().port}; /raster/{z}/{x}/{y}.png serves QLD + NSW vectors automatically (${config.tilePx}px)`);
     L.sys(`Render concurrency ${config.renderConcurrency}; prefetch ${config.prefetchRadius ? `up to ${config.prefetchConcurrency} tiles, radius ${config.prefetchRadius}, zoom ${config.prefetchZoom ? '±1' : 'off'}` : 'off'}`);
     L.sys(`Vector renders ${config.metatileSize}×${config.metatileSize} tiles with ${config.renderBufferPx}px logical padding; each output remains ${config.tilePx}px`);
-    L.sys(config.adminAllowedNetworks ? 'Management uses the same port and is restricted to ADMIN_ALLOWED_NETWORKS and ADMIN_ALLOWED_HOSTS.' : 'Management disabled: configure ADMIN_ALLOWED_NETWORKS and ADMIN_ALLOWED_HOSTS for LAN/ZeroTier access. Public tiles remain available.');
+    L.sys('Status is public and read-only. Tests and cache clearing require the container CLI; application logs retain their network restrictions.');
   });
   let stopping = false;
   const stop = () => {
     if (stopping) return; stopping = true;
-    instance.close(); server.close(() => process.exit(0));
+    instance.close(); control.close(); server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 10000).unref();
   };
   process.once('SIGTERM', stop); process.once('SIGINT', stop);
