@@ -47,37 +47,6 @@
       </div>
       <p class="hint queue-explanation">Requested tiles have first priority, followed by nearby prefetch, then zoom prefetch. Rendering counts jobs; each vector job can prepare up to four tiles. Waiting counts render jobs and pending prefetch checks. Cached tiles bypass rendering; requesting an unfinished prefetch tile moves its render to Requested.</p>
     </section>
-    <section class="panel test-panel" aria-labelledby="test-heading">
-      <div class="queue-heading"><h2 id="test-heading">Tile test</h2><span id="test-phase" class="badge">Ready</span></div>
-      <p>Send a batch of tile requests from inside this server and watch the workers above. Repeat an area for cached delivery, or clear rendered tiles to test fresh rendering.</p>
-      <form id="test-form">
-        <fieldset id="test-fields" class="test-fields">
-          <legend class="sr-only">Tile area and request settings</legend>
-          <label>Zoom<input name="z" type="number" value="16" min="0" max="19" step="1" required></label>
-          <label>Starting X<input name="x" type="number" value="60500" min="0" step="1" required></label>
-          <label>Starting Y<input name="y" type="number" value="37950" min="0" step="1" required></label>
-          <label>Width in tiles<input name="width" type="number" value="8" min="1" max="64" step="1" required></label>
-          <label>Height in tiles<input name="height" type="number" value="8" min="1" max="64" step="1" required></label>
-          <label>Parallel requests<input name="concurrency" type="number" value="8" min="1" max="64" step="1" required></label>
-        </fieldset>
-        <div class="test-toolbar"><button id="test-start" type="submit">Start test</button><button id="test-stop" type="button" disabled>Stop test</button><span id="test-area" class="hint">64 tiles · up to 8 requests at once</span></div>
-      </form>
-      <p id="test-message" class="hint" role="status">No test has been run. The request limit does not change the configured render worker count.</p>
-      <progress id="test-progress" max="64" value="0" aria-label="Tile test completion"></progress>
-      <dl id="test-results" class="test-results"></dl>
-      <p class="hint">This measures local delivery inside the server, not the connection to Gaia. Stop prevents new test requests; accepted requests finish normally. Prefetch can continue afterward. Worker counts include other traffic and time waiting for resources.</p>
-      <details id="test-log-panel"><summary>Test output</summary><pre id="test-output" tabindex="0">No test output yet.</pre></details>
-      <div class="cache-actions">
-        <div><h3>Rendered tile cache</h3><p class="hint">Delete server PNGs and render them again on demand. Vector downloads and styles are kept; Gaia’s saved tiles are unaffected.</p></div>
-        <button id="cache-clear" type="button">Clear rendered tiles…</button>
-      </div>
-      <div id="cache-confirm" class="cache-confirm" hidden>
-        <p>Clear all rendered tiles from this server? New tile requests will briefly receive a retry response while current work finishes and the cache is cleared.</p>
-        <button id="cache-confirm-clear" class="danger" type="button">Yes, clear rendered tiles</button> <button id="cache-cancel" type="button">Cancel</button>
-      </div>
-      <p id="cache-message" class="hint" role="status"></p>
-      <p id="action-error" class="action-error" role="alert" hidden></p>
-    </section>
     <div class="columns">
       <section class="panel"><h2>Where the time goes</h2><p class="hint">Median is the typical response. 95th percentile shows the slower end.</p>
         <table><thead><tr><th scope="col">Stage</th><th scope="col">Median</th><th scope="col">95th percentile</th></tr></thead><tbody id="timings"></tbody></table>
@@ -87,8 +56,8 @@
         <h3>This session</h3><dl id="session"></dl><p class="hint">PNG data sent totals PNG sizes from successful HTTP responses handed to the operating system. It does not confirm receipt or display in Gaia. Cached responses count even while other tiles are rendering.</p>
       </section>
     </div>
-    <section class="panel settings"><h2>Running configuration</h2><dl id="settings"></dl><p class="hint">Counters reset on restart. Opening this page only observes activity; a tile test starts when you press Start test.</p></section>
-    <details id="logs-panel" class="panel logs">
+    <section class="panel settings"><h2>Running configuration</h2><dl id="settings"></dl><p class="hint">Counters reset on restart. This page is read-only.</p></section>
+    <details id="logs-panel" class="panel logs" hidden>
       <summary>Application log</summary>
       <div class="log-toolbar"><p class="hint">Latest 500 application and renderer log entries, kept in memory. Full container output remains available in Unraid.</p><button id="logs-pause" type="button" aria-pressed="false">Pause</button></div>
       <p id="logs-status" class="hint">Opens a live view, updating every 0.25 seconds.</p>

@@ -5,6 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 const { createApp } = require('../server');
+const { listenControl, requestControl } = require('../lib/local-control');
 const { loadConfig } = require('../lib/config');
 const { atomicWrite } = require('../lib/utils');
 const { createProviders, tileURL, parseTile } = require('../lib/providers');
@@ -20,48 +21,62 @@ async function server(t, dependencies = {}, env = {}) {
   const listener = await new Promise(resolve => { const s = instance.app.listen(0, '127.0.0.1', () => resolve(s)); });
   const url = 'http://127.0.0.1:' + listener.address().port;
   instance.app.locals.internalOrigin = url;
-  t.after(async () => { instance.close(); listener.closeAllConnections(); await new Promise(r => listener.close(r)); await fs.rm(dir, { recursive: true, force: true }); });
-  return { ...instance, config, url };
+  const controlDir = await fs.mkdtemp('/tmp/qtopo-control-test-');
+  const socket = path.join(controlDir, 'control.sock');
+  const control = await listenControl(instance.actions, socket);
+  t.after(async () => { instance.close(); control.closeAllConnections(); await new Promise(r => control.close(r)); await fs.rm(controlDir, { recursive: true, force: true }); listener.closeAllConnections(); await new Promise(r => listener.close(r)); await fs.rm(dir, { recursive: true, force: true }); });
+  return { ...instance, config, url, socket };
 }
 const actionHeaders = { 'Content-Type': 'application/json', 'X-QTopo-Action': 'status-page' };
-const action = (s, route, body = {}, headers = actionHeaders) => fetch(s.url + '/api/actions/' + route, { method: 'POST', headers, body: JSON.stringify(body) });
+const webAction = (s, route, body = {}, headers = actionHeaders) => fetch(s.url + '/api/actions/' + route, { method: 'POST', headers, body: JSON.stringify(body) });
+const action = async (s, route, body = {}) => {
+  try {
+    const data = await requestControl('/' + route, body, s.socket);
+    return { status: route === 'tile-test/stop' ? 200 : 202, json: async () => data };
+  } catch (error) { return { status: error.status, json: async () => ({ error: error.message }) }; }
+};
 // Fetch controls the Host header; use HTTP directly to exercise hostile hosts.
 const statusWithHeaders = (url, headers) => new Promise((resolve, reject) => {
   http.get(url, { headers }, response => { response.resume(); response.on('end', () => resolve(response.statusCode)); }).on('error', reject);
 });
 async function waitForActions(s, predicate) {
   for (let i = 0; i < 150; i++) {
-    const state = (await (await fetch(s.url + '/readyz')).json()).actions;
+    const state = await requestControl('/status', undefined, s.socket);
     if (predicate(state)) return state;
     await sleep(20);
   }
   assert.fail('Status action did not reach the expected state');
 }
-test('public listener denies all management by default while still serving map tiles', async t => {
+test('public status is read-only: web controls are absent even with spoofed proxy headers', async t => {
   let renders = 0;
-  const s = await server(t, { renderer: { close() {}, async render(job) { renders++; await atomicWrite(job.outPath, PNG); } } }, { ADMIN_ALLOWED_NETWORKS: '' });
+  const s = await server(t, { renderer: { stats: { active: 0, lastRender: { z:16, x:60500, y:37950 } }, close() {}, async render(job) { renders++; await atomicWrite(job.outPath, PNG); } } }, { ADMIN_ALLOWED_NETWORKS: '' });
   const retained = path.join(s.config.rasterDir, 'v2/retained.png');
   await atomicWrite(retained, PNG);
-  for (const route of ['/status', '/status.html', '/status.js', '/status.css', '/readyz', '/api/logs', '/STATUS', '/status/']) {
+  for (const route of ['/status', '/status.html', '/status.js', '/status.css', '/readyz', '/STATUS', '/status/']) {
     const response = await fetch(s.url + route);
-    assert.equal(response.status, 403, route);
+    assert.equal(response.status, 200, route);
     assert.equal(response.headers.get('cache-control'), 'no-store');
     assert.equal(response.headers.get('access-control-allow-origin'), null);
     await response.arrayBuffer();
   }
+  const data = await (await fetch(s.url + '/readyz')).json();
+  assert.equal(data.logsAvailable, false);
+  assert.equal(data.actions, undefined);
+  assert.equal(data.renderer.lastRender, undefined);
+  assert.equal((await fetch(s.url + '/api/logs')).status, 403);
   for (const [route, body] of [['tile-test/start', { width: 1, height: 1 }], ['tile-test/stop', {}], ['cache/clear', { confirm: 'clear-rendered-tiles' }]]) {
-    assert.equal((await action(s, route, body)).status, 403, route);
-    assert.equal((await action(s, route, body, { ...actionHeaders, 'X-Forwarded-For': '127.0.0.1', 'X-Real-IP': '127.0.0.1' })).status, 403);
+    assert.equal((await webAction(s, route, body)).status, 404, route);
+    assert.equal((await webAction(s, route, body, { ...actionHeaders, 'X-Forwarded-For': '127.0.0.1', 'X-Real-IP': '127.0.0.1' })).status, 404);
+  }
+  for (const route of ['/api/actions/cache/clear', '/API/ACTIONS/cache/clear', '/api/%61ctions/cache/clear']) {
+    for (const method of ['GET', 'POST', 'HEAD', 'OPTIONS']) assert.equal((await fetch(s.url + route, { method })).status, 404);
   }
   assert.deepEqual(await fs.readFile(retained), PNG);
-  assert.equal(renders, 0, 'denied controls must never schedule rendering');
-  for (const route of ['/%73tatus.html', '/status%2ejs', '/admin/status.html', '/public/status.html']) {
-    assert.ok([403, 404].includes((await fetch(s.url + route)).status), route);
-  }
-  for (const method of ['HEAD', 'OPTIONS']) assert.equal((await fetch(s.url + '/readyz', { method })).status, 403);
-  assert.equal((await fetch(s.url + '/healthz')).status, 200);
-  assert.equal((await fetch(s.url + '/')).status, 200);
-  assert.equal((await fetch(s.url + '/api/providers')).status, 200);
+  assert.equal(renders, 0, 'public status and retired controls must not schedule rendering');
+  const page = await (await fetch(s.url + '/status')).text();
+  assert.doesNotMatch(page, /test-form|cache-clear|Start test|Clear rendered tiles/);
+  const script = await (await fetch(s.url + '/status.js')).text();
+  assert.doesNotMatch(script, /api\/actions|performAction/);
   for (const route of ['/raster/16/60500/37950.png', '/16/60500/37950.png']) {
     const response = await fetch(s.url + route, { headers: { Origin: 'https://www.gaiagps.com' } });
     assert.equal(response.status, 200);
@@ -69,39 +84,31 @@ test('public listener denies all management by default while still serving map t
     assert.deepEqual(Buffer.from(await response.arrayBuffer()), PNG);
   }
 });
-test('management uses explicit networks and hostnames, not private-looking forwarded headers', async t => {
+test('private logs still require explicit networks and hostnames; local HTTP cannot run actions', async t => {
   const s = await server(t);
-  assert.equal((await fetch(s.url + '/status')).status, 200);
+  assert.equal((await (await fetch(s.url + '/readyz')).json()).logsAvailable, true);
+  assert.equal((await fetch(s.url + '/api/logs')).status, 200);
   for (const headers of [
-    { Host: 'attacker.example' },
-    { Host: '127.0.0.1.attacker.example' },
-    { 'X-Forwarded-For': '127.0.0.1' },
-    { 'X-Forwarded-Host': 'localhost' },
-    { 'X-Real-IP': '127.0.0.1' },
-  ]) assert.equal(await statusWithHeaders(s.url + '/readyz', headers), 403, JSON.stringify(headers));
-  for (const headers of [{ Origin: 'https://attacker.example' }, { Origin: 'null' }, { 'Sec-Fetch-Site': 'same-site' }]) {
-    assert.equal((await action(s, 'tile-test/stop', {}, { ...actionHeaders, ...headers })).status, 403);
-  }
-  assert.equal((await action(s, 'tile-test/stop', {}, { ...actionHeaders, Origin: s.url })).status, 200);
+    { Host: 'attacker.example' }, { Host: '127.0.0.1.attacker.example' },
+    { 'X-Forwarded-For': '127.0.0.1' }, { 'X-Forwarded-Host': 'localhost' }, { 'X-Real-IP': '127.0.0.1' },
+  ]) assert.equal(await statusWithHeaders(s.url + '/api/logs', headers), 403, JSON.stringify(headers));
+  assert.equal((await webAction(s, 'tile-test/stop', {}, { ...actionHeaders, Origin: s.url })).status, 404);
 });
-test('a trusted proxy must supply an allowed actual client; spoofed earlier hops cannot grant management access', async t => {
+test('a trusted proxy must supply an allowed actual client to read logs, but cannot enable web actions', async t => {
   const s = await server(t, {}, { TRUSTED_PROXIES: '127.0.0.1/32', ADMIN_ALLOWED_NETWORKS: '192.0.2.0/24,2001:db8:1::/64' });
   for (const client of ['192.0.2.42', '2001:db8:1::2']) {
-    assert.equal((await fetch(s.url + '/readyz', { headers: { 'X-Forwarded-For': client } })).status, 200);
+    assert.equal((await fetch(s.url + '/api/logs', { headers: { 'X-Forwarded-For': client } })).status, 200);
   }
   for (const headers of [{}, { 'X-Forwarded-For': '198.51.100.2' }, { 'X-Forwarded-For': '192.0.2.42, 198.51.100.2' }, { 'X-Forwarded-For': 'not-an-address' }]) {
-    assert.equal((await fetch(s.url + '/readyz', { headers })).status, 403);
-    assert.equal((await action(s, 'cache/clear', { confirm: 'clear-rendered-tiles' }, { ...actionHeaders, ...headers })).status, 403);
+    assert.equal((await fetch(s.url + '/api/logs', { headers })).status, 403);
   }
-  assert.equal((await action(s, 'tile-test/stop', {}, { ...actionHeaders, 'X-Forwarded-For': '192.0.2.42' })).status, 200);
+  assert.equal((await webAction(s, 'cache/clear', { confirm: 'clear-rendered-tiles' }, { ...actionHeaders, 'X-Forwarded-For': '192.0.2.42' })).status, 404);
 });
-test('status controls run one local tile test, reject unsafe inputs and stop without aborting accepted tiles', async t => {
+test('local socket controls run one tile test, reject unsafe inputs and stop without aborting accepted tiles', async t => {
   let release, renders = 0;
   const blocked = new Promise(resolve => { release = resolve; });
   t.after(() => release());
   const s = await server(t, { renderer: { close() {}, async render(job) { renders++; await blocked; await atomicWrite(job.outPath, PNG); } } });
-  assert.equal((await action(s, 'tile-test/start', {}, { 'Content-Type': 'application/json' })).status, 403);
-  assert.equal((await action(s, 'tile-test/start', {}, { ...actionHeaders, 'Sec-Fetch-Site': 'cross-site' })).status, 403);
   assert.equal((await action(s, 'tile-test/start', { url: 'http://other-server/' })).status, 400);
   assert.equal((await action(s, 'tile-test/start', { width: 1000 })).status, 400);
   assert.equal((await action(s, 'tile-test/start', { z: 22 })).status, 400);

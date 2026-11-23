@@ -16,7 +16,7 @@ The pre-NSW source is tagged `pre-nsw` in GitHub. New builds publish **latest on
 
 ## Unraid
 
-Keep the existing container port **8080**, host port (for example 9878), and host folder mounted at **/data**. Map delivery does not require a template change. **Management is now disabled by default:** configure the allowed networks and hostnames below to restore your private status page and its controls. No second port or extra login is required.
+Keep the existing container port **8080**, host port (for example 9878), and host folder mounted at **/data**. Map delivery does not require a template change. The status page is public and read-only. Tests and cache clearing run only through the container CLI. Raw application logs remain private unless the configured networks and hostnames permit access. No second network port or extra login is required.
 
 | Setting | Value |
 |---|---|
@@ -34,17 +34,17 @@ If switching an existing root-owned installation to PUID/PGID, set `FIX_PERMISSI
 
 Keep using `http://<unraid-host>:<host-port>/raster/{z}/{x}/{y}.png` in Gaia or your existing mapping app. No provider selection is required. Open the browser preview and use **Copy QLD + NSW tile URL** when setting up a new app. To roll back, change the Unraid repository to `pkai3/qtopo-server:stable` and update the container; the same mount and port still work.
 
-### Private status page on the existing port
+### Status and private logs
 
-Add environment variables in the Unraid container editor, then apply the change:
+Open `/status` on the normal server URL for public, read-only activity charts. `/readyz` returns aggregate counters and settings; it omits individual tile locations, test coordinates and local maintenance details. Enabling ZeroTier is not required to view status. The former `/api/actions/*` web endpoints return 404 for every client, including localhost and trusted proxies.
 
-- `ADMIN_ALLOWED_NETWORKS`: the verified client IP addresses or CIDR networks for your LAN and ZeroTier. Prefer individual addresses if only a few devices need management. Include `127.0.0.1/32` if the container-console tester should read server statistics.
-- `ADMIN_ALLOWED_HOSTS`: the exact hostnames or IP addresses you use to open the status page, without schemes or ports. For example, `tower.local,192.168.2.92,localhost,127.0.0.1,[::1]`. Replace these examples with your own names and addresses.
-- `TRUSTED_PROXIES`: leave empty for direct LAN/ZeroTier access. If management passes through a reverse proxy, set only that proxy's actual source IP as seen by QTopo, and add the management hostname to `ADMIN_ALLOWED_HOSTS`. The proxy must replace or safely append `X-Forwarded-For` with the actual client address. Do not trust all Docker, LAN or private addresses.
+Raw logs contain requested tile locations and remain restricted. The log panel is shown only to allowed clients:
 
-For example, `ADMIN_ALLOWED_NETWORKS=192.168.2.0/24,127.0.0.1/32` permits that LAN and container loopback; add your verified ZeroTier client addresses separately. QTopo has no automatic allowance for private-looking IPs. An untrusted connection carrying forwarding headers is denied management access, and a trusted proxy must provide a client address from the allowed networks. A public client cannot gain access simply by sending a private IP in a header.
+- `ADMIN_ALLOWED_NETWORKS`: verified client addresses/CIDRs for private log access; empty disables web log access.
+- `ADMIN_ALLOWED_HOSTS`: exact names/IPs used for private logs, without schemes or ports.
+- `TRUSTED_PROXIES`: only the proxy's actual source address as seen by QTopo. This also allows correctly forwarded HTTPS URLs. Never trust an entire Docker/LAN network as a proxy.
 
-Open the existing private URL, such as `http://tower.local:9877/status`, over LAN/ZeroTier. A public DNS name may still send your connection through the public internet even when ZeroTier is connected; use a private route or private DNS for management. Verify that `/status` works privately and `/readyz` and `/api/actions/…` return 403 from outside the allowed networks. This applies on the direct published container port as well as through the proxy. Public maps, PNG/PBF tiles and `/healthz` remain available without a login.
+A public DNS name still uses its public route when ZeroTier is enabled. That only affects private logs now; status and tiles are public. Read full container logs from Unraid or `docker logs` when needed. Forwarded private addresses from untrusted peers cannot enable log access.
 
 ## Maps and tile URLs
 
@@ -68,7 +68,7 @@ The existing `/raster/{z}/{x}/{y}.png` URL now provides automatic QLD + NSW cove
 
 The shorter `/{z}/{x}/{y}.png` URL is an alias for the same automatic raster source and shares its cache. For example, an HTTPS proxy can expose `https://topo.example.com/{z}/{x}/{y}.png`.
 
-Public map endpoints send CORS headers so Gaia and other browser clients can fetch tiles directly without a CORS proxy. Management endpoints require explicitly allowed client networks and hostnames; CORS restrictions alone are not access control. Gaia's HTTPS website may still block an HTTP tile URL as mixed content: keep its **Route Through CORS Proxy** option enabled for that URL, or use an HTTPS reverse proxy for direct access. Leave **Reversed Y Coordinate** off; this server uses XYZ coordinates.
+Public map endpoints send CORS headers so Gaia and other browser clients can fetch tiles directly without a CORS proxy. Raw application logs require explicitly allowed client networks and hostnames. Web maintenance actions do not exist; CORS restrictions alone are not access control. Gaia's HTTPS website may still block an HTTP tile URL as mixed content: keep its **Route Through CORS Proxy** option enabled for that URL, or use an HTTPS reverse proxy for direct access. Leave **Reversed Y Coordinate** off; this server uses XYZ coordinates.
 
 In the browser, **Automatic + Interactive vector map** loads PBF tiles and renders them on your device. The map centre selects the QLD or NSW style using the same state boundary as the server. Panning across the border switches the displayed state after the pan, retaining the camera and layer preferences. This vector preview shows one state's style at a time; **Raster tiles / GPS preview** shows the combined, border-clipped PNGs used by Gaia. NSW map sheets are always raster and the URL and selector reflect that. The on-screen caption identifies the active vector state or raster tile resolution.
 
@@ -80,8 +80,8 @@ Additional endpoints:
 - `/?provider=nsw&mode=raster` — shareable raster preview; the URL hash preserves position.
 - `/raster` and `/index_raster.html` — redirects to raster preview.
 - `/healthz` — lightweight container health.
-- `/readyz` — restricted management status: provider list and cache/renderer counters.
-- `/status` — restricted management page: live activity, controls and application log.
+- `/readyz` — public read-only status: provider list and aggregate cache/renderer counters.
+- `/status` — public read-only activity page; raw logs are shown only for allowed private clients.
 - `/api/logs` — restricted management log: the most recent 500 entries, with incremental cursors; memory only, reset on restart.
 - `/tiles_raster/…`, `/tiles_vector/…` — legacy 308 redirects.
 
@@ -90,8 +90,8 @@ Additional endpoints:
 | Variable | Default | Meaning |
 |---|---|---|
 | PORT | 8080 | HTTP port |
-| ADMIN_ALLOWED_NETWORKS | empty (management disabled) | Comma-separated client IP addresses/CIDRs allowed to use status, logs and actions; use only your verified LAN/ZeroTier networks |
-| ADMIN_ALLOWED_HOSTS | localhost,127.0.0.1,[::1] | Exact hostnames/IPs used to visit management, without schemes or ports; also prevents DNS rebinding |
+| ADMIN_ALLOWED_NETWORKS | empty (web logs disabled) | Comma-separated client IP addresses/CIDRs allowed to read raw logs; use only your verified LAN/ZeroTier networks |
+| ADMIN_ALLOWED_HOSTS | localhost,127.0.0.1,[::1] | Exact hostnames/IPs allowed for private log access, without schemes or ports; also prevents DNS rebinding |
 | TRUSTED_PROXIES | empty (none trusted) | Exact reverse-proxy IPs/CIDRs allowed to supply client addresses and HTTPS forwarding headers; never use the whole Docker or LAN subnet |
 | DATA_DIR | /data | Data root |
 | VECTOR_DIR / RASTER_DIR / STYLE_DIR | Under DATA_DIR | Optional directory overrides |
@@ -149,14 +149,23 @@ The viewer serves its JavaScript locally. Map data and uncached NSW glyphs/sprit
 
 ## Development and verification
 
-Open `/status` → **Tile test** to run a bounded load test inside the container. Set the starting XYZ tile, width, height and parallel request count, then press **Start test**. The default is 64 tiles and eight requests at once. Progress and results refresh with the activity charts every 250ms; the test continues if the page is closed, and reopening it restores its progress. Only one UI test can run at a time. **Stop test** prevents further requests while allowing the current requests to finish. The results measure delivery inside the server, not transfer to Gaia or your browser.
-
-**Clear rendered tiles…** asks for confirmation, pauses prefetch and new raster requests, lets accepted requests and complete render grids finish, then removes rendered PNGs and their sidecars from the current `RASTER_DIR/v2` cache. Vector downloads, other resources, styles and files outside that cache are retained. It does not clear tiles already saved by Gaia. New raster requests receive a temporary 503 with Retry-After while clearing; ordinary operation resumes afterward. Stop any UI test before clearing. If work cannot drain within five minutes, clearing reports an error and service resumes without deleting files. These status-page actions use JSON POST requests, reject cross-origin requests, and cannot target another server. The application enforces the configured management networks and hostnames before any action runs. Anyone on an allowed network using an allowed hostname can use the controls, so permit only devices or networks you trust to administer QTopo.
-
-The same tester is available from the QTopo container console in Unraid:
+Run these commands in the **Unraid terminal** (replace the container name for stable):
 
 ```sh
-node scripts/load-tiles.js --z 16 --x 60500 --y 37950 --width 8 --height 8 --concurrency 8
+docker exec -it qtopo-server-latest node scripts/admin.js test --width 8 --height 8 --concurrency 8
+docker exec qtopo-server-latest node scripts/admin.js stop-test
+docker exec qtopo-server-latest node scripts/admin.js clear-cache --confirm
+docker exec qtopo-server-latest node scripts/admin.js status
+```
+
+These commands use a Unix socket inside the container, in a directory accessible only to the server user and root (0700 directory, 0600 socket). It has no TCP port, proxy route, or browser API. Tests always target the same container. Ctrl+C during a test stops scheduling new requests; accepted requests finish normally. One local test can run at a time. A test continues if the terminal disconnects; `stop-test` stops it and `status` shows progress.
+
+Cache clearing pauses prefetch and new raster requests, drains accepted requests and complete metatiles, then removes rendered PNGs and sidecars only from `RASTER_DIR/v2`. Downloads, styles, user files and symlink targets are preserved. New raster requests receive temporary 503 responses with Retry-After. If workers cannot drain within five minutes, clearing fails without deleting files and normal serving resumes. Stop any local test before clearing. `--confirm` is mandatory. Gaia's saved tiles are unaffected.
+
+For a standalone HTTP client test, the existing script remains available:
+
+```sh
+node scripts/load-tiles.js --url http://tower.local:9877 --width 8 --height 8 --concurrency 8
 ```
 
 This requests 64 distinct tiles with at most eight HTTP requests in flight. It requests one tile from each 2×2 grid before the siblings, so shared metatile work does not artificially restrict the initial worker load. It reports response times, failures, cache counters and observed peak busy render jobs. Watch `/status` or Unraid's process monitor during the burst. `--url http://tower.local:9877` targets Unraid when running the script from another machine with Node; no local Docker is needed. `--help` lists the options.
