@@ -7,6 +7,7 @@ const { createRenderer } = require('../lib/render');
 const { PRIORITY } = require('../lib/queue');
 const { atomicWrite, cachedRaster } = require('../lib/utils');
 const { prune } = require('../lib/cleaner');
+const logger = require('../lib/logger');
 test('terminate a hung child and allow queued work to continue', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-worker-test-'));
   const renderer = createRenderer({ renderConcurrency: 1, renderQueueLimit: 2, rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 500 }, path.join(__dirname, 'fixtures/render-worker.js'));
@@ -53,6 +54,19 @@ test('reuse workers across tiles, deduplicate requests, and replace failed worke
   await assert.rejects(renderer.render({ ...tile(3), fail: true }), /fixture failure/);
   await renderer.render(tile(3));
   assert.notEqual(await fs.readFile(tile(2).recordPid, 'utf8'), await fs.readFile(tile(3).recordPid, 'utf8'));
+  assert.equal(renderer.stats.spawned, 2);
+});
+
+test('native worker crash output reaches the application log and subsequent work can recover', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-crash-test-'));
+  const renderer = createRenderer({ renderConcurrency: 1, renderQueueLimit: 4, rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 2000 }, path.join(__dirname, 'fixtures/render-worker.js'));
+  t.after(async () => { renderer.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const cursor = logger.read();
+  await assert.rejects(renderer.render({ crash: true, outPath: path.join(root, 'crash.png') }), /Renderer exited 7/);
+  await renderer.render({ outPath: path.join(root, 'recovered.png') });
+  const output = logger.read(cursor.next, cursor.session).entries.map(entry => entry.line).join('\n');
+  assert.match(output, /\[NATIVE\]:.*worker \d+: native fixture output/);
+  assert.match(output, /\[NATIVE\]:.*worker \d+: native fixture fatal without newline/);
   assert.equal(renderer.stats.spawned, 2);
 });
 

@@ -5,7 +5,7 @@ FROM node:24-bookworm-slim AS node
 FROM ubuntu:24.04 AS base
 ENV DEBIAN_FRONTEND=noninteractive NODE_ENV=production LIBGL_ALWAYS_SOFTWARE=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates xvfb libgl1 libegl1 libopengl0 libgles2 libglfw3 libcurl4t64 libuv1t64 libicu74 libwebp7 \
+    ca-certificates xvfb x11-utils libgl1 libegl1 libopengl0 libgles2 libglfw3 libcurl4t64 libuv1t64 libicu74 libwebp7 \
     libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libjpeg-turbo8 libgif7 librsvg2-2 \
     tini gosu \
     && rm -rf /var/lib/apt/lists/* \
