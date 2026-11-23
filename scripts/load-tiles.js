@@ -29,16 +29,17 @@ function tilesFor(o) {
 
 async function run(o, log = console.log, { signal, onProgress = () => {} } = {}) {
   const tiles = tilesFor(o), latencies = [], failures = [];
-  let cursor = 0, active = 0, peakRequests = 0, peakRenders = 0, peakQueued = 0, bytes = 0, lastProgress = 0;
+  let cursor = 0, active = 0, peakRequests = 0, peakRenders = 0, peakQueued = 0, bytes = 0, lastProgress = 0, observedStatus = false;
   const started = performance.now(), stop = new AbortController();
   const progress = () => onProgress({ requested: tiles.length, started: cursor, succeeded: latencies.length, failed: failures.length,
     active, bytes, elapsedMs: Math.round(performance.now() - started), peakRequests,
-    peakRenderJobsObserved: peakRenders, peakQueuedJobsObserved: peakQueued });
+    peakRenderJobsObserved: observedStatus ? peakRenders : null, peakQueuedJobsObserved: observedStatus ? peakQueued : null });
   const status = async () => {
     try {
       const response = await fetch(o.url + '/readyz', { signal: AbortSignal.any([stop.signal, AbortSignal.timeout(2000)]) });
       if (!response.ok) return;
       const data = await response.json();
+      observedStatus = true;
       peakRenders = Math.max(peakRenders, data.renderer?.active || 0);
       peakQueued = Math.max(peakQueued, data.renderer?.queued || 0);
       return data;
@@ -80,7 +81,7 @@ async function run(o, log = console.log, { signal, onProgress = () => {} } = {})
   const percentile = p => latencies.length ? Math.round(latencies[Math.ceil(latencies.length * p) - 1]) : null;
   const sameSession = before && after && before.startedAt === after.startedAt;
   const delta = key => sameSession && Number.isFinite(before.requests?.[key]) && Number.isFinite(after.requests?.[key]) ? after.requests[key] - before.requests[key] : null;
-  const result = { requested: tiles.length, started: cursor, skipped: tiles.length - cursor, stopped: !!signal?.aborted, succeeded: latencies.length, failed: failures.length, elapsedMs, medianMs: percentile(0.5), p95Ms: percentile(0.95), bytes, peakRequests, peakRenderJobsObserved: before ? peakRenders : null, peakQueuedJobsObserved: before ? peakQueued : null, serverCacheHits: delta('hits'), serverCacheMisses: delta('misses'), failures };
+  const result = { requested: tiles.length, started: cursor, skipped: tiles.length - cursor, stopped: !!signal?.aborted, succeeded: latencies.length, failed: failures.length, elapsedMs, medianMs: percentile(0.5), p95Ms: percentile(0.95), bytes, peakRequests, peakRenderJobsObserved: observedStatus ? peakRenders : null, peakQueuedJobsObserved: observedStatus ? peakQueued : null, serverCacheHits: delta('hits'), serverCacheMisses: delta('misses'), failures };
   log(JSON.stringify(result, null, 2));
   log('Server counters include other clients and prefetch. Busy jobs include resource/IO waits; they are not CPU usage. This script does not change RENDER_CONCURRENCY.');
   log('Repeat the same area for cached delivery; choose a new area for rendering. No cache is cleared. Prefetch may continue after the HTTP batch ends.');

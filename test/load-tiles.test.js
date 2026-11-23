@@ -36,9 +36,13 @@ test('load generator respects request concurrency, reports failures and makes ea
 
 test('stopping a load test lets accepted requests finish and skips the remainder', async t => {
   const stop = new AbortController();
-  let accepted = 0;
+  let accepted = 0, statusCalls = 0;
   const server = http.createServer((req, res) => {
-    if (req.url === '/readyz') { res.writeHead(404); res.end(); return; }
+    if (req.url === '/readyz') {
+      if (++statusCalls === 1) { res.writeHead(503); res.end(); }
+      else { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ renderer: { active: 0, queued: 0 } })); }
+      return;
+    }
     if (++accepted === 2) stop.abort();
     setTimeout(() => res.end(Buffer.from('89504e470d0a1a0a', 'hex')), 40);
   });
@@ -49,4 +53,6 @@ test('stopping a load test lets accepted requests finish and skips the remainder
   assert.equal(accepted, 2); assert.equal(result.started, 2); assert.equal(result.skipped, 4);
   assert.equal(result.succeeded, 2); assert.equal(result.failed, 0); assert.equal(result.stopped, true);
   assert.equal(progress.at(-1).active, 0);
+  assert.equal(result.peakRenderJobsObserved, 0, 'later status samples still count when the initial status request failed');
+  assert.equal(result.serverCacheHits, null, 'a missing baseline must not become a fabricated cache delta');
 });
