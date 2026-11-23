@@ -13,6 +13,7 @@ async function main() {
   await fs.mkdir('/tmp/smoke/profiles', { recursive: true });
   const samples = [
     { name: 'brisbane', center: [153.00782, -27.49382], z: 15, profiles },
+    { name: 'swanbank-powerlines', center: [152.833, -27.658], z: 14, profiles: profiles.filter(p => ['classic', 'readable', 'mobile-3x'].includes(p.id)) },
     { name: 'nsw', center: [150.31, -33.72], z: 13, profiles },
     { name: 'lagoon', center: [152.42767, -27.45576], z: 13, profiles: profiles.filter(p => ['classic', 'readable'].includes(p.id)) },
     { name: 'clifton-road-icons', center: [151.1164, -24.2374], z: 15, profiles: profiles.filter(p => ['classic', 'readable', 'mobile-2x', 'mobile-3x'].includes(p.id)) },

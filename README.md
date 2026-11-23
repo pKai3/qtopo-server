@@ -67,9 +67,27 @@ The unqualified `/{z}/{x}/{y}.png` and `/raster/{z}/{x}/{y}.png` URLs follow `DE
 
 These names always select the current recipe; no version suffix is required. QLD/NSW selection remains automatic. The PNG dimensions, XYZ geography, source zoom thresholds and upstream features stay the same. Source data, fonts and sprites are shared; prepared styles, rendered tiles and prefetch groups are isolated by profile. Classic retains the previous cache revision exactly. Saved style files are never overwritten. Recipe changes get fresh server cache revisions without clearing any existing cache; Gaia's own saved/offline tiles still require a refresh or download to see changes.
 
-Readable and Mobile use softer land/contour colours and stronger text halos. In QLD, opaque water polygons cover waterway skeleton lines inside permanent water bodies while keeping external creek segments and drawing shorelines, roads and bridges above them. QLD point symbols that previously centred icon and text together let their label choose a clear side; the icon remains at its actual location. Existing custom label offsets are respected. NSW uses its own published ordering and collision rules, with larger features and revised water/contour colours. Pre-rendered NSW map sheets cannot be restyled.
+Readable and Mobile use softer land/contour colours and stronger text halos. Power lines are thin grey dashes at every display scale. In QLD, opaque water polygons cover waterway skeleton lines inside permanent water bodies while keeping external creek segments and drawing shorelines, roads and bridges above them. QLD point symbols that previously centred icon and text together let their label choose a clear side; the icon remains at its actual location. Existing custom label offsets are respected. NSW uses its own published ordering and collision rules, with larger features and revised water/contour colours. Pre-rendered NSW map sheets cannot be restyled.
 
 Advanced clients can request `/raster/{profile}/{provider}/{z}/{x}/{y}.png` or `/styles/{profile}/{provider}.json`. Legacy provider-specific routes follow the configured default. `/api/providers` lists all profiles and absolute tile templates; `/?profile=mobile-2x&mode=raster` opens a matching preview.
+
+### Live profile updates
+
+After installing the server release that supports live profiles, styles can be updated through SSH without another image build or container restart. Export a complete profile, edit its QLD and NSW style JSON, then sync it back:
+
+```sh
+ssh root@your-server 'docker exec qtopo-server-latest node scripts/profiles.js export mobile-3x -' > mobile-3x.json
+# Edit mobile-3x.json, then validate and install it atomically:
+ssh root@your-server 'docker exec -i qtopo-server-latest node scripts/profiles.js sync -' < mobile-3x.json
+```
+
+Use `docker exec -u <PUID>:<PGID>` when the container runs as a configured Unraid user. The CLI also accepts ordinary file paths and has `list` and `validate` commands. The JSON's `id` determines the URL: keeping `mobile-3x` updates that existing source; changing it to a new name creates another source. Classic is protected from file overrides, and syncing does not change `DEFAULT_PROFILE`.
+
+One file contains both state styles. Sync validates it before installation and keeps the previous file under `/data/profiles/history`. Sync a history file to roll back. New requests detect changes within 250 ms; in-flight requests finish with their captured style. Only changed styles get new raster cache identities, and old tiles remain available for rollback. Live profiles use immediate HTTP revalidation, but Gaia's downloaded/offline tiles may still need refreshing in the app. Invalid file edits keep the last valid in-memory profile; always use the CLI to avoid leaving invalid data on disk across a restart.
+
+Live files in `/data/profiles` override committed defaults in the image's `profiles/` directory. To include an approved profile in a later release, export it, validate it and commit it as `profiles/<id>.json`. Image updates never overwrite live files. To resume following the bundled profile, move the corresponding live JSON out of `/data/profiles` after saving a copy.
+
+Profile files contain complete MapLibre styles, including layer filters and zoom thresholds. Provider tile URLs are normalized to the server's existing proxies. QLD uses the bundled symbols by default; setting `styles.qld.sprite` to `/resources/qld/sprites/sprite` selects official QTopo symbols and fonts through the existing resource proxy. Match `icon-image` names and font stacks to that resource set. NSW retains its official symbols. There is no HTTP upload or editing endpoint.
 
 All client tile URLs use XYZ order: zoom, column, row. ArcGIS row/column ordering is handled internally. The provider-specific routes below remain available for advanced use:
 
@@ -115,8 +133,9 @@ Additional endpoints:
 | DATA_DIR | /data | Data root |
 | VECTOR_DIR / RASTER_DIR / STYLE_DIR | Under DATA_DIR | Optional directory overrides |
 | STYLE_PATH | /data/styles/style.json | Editable QLD style |
+| PROFILE_DIR | /data/profiles | Validated live profile JSON files; persistent overrides of bundled profiles |
 | FONT_DIR | Bundled fonts | Local QLD glyph directory |
-| DEFAULT_PROFILE | classic | Appearance for unqualified raster/style URLs; classic, readable, size-2x, size-3x, mobile-2x or mobile-3x. Named URLs remain independent of this choice. |
+| DEFAULT_PROFILE | classic | Appearance for unqualified raster/style URLs; a built-in or installed profile name. Named URLs remain independent of this choice. |
 | DEFAULT_PROVIDER | qld | Initial viewer location: qld, nsw, nsw-topo; automatic GPS coverage is always enabled |
 | PUBLIC_URL | Request origin | External origin, e.g. https://maps.example.com, when using an HTTPS reverse proxy |
 | TILE_PX | 1024 | 256, 512 or 1024 output pixels for vector-to-raster maps |

@@ -53,6 +53,7 @@ jobs:
             if [ "$pixels" = 1024 ]; then
               docker exec qtopo-smoke-$pixels node scripts/smoke-metatile.js
               docker exec qtopo-smoke-$pixels node scripts/smoke-profiles.js
+              docker exec -u 99:100 qtopo-smoke-$pixels node scripts/smoke-profile-sync.js
             fi
             docker cp qtopo-smoke-$pixels:/tmp/smoke/. test-results/
             docker stop qtopo-smoke-$pixels

@@ -24,6 +24,18 @@ test('profiles validate for both states, preserve Classic and keep independent c
       assert.deepEqual(validateStyleMin(prepared.style), [], `${id}/${profile.id}`);
       for (const scale of [0.5, 1, 3]) assert.deepEqual(validateStyleMin(renderStyle(prepared.style, scale)), []);
       assert.deepEqual(prepared.style.sources, original.sources, 'no change to source detail or tile coordinates');
+      for (const layer of prepared.style.layers.filter(l => l.id.startsWith('powerlines-'))) {
+        const before = original.layers.find(l => l.id === layer.id);
+        if (profile.refined) {
+          assert.equal(layer.paint['line-color'], '#858a8b');
+          assert.equal(layer.paint['line-width'], 1, 'power lines stay thin at every display scale');
+          assert.deepEqual(layer.paint['line-dasharray'], [4, 3]);
+          assert.equal(layer.paint['line-opacity'], 0.75);
+        } else {
+          assert.equal(layer.paint['line-color'], before.paint['line-color']);
+          assert.deepEqual(layer.paint['line-dasharray'], before.paint['line-dasharray']);
+        }
+      }
       for (const layer of prepared.style.layers) {
         const before = original.layers.find(l => l.id === layer.id);
         assert.deepEqual([layer.filter, layer.minzoom, layer.maxzoom], [before.filter, before.minzoom, before.maxzoom]);
@@ -35,7 +47,7 @@ test('profiles validate for both states, preserve Classic and keep independent c
       if (profile.factor === 1) for (const layer of prepared.style.layers) {
         const before = original.layers.find(l => l.id === layer.id);
         for (const key of ['text-size', 'icon-size']) assert.deepEqual(layer.layout?.[key], before.layout?.[key], `${profile.id}/${layer.id}/${key}`);
-        assert.deepEqual(layer.paint?.['line-width'], before.paint?.['line-width'], `${profile.id}/${layer.id}/line-width`);
+        if (profile.id === 'classic' || !layer.id.startsWith('powerlines-')) assert.deepEqual(layer.paint?.['line-width'], before.paint?.['line-width'], `${profile.id}/${layer.id}/line-width`);
       }
     }
     assert.equal(revisions.size, profiles.length);
@@ -61,8 +73,9 @@ test('profiles validate for both states, preserve Classic and keep independent c
   assert.notEqual((await cache.get(providers.qld, 'mobile-2x')).revision, previous.revision);
 });
 
-test('default profile accepts only the published names', () => {
+test('default profile accepts built-ins or a valid custom name', () => {
   assert.equal(loadConfig({}).defaultProfile, 'classic');
+  assert.equal(loadConfig({ DEFAULT_PROFILE: 'my-mobile' }).defaultProfile, 'my-mobile');
   for (const p of profiles) assert.equal(loadConfig({ DEFAULT_PROFILE: p.id }).defaultProfile, p.id);
-  for (const value of ['constructor', '../classic', 'classic-v1', 'unknown']) assert.throws(() => loadConfig({ DEFAULT_PROFILE: value }), /Unknown DEFAULT_PROFILE/);
+  for (const value of ['constructor', '../classic', 'raster', 'UPPERCASE']) assert.throws(() => loadConfig({ DEFAULT_PROFILE: value }), /Unknown DEFAULT_PROFILE/);
 });

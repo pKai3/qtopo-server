@@ -490,3 +490,37 @@ test('prefetch keeps the requested profile for neighbouring tiles', async t => {
   const sizes = new Set(background.map(j => j.style.layers.find(l => l.id === 'homesteads').layout['text-size']));
   assert.deepEqual(sizes, new Set([10, 20]));
 });
+
+test('profile files create and update public URLs without restart while Classic stays untouched', async t => {
+  const jobs = [];
+  const s = await server(t, { renderer: { stats: {}, close() {}, async render(job) {
+    jobs.push(job); for (const output of job.outputs || [job]) await atomicWrite(output.outPath, PNG);
+  } } });
+  const { syncProfile } = require('../lib/profile-files');
+  const tile = '/13/7578/4746.png', upload = path.join(s.config.dataDir, 'upload.json');
+  assert.equal((await fetch(s.url + '/live-test' + tile)).status, 404);
+  await fetch(s.url + '/classic' + tile);
+  const classicPath = jobs.at(-1).outPath;
+  const document = { format: 1, id: 'live-test', name: 'Live test', styles: {
+    qld: await getStyle(s.config, s.providers.qld), nsw: await getStyle(s.config, s.providers.nsw),
+  } };
+  await fs.writeFile(upload, JSON.stringify(document)); await syncProfile(s.config, upload); await sleep(270);
+  const response = await fetch(s.url + '/live-test' + tile);
+  assert.equal(response.status, 200); assert.equal(response.headers.get('x-qtopo-profile'), 'live-test');
+  assert.equal(response.headers.get('cache-control'), 'public, max-age=0');
+  const firstPath = jobs.at(-1).outPath;
+  document.styles.qld.layers.find(l => l.id === 'roads-high').paint['line-color'] = '#123456';
+  await fs.writeFile(upload, JSON.stringify(document)); await syncProfile(s.config, upload); await sleep(270);
+  assert.equal((await fetch(s.url + '/live-test' + tile)).status, 200);
+  assert.notEqual(jobs.at(-1).outPath, firstPath);
+  assert.equal(jobs.at(-1).style.layers.find(l => l.id === 'roads-high').paint['line-color'], '#123456');
+  const count = jobs.length;
+  await fs.writeFile(path.join(s.config.profileDir, 'live-test.json'), '{invalid'); await sleep(270);
+  assert.equal((await fetch(s.url + '/live-test' + tile)).status, 200);
+  await fetch(s.url + '/classic' + tile); await fetch(s.url + tile);
+  assert.equal(jobs.length, count, 'invalid upload keeps prior pixels; Classic aliases still hit their old cache');
+  assert.ok(await fs.stat(classicPath)); assert.ok(await fs.stat(firstPath), 'old profile tiles are retained');
+  const catalog = await (await fetch(s.url + '/api/providers')).json();
+  assert.ok(catalog.profiles.some(p => p.id === 'live-test' && p.raster === s.url + '/live-test/{z}/{x}/{y}.png'));
+  assert.equal((await fetch(s.url + '/api/profiles/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(document) })).status, 404);
+});

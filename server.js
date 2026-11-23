@@ -4,7 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const L = require('./lib/logger');
 const { loadConfig } = require('./lib/config');
-const { profiles, getProfile } = require('./lib/profiles');
+const { createProfileCatalog } = require('./lib/profile-files');
 const { createProviders, tileURL, parseTile, hash } = require('./lib/providers');
 const { createCache } = require('./lib/cache');
 const { cachedRaster, httpError } = require('./lib/utils');
@@ -27,6 +27,9 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   process.umask(0o002);
   const providers = dependencies.providers || createProviders(config);
   await seedStyles(config, providers);
+  const profileCatalog = createProfileCatalog(config, L);
+  await profileCatalog.refresh(true);
+  if (!profileCatalog.get(config.defaultProfile)) throw new Error(`Unknown DEFAULT_PROFILE: ${config.defaultProfile}`);
   const styles = createStyleCache(config), requests = createRequestMetrics();
   const startedAt = new Date().toISOString();
   for (const dir of [config.vectorDir, config.rasterDir, config.resourceDir]) await fs.mkdir(path.join(dir, 'v2'), { recursive: true });
@@ -56,7 +59,10 @@ async function createApp(config = loadConfig(), dependencies = {}) {
       return `${profile}/qld/${tile.z}/${layout.x}/${layout.y}`;
     },
     render: async (source, tile, priority, rank, interest) => {
-      const [profile, id] = source.split(':');
+      const [key, id] = source.split(':');
+      const [profileId, token] = key.split('@');
+      const profile = profileCatalog.get(profileId);
+      if (!profile || profile.token !== token) return; // Superseded speculative work.
       const result = await (id === 'auto' ? automaticRasterFile(tile, priority, rank, interest, profile) : rasterFile(providers[id], tile, priority, rank, interest, profile));
       requests.prefetched(result);
     },
@@ -74,7 +80,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   // Keep status/log endpoints outside this policy, and never enable credentials.
   app.use(['/raster', '/vector', '/tiles_raster', '/tiles_vector', '/styles', '/style.json', '/fonts', '/resources', '/assets', '/api/providers', shortTile, profileTile], (req, res, next) => {
     res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Expose-Headers', 'ETag, Retry-After');
+    res.set('Access-Control-Expose-Headers', 'ETag, Retry-After, X-QTopo-Profile');
     if (req.method === 'OPTIONS') {
       res.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
       res.set('Access-Control-Allow-Headers', 'Accept, Content-Type, If-None-Match, If-Modified-Since, Range');
@@ -106,10 +112,12 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     if (!p || (type && p.type !== type)) throw httpError('Unknown map provider', 404);
     return p;
   }
-  function profileFor(req) {
+  async function profileFor(req) {
+    await profileCatalog.refresh();
     const id = req.params.profile || config.defaultProfile;
-    if (!getProfile(id)) throw httpError('Unknown map profile', 404);
-    return id;
+    const profile = profileCatalog.get(id);
+    if (!profile) throw httpError('Unknown map profile', 404);
+    return profile;
   }
   function coordinates(req, p) {
     const tile = parseTile(req.params, p.maxzoom);
@@ -141,7 +149,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     return p.tileMap ? prepared.atZoom(await nativeZoom(p, tile)) : prepared;
   }
   const renderTag = priority => ['RDR', 'PREFETCH', 'PREFETCH-Z'][priority];
-  async function rasterFile(p, tile, priority = PRIORITY.REQUEST, rank = 0, interest, profile = config.defaultProfile) {
+  async function rasterFile(p, tile, priority = PRIORITY.REQUEST, rank = 0, interest, profile = profileCatalog.get(config.defaultProfile)) {
     const { style, revision } = await styleForRaster(p, tile, profile);
     const outPath = path.join(config.rasterDir, 'v2', p.id, revision, String(tile.z), String(tile.x), `${tile.y}.png`);
     let cached = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
@@ -177,9 +185,10 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     if (!cached) throw httpError('Rendered tile is unavailable');
     return { path: outPath, empty: cached.empty, hit };
   }
-  async function deliverRaster(res, result) {
+  async function deliverRaster(res, result, profile) {
     if (result.empty) L.log('RDR', `Empty tile: ${result.path}`);
-    headers(res, result.empty ? Math.floor(config.emptyTTL / 1000) : 3600);
+    headers(res, profile.styles ? 0 : result.empty ? Math.floor(config.emptyTTL / 1000) : 3600);
+    res.set('X-QTopo-Profile', profile.id);
     await sendFile(res, result.path, 'image/png');
   }
   async function raster(req, res) {
@@ -190,25 +199,26 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     await serveRaster(req, res);
   }
   async function serveRaster(req, res, p) {
-    const profile = profileFor(req);
+    const profile = await profileFor(req);
     if (actions.cacheBusy) throw httpError('Rendered tiles are being cleared; please retry shortly.', 503);
     const tile = coordinates(req, p || providers.qld);
+    L.log('PROFILE', `${profile.id} ${tile.z}/${tile.x}/${tile.y}`);
     activeRasterRequests++;
     const measured = requests.begin();
     res.once('finish', () => measured.finish(res.statusCode, false, res.statusCode === 304 ? 0 : res.getHeader('content-length')));
     res.once('close', () => { if (!res.writableFinished) measured.finish(res.statusCode, true); });
     const focus = requestFocus.observe(req.ip, tile), interest = focus.forTile(tile);
-    const finish = prefetch.begin(`${profile}:${p?.id || 'auto'}`, tile, focus);
+    const finish = prefetch.begin(`${profile.id}@${profile.token}:${p?.id || 'auto'}`, tile, focus);
     let success = false;
     try {
       const result = await (p ? rasterFile(p, tile, PRIORITY.REQUEST, 0, interest, profile) : automaticRasterFile(tile, PRIORITY.REQUEST, 0, interest, profile));
       if (req.aborted || res.destroyed) return;
       measured.ready(result);
-      await deliverRaster(res, result);
+      await deliverRaster(res, result, profile);
       success = true;
     } finally { activeRasterRequests--; finish(success); }
   }
-  async function automaticRasterFile(tile, priority = PRIORITY.REQUEST, rank = 0, interest, profile = config.defaultProfile) {
+  async function automaticRasterFile(tile, priority = PRIORITY.REQUEST, rank = 0, interest, profile = profileCatalog.get(config.defaultProfile)) {
     const area = coverage(tile);
     if (priority === PRIORITY.REQUEST) L.log('AUTO', `${tile.z}/${tile.x}/${tile.y}: ${area.region === 'border' ? 'QLD + NSW border' : area.region.toUpperCase()} vectors`);
     if (area.region === 'qld') return rasterFile(providers.qld, tile, priority, rank, interest, profile);
@@ -229,10 +239,11 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     return { path: outPath, empty: cached.empty, hit };
   }
 
-  app.get('/api/providers', (req, res) => {
+  app.get('/api/providers', async (req, res) => {
+    await profileCatalog.refresh();
     res.set('Cache-Control', 'no-cache').json({
       defaultProvider: config.defaultProvider, defaultProfile: config.defaultProfile,
-      profiles: profiles.map(p => ({ id: p.id, name: p.name, factor: p.factor, refined: p.refined, raster: `${origin(req)}/${p.id}/{z}/{x}/{y}.png` })),
+      profiles: profileCatalog.list().map(p => ({ id: p.id, name: p.name, factor: p.factor, refined: p.refined, raster: `${origin(req)}/${p.id}/{z}/{x}/{y}.png` })),
       automatic: { raster: `${origin(req)}/raster/{z}/{x}/{y}.png`, tileSize: config.tilePx, maxzoom: providers.qld.maxzoom, bounds: [137.8, -37.6, 162.7, -9], attribution: `${providers.qld.attribution}; ${providers.nsw.attribution}` },
       providers: Object.values(providers).map(p => ({
         id: p.id, name: p.name, type: p.type, bounds: p.bounds, center: p.center, zoom: p.zoom,
@@ -244,7 +255,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   });
   async function style(req, res) {
     const p = providerFor(req);
-    res.set('Cache-Control', 'no-cache').json(absoluteStyle((await styles.get(p, profileFor(req))).style, origin(req)));
+    res.set('Cache-Control', 'no-cache').json(absoluteStyle((await styles.get(p, await profileFor(req))).style, origin(req)));
   }
   app.get('/style.json', style);
   app.get('/styles/:provider.json', style);
