@@ -1,87 +1,36 @@
-name: Test, build and publish
+name: Preserve fallback and promote stable
 on:
-  push:
-    branches: [master]
-  pull_request:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: true
-
+  group: promote-stable
+  cancel-in-progress: false
 jobs:
-  test:
+  promote:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-node@v7.0.0
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci --ignore-scripts
-      - run: npm test
-
-  container:
-    needs: test
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7.0.1
       - uses: docker/setup-buildx-action@v4.4.1
-      - name: Build the Unraid image
-        uses: docker/build-push-action@v7.4.0
-        with:
-          context: .
-          pull: true
-          platforms: linux/amd64
-          load: true
-          tags: qtopo:test
-          build-args: BUILD_REVISION=${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Exercise native rendering and neighbouring tile prefetch
-        run: |
-          mkdir -p test-results
-          for pixels in 1024 512 256; do
-            compression=3
-            if [ "$pixels" = 256 ]; then compression=6; fi
-            docker run -d --name qtopo-smoke-$pixels -e TILE_PX=$pixels -e PNG_COMPRESSION_LEVEL=$compression -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 -e PREFETCH_RADIUS=0 qtopo:test
-            docker exec qtopo-smoke-$pixels node scripts/smoke.js
-            docker cp qtopo-smoke-$pixels:/tmp/smoke/. test-results/
-            docker stop qtopo-smoke-$pixels
-          done
-          docker run -d --name qtopo-prefetch -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 -e RENDER_CONCURRENCY=4 qtopo:test
-          docker exec qtopo-prefetch node scripts/smoke-prefetch.js
-          docker cp qtopo-prefetch:/tmp/smoke/. test-results/
-          docker stop qtopo-prefetch
-      - name: Container logs
-        if: always()
-        run: |
-          mkdir -p test-results
-          for pixels in 1024 512 256; do
-            docker cp qtopo-smoke-$pixels:/tmp/smoke/. test-results/ 2>/dev/null || true
-            docker logs qtopo-smoke-$pixels > test-results/container-$pixels.log 2>&1 || true
-          done
-          docker logs qtopo-prefetch > test-results/prefetch.log 2>&1 || true
-      - uses: actions/upload-artifact@v7.0.1
-        if: always()
-        with:
-          name: map-render-checks
-          path: test-results/
       - uses: docker/login-action@v4.6.0
-        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Publish the tested image to latest only
-        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+      - name: Preserve original image before promoting the confirmed release
+        env:
+          IMAGE: pkai3/qtopo-server
+          FALLBACK_DIGEST: sha256:c321de21fd723fea8d30e9cee16043fb662c3a5df66bdae54acfb3439c9731eb
+          STABLE_DIGEST: sha256:084289494298734ba34fc894f119bf956e2228e1e50ad3c9574f2721dcdd24e1
         run: |
-          docker buildx imagetools inspect pkai3/qtopo-server:stable | grep -E '^Digest: +sha256:c321de21fd723fea8d30e9cee16043fb662c3a5df66bdae54acfb3439c9731eb$'
-          docker tag qtopo:test pkai3/qtopo-server:sha-${GITHUB_SHA::7}
-          docker tag qtopo:test pkai3/qtopo-server:latest
-          docker push pkai3/qtopo-server:sha-${GITHUB_SHA::7}
-          docker push pkai3/qtopo-server:latest
-          docker buildx imagetools inspect pkai3/qtopo-server:latest
+          digest() { docker buildx imagetools inspect "$IMAGE:$1" | awk '/^Digest:/{print $2}'; }
+          test "$(digest latest)" = "$STABLE_DIGEST"
+          previous=$(digest stable)
+          test "$previous" = "$FALLBACK_DIGEST" || test "$previous" = "$STABLE_DIGEST"
+          backup=$(digest fallback 2>/dev/null) || backup=''
+          test -z "$backup" || test "$backup" = "$FALLBACK_DIGEST"
+          docker buildx imagetools create --prefer-index=false --tag "$IMAGE:fallback" "$IMAGE@$FALLBACK_DIGEST"
+          test "$(digest fallback)" = "$FALLBACK_DIGEST"
+          docker buildx imagetools create --prefer-index=false --tag "$IMAGE:stable" "$IMAGE@$STABLE_DIGEST"
+          test "$(digest stable)" = "$STABLE_DIGEST"
+          test "$(digest latest)" = "$STABLE_DIGEST"
+          docker buildx imagetools inspect "$IMAGE:fallback"
+          docker buildx imagetools inspect "$IMAGE:stable"
