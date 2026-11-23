@@ -20,6 +20,8 @@ function rows(element, values, definition = false) {
 function stack(id, counts, capacity) {
   const total = counts.requested + counts.neighbours + counts.zoom;
   const scale = Math.max(1, capacity, total);
+  const bar = $(`${id}-stack`), slotSize = `${100 / scale}%`;
+  if (bar.style.getPropertyValue('--slot-size') !== slotSize) bar.style.setProperty('--slot-size', slotSize);
   for (const key of ['requested', 'neighbours', 'zoom']) {
     const segment = $(`${id}-${key}`), width = `${100 * counts[key] / scale}%`;
     if (segment.style.width !== width) segment.style.width = width;
