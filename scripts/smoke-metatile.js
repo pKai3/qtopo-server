@@ -114,5 +114,14 @@ async function benchmark() {
   await fs.writeFile('/tmp/smoke/metatile-timings.json', JSON.stringify({ pixels: size, concurrency: 1, resources: 'warm', results }, null, 2));
   console.log('Same-grid timing comparison:', JSON.stringify(results));
 }
-async function main() { await fs.mkdir(root, { recursive: true }); await labels(); await benchmark(); }
+async function main() {
+  // docker exec does not inherit the DISPLAY chosen dynamically by start.sh.
+  // This CI helper runs alongside that server and must use its ready display.
+  const displays = (await fs.readdir('/tmp')).filter(name => /^qtopo-display\.[A-Za-z0-9]+$/.test(name));
+  assert.equal(displays.length, 1, 'expected one supervised X display');
+  const display = (await fs.readFile(path.join('/tmp', displays[0]), 'utf8')).trim();
+  assert.match(display, /^\d+$/);
+  process.env.DISPLAY = ':' + display;
+  await fs.mkdir(root, { recursive: true }); await labels(); await benchmark();
+}
 main().catch(err => { console.error(err); process.exitCode = 1; });
