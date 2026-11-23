@@ -63,6 +63,10 @@ jobs:
           docker exec qtopo-prefetch node scripts/smoke-prefetch.js
           docker cp qtopo-prefetch:/tmp/smoke/. test-results/
           docker stop qtopo-prefetch
+          docker run -d --name qtopo-memory --cpus=4 --memory=4g --memory-swap=4g --pids-limit=1024 -e RENDER_CONCURRENCY=8 -e PREFETCH_RADIUS=2 qtopo:test
+          docker exec qtopo-memory node scripts/smoke-memory.js
+          docker cp qtopo-memory:/tmp/smoke/. test-results/
+          docker stop qtopo-memory
       - name: Container logs
         if: always()
         run: |
@@ -72,6 +76,8 @@ jobs:
             docker logs qtopo-smoke-$pixels > test-results/container-$pixels.log 2>&1 || true
           done
           docker logs qtopo-prefetch > test-results/prefetch.log 2>&1 || true
+          docker cp qtopo-memory:/tmp/smoke/. test-results/ 2>/dev/null || true
+          docker logs qtopo-memory > test-results/memory.log 2>&1 || true
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:

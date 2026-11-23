@@ -147,6 +147,10 @@ Additional endpoints:
 | LABEL_SCALE | 1 | Legacy extra raster text/icon multiplier, 0.5–3, applied on top of every profile; keep 1 when comparing named profiles. |
 | VECTOR_UPSTREAM | QLD service | Optional QLD template containing {z}, {x}, {y} |
 | RENDER_CONCURRENCY | 2 | Maximum simultaneous reusable native workers, 1–16 |
+| LP_NUM_THREADS | 1 (Docker) | Mesa software-rendering threads per worker. Independent of `RENDER_CONCURRENCY`; avoids multiplying each worker by the host CPU count. |
+| MALLOC_ARENA_MAX | 2 (Docker) | Limit glibc allocator arenas per process to reduce retained native memory. |
+| MALLOC_MMAP_THRESHOLD_ | 131072 (Docker) | Allocate large native buffers separately so freeing them can return their memory to the OS. Bytes; explicit setting prevents the threshold growing with repeated renders. |
+| MALLOC_TRIM_THRESHOLD_ | 131072 (Docker) | Keep glibc's heap-trimming threshold fixed so releasable heap memory is returned between renders. Bytes. |
 | RENDER_QUEUE_LIMIT | 64 | Maximum queued distinct renders |
 | REQUEST_PAN_THRESHOLD | 8 | Tile distance from the current area anchor before a pan moves queued requests to a new area; positive integer, measured in either axis at the requested zoom |
 | PREFETCH_RADIUS | 1 | Nearby tile radius, 0–10; 0 disables prefetch. Radius 1 considers 8 neighbours, 2 considers 24, and 10 considers 440. The queue limit bounds retained work, favouring the nearest tiles around recent requests |
