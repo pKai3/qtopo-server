@@ -15,6 +15,7 @@ const { createTileIndex } = require('./lib/tile-index');
 const { createPrefetch } = require('./lib/prefetch');
 const { PRIORITY } = require('./lib/queue');
 const { createRequestMetrics } = require('./lib/metrics');
+const { metatileLayout } = require('./lib/metatile');
 
 async function createApp(config = loadConfig(), dependencies = {}) {
   process.umask(0o002);
@@ -105,7 +106,18 @@ async function createApp(config = loadConfig(), dependencies = {}) {
       } else {
         const internalOrigin = app.locals.internalOrigin;
         if (!internalOrigin) throw httpError('Renderer not ready', 503);
-        Object.assign(job, { kind: 'vector', origin: internalOrigin, style: absoluteStyle(renderStyle(style, config.labelScale, p.id === 'qld'), internalOrigin) });
+        const layout = metatileLayout(tile, config);
+        // Sparse NSW coverage can change source zoom within a grid. Only save
+        // siblings that use this exact style variant; never cache reduced detail
+        // under another tile's higher-resolution revision.
+        const variants = p.tileMap ? await Promise.all(layout.tiles.map(t => styleForRaster(p, t))) : layout.tiles.map(() => ({ revision }));
+        const outputs = layout.tiles.filter((_, i) => variants[i].revision === revision).map(t => ({
+          ...t, outPath: path.join(config.rasterDir, 'v2', p.id, revision, String(t.z), String(t.x), `${t.y}.png`),
+        }));
+        Object.assign(job, { kind: 'vector', layout, outputs,
+          renderKey: path.join(config.rasterDir, 'v2', p.id, revision, 'metatile', String(tile.z), `${layout.x}-${layout.y}`),
+          origin: internalOrigin, style: absoluteStyle(renderStyle(style, config.labelScale, p.id === 'qld'), internalOrigin),
+        });
       }
       await renderer.render(job);
       cached = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
@@ -214,7 +226,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   app.get('/readyz', (_req, res) => res.set('Cache-Control', 'no-store').json({
     status: 'ok', startedAt, version: require('./package.json').version,
     revision: process.env.BUILD_REVISION || 'development',
-    settings: { tilePx: config.tilePx, pngCompression: config.pngCompression, renderConcurrency: config.renderConcurrency, renderQueueLimit: config.renderQueueLimit, upstreamConcurrency: config.upstreamConcurrency, prefetchConcurrency: config.prefetchConcurrency, prefetchQueueLimit: config.prefetchQueueLimit, prefetchRadius: config.prefetchRadius, prefetchZoom: config.prefetchZoom },
+    settings: { tilePx: config.tilePx, metatileSize: config.metatileSize, renderBufferPx: config.renderBufferPx, pngCompression: config.pngCompression, renderConcurrency: config.renderConcurrency, renderQueueLimit: config.renderQueueLimit, upstreamConcurrency: config.upstreamConcurrency, prefetchConcurrency: config.prefetchConcurrency, prefetchQueueLimit: config.prefetchQueueLimit, prefetchRadius: config.prefetchRadius, prefetchZoom: config.prefetchZoom },
     providers: Object.keys(providers), renderer: renderer.stats, cache: cache.stats, prefetch: prefetch.stats,
     requests: requests.stats, styles: styles.stats,
   }));
@@ -243,6 +255,7 @@ async function main() {
     instance.app.locals.internalOrigin = `http://127.0.0.1:${server.address().port}`;
     L.sys(`Listening on port ${server.address().port}; /raster/{z}/{x}/{y}.png serves QLD + NSW vectors automatically (${config.tilePx}px)`);
     L.sys(`Render concurrency ${config.renderConcurrency}; prefetch ${config.prefetchRadius ? `up to ${config.prefetchConcurrency} tiles, radius ${config.prefetchRadius}, zoom ${config.prefetchZoom ? '±1' : 'off'}` : 'off'}`);
+    L.sys(`Vector renders ${config.metatileSize}×${config.metatileSize} tiles with ${config.renderBufferPx}px logical padding; each output remains ${config.tilePx}px`);
   });
   let stopping = false;
   const stop = () => {

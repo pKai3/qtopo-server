@@ -27,7 +27,7 @@ function stack(id, counts, capacity) {
   }
   const remaining = Math.max(0, capacity - total);
   $(`${id}-stack`).setAttribute('aria-label', `${id === 'rendering' ? 'Rendering' : 'Waiting'}: ${counts.requested} requested, ${counts.neighbours} nearby prefetch, ${counts.zoom} zoom prefetch. ${remaining} ${id === 'rendering' ? 'idle workers' : 'unused queue spaces'}.`);
-  text($(`${id}-total`), id === 'rendering' ? `${number(total)} of ${number(capacity)} workers busy` : `${number(total)} tiles waiting`);
+  text($(`${id}-total`), id === 'rendering' ? `${number(total)} of ${number(capacity)} workers busy` : `${number(total)} work items waiting`);
   text($(`${id}-space`), id === 'rendering' ? `${number(remaining)} idle ${remaining === 1 ? 'worker' : 'workers'} · grey space` : `Scale: ${number(capacity)} combined queue spaces · grey is unused`);
 }
 let previous, timer, loading = false;
@@ -61,7 +61,7 @@ async function refresh() {
     const summaries = [
       ['Cached tile ready', q.cachedTimings.readyMs], ['Cached response', q.cachedTimings.responseMs],
       ['All tile responses', q.timings.responseMs], ['Render queue', r.timings.queueMs],
-      ['Worker elapsed', r.timings.workerMs], ['Resource waiting', r.timings.resourceWaitMs],
+      ['First tile ready', r.timings.firstTileMs], ['Worker elapsed', r.timings.workerMs], ['Resource waiting', r.timings.resourceWaitMs],
       ['PNG encoding', r.timings.encodeMs], ['Worker CPU', r.timings.cpuMs],
     ];
     rows($('timings'), summaries.map(([label, value]) => [label, ms(value?.p50), ms(value?.p95)]));
@@ -74,7 +74,7 @@ async function refresh() {
     const rate = previous?.startedAt === data.startedAt ? `${Math.max(0, (q.completed - previous.completed) * 1000 / (now - previous.time)).toFixed(1)} tiles/s` : '—';
     previous = { startedAt: data.startedAt, completed: q.completed, time: now };
     rows($('session'), [['Active tile requests', number(q.active)], ['Completed responses', number(q.completed)], ['Recent delivery rate', rate], ['PNG data sent', bytes(q.bytes)], ['Failed responses', number(q.errors)], ['Client disconnects', number(q.disconnected)]], true);
-    rows($('settings'), [['Tile resolution', `${s.tilePx} × ${s.tilePx}`], ['PNG compression', `${s.pngCompression} / 9 · lossless`], ['Render concurrency', number(s.renderConcurrency)], ['Prefetch concurrency', number(s.prefetchConcurrency)], ['Render queue limit', number(s.renderQueueLimit)], ['Download concurrency', number(s.upstreamConcurrency)], ['Zoom prefetch', s.prefetchZoom && s.prefetchRadius ? 'Enabled · lowest priority' : 'Disabled'], ['Started', new Date(data.startedAt).toLocaleString()]], true);
+    rows($('settings'), [['Tile resolution', `${s.tilePx} × ${s.tilePx}`], ['Vector render grid', `${s.metatileSize} × ${s.metatileSize} tiles`], ['Render border', `${s.renderBufferPx * s.tilePx / 512}px at this resolution`], ['PNG compression', `${s.pngCompression} / 9 · lossless`], ['Render concurrency', number(s.renderConcurrency)], ['Prefetch concurrency', number(s.prefetchConcurrency)], ['Render queue limit', number(s.renderQueueLimit)], ['Download concurrency', number(s.upstreamConcurrency)], ['Zoom prefetch', s.prefetchZoom && s.prefetchRadius ? 'Enabled · lowest priority' : 'Disabled'], ['Started', new Date(data.startedAt).toLocaleString()]], true);
     $('release').textContent = `QTopo ${data.version} · ${data.revision.slice(0, 12)}`;
   } catch (error) {
     $('activity').textContent = 'Unavailable';

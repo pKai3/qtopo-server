@@ -123,6 +123,21 @@ test('NSW source imagery passes through the conversion queue and never the vecto
   assert.equal(calls[0].kind, 'image'); assert.match(calls[0].url, /tile\/10\/610\/938/);
   assert.equal(jobs[0].kind, 'image'); assert.equal(jobs[0].size, 256); assert.equal(jobs[0].inputPath, '/example/source.jpeg');
 });
+test('NSW grid outputs stay isolated when neighbouring tiles have different native zooms', async t => {
+  const jobs = [];
+  const s = await server(t, {
+    nativeZoom: async (_provider, tile) => tile.x % 2 ? 12 : 16,
+    renderer: { close() {}, async render(job) { jobs.push(job); await atomicWrite(job.outPath, PNG); } },
+  });
+  assert.equal((await fetch(s.url + '/raster/nsw/16/60000/39000.png')).status, 200);
+  assert.equal((await fetch(s.url + '/raster/nsw/16/60001/39000.png')).status, 200);
+  assert.equal(jobs.length, 2);
+  assert.deepEqual(jobs[0].layout, jobs[1].layout);
+  assert.notEqual(jobs[0].renderKey, jobs[1].renderKey);
+  assert.deepEqual(jobs[0].outputs.map(t => t.x), [60000, 60000]);
+  assert.deepEqual(jobs[1].outputs.map(t => t.x), [60001, 60001]);
+  assert.notEqual(jobs[0].styleKey, jobs[1].styleKey);
+});
 test('configuration and ArcGIS tile order are explicit', () => {
   assert.equal(loadConfig({}).tilePx, 1024);
   assert.equal(loadConfig({ TILE_PX: '512' }).tilePx, 512);
