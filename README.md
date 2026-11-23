@@ -133,6 +133,16 @@ The viewer serves its JavaScript locally. Map data and uncached NSW glyphs/sprit
 
 ## Development and verification
 
+For a bounded load test, open the QTopo container console in Unraid and run:
+
+```sh
+node scripts/load-tiles.js --z 16 --x 60500 --y 37950 --width 8 --height 8 --concurrency 8
+```
+
+This requests 64 distinct tiles with at most eight HTTP requests in flight. It requests one tile from each 2×2 grid before the siblings, so shared metatile work does not artificially restrict the initial worker load. It reports response times, failures, cache counters and observed peak busy render jobs. Watch `/status` or Unraid's process monitor during the burst. `--url http://tower.local:9877` targets Unraid when running the script from another machine with Node; no local Docker is needed. `--help` lists the options.
+
+The script's concurrency is client request concurrency; the container's `RENDER_CONCURRENCY` still limits render workers. Choose a new area to exercise rendering, or repeat the same area to measure cached delivery. It never deletes caches or changes settings. Server statistics include other traffic and prefetch, and busy workers can be waiting for data rather than consuming CPU. Prefetch may continue after the batch finishes. Compare worker limits only with the same tile size and similar cache/upstream conditions.
+
 Use Node 24 LTS, matching `.nvmrc`, CI and the container. Image builds pull the current Node 24 and Ubuntu 24.04 base images so they receive maintenance updates. Node 26 is also LTS, but MapLibre Native 6.4.1 only publishes binaries for Node 20, 22 and 24; moving to 26 requires an upstream binary or a separately maintained source build of the renderer.
 
 Direct dependencies are pinned, and `package-lock.json` records the tested dependency tree. Canvas 3.2.3 still depends on the deprecated `prebuild-install` helper; the container builds Canvas from source to avoid incompatible bundled graphics libraries. Remove that indirect dependency when Canvas provides a supported replacement.
