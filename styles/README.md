@@ -30,6 +30,16 @@ The follow-up contour label revision enlarges QLD elevation labels by another
 25%: Readable 12.5 px, Mobile 2x 20 px and Mobile 3x 27.5 px. Linework and zoom
 thresholds are unchanged.
 
+Line-following text now uses a `text-max-angle` limit of 20 degrees, with 30
+degrees for contour elevations, across Classic, detailed and light styles in
+both states. This limits changes in direction between characters, rather than
+specifying a radius in metres. Unsuitable placements are skipped. QLD contour
+label spacing is capped at 400 style pixels to offer more placement opportunities
+on gentler sections; existing closer spacing is preserved. Font sizes, halos,
+road-label spacing and all contour linework and zoom thresholds are unchanged.
+The change was compared in native raster renders around Government House and
+Birdwood Terrace at z16 using Hiking Light's mobile sizing.
+
 Light choices: `readable-light.json` uses desktop sizing and `mobile-light.json`
 uses Mobile 3x sizing. They omit buildings, utilities, parcel detail and minor
 urban POIs. Contours, tracks, water, road hierarchy, locality names, outdoor
