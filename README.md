@@ -124,7 +124,11 @@ The viewer serves its JavaScript locally. Map data and uncached NSW glyphs/sprit
 
 ## Development and verification
 
-Requires Node 22+ (the container uses Node 24 LTS).
+Use Node 24 LTS, matching `.nvmrc`, CI and the container. Image builds pull the current Node 24 and Ubuntu 24.04 base images so they receive maintenance updates. Node 26 is also LTS, but MapLibre Native 6.4.1 only publishes binaries for Node 20, 22 and 24; moving to 26 requires an upstream binary or a separately maintained source build of the renderer.
+
+Direct dependencies are pinned, and `package-lock.json` records the tested dependency tree. Canvas 3.2.3 still depends on the deprecated `prebuild-install` helper; the container builds Canvas from source to avoid incompatible bundled graphics libraries. Remove that indirect dependency when Canvas provides a supported replacement.
+
+MapLibre Native 6.4.1's indirect `minimatch` dependency is overridden to 11.0.9 to address [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249). The override applies only to that native package version and can be removed when its upstream dependency range includes a fixed release.
 
 ```sh
 npm ci
