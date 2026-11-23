@@ -21,24 +21,50 @@ if [[ "$(id -u)" == 0 && -n "${PUID:-}" ]]; then
   exec gosu "$PUID:$PGID" "$0" "$@"
 fi
 mkdir -p "$VECTOR_DIR" "$RASTER_DIR" "$STYLE_DIR" "$MESA_SHADER_CACHE_DIR"
-export DISPLAY="${DISPLAY:-:99}"
 # Workers connect only while rendering. Keep the display alive between jobs so
 # disconnecting the last worker does not reset it and recompile the keyboard map.
-Xvfb "$DISPLAY" -screen 0 1024x768x24 -nolisten tcp -noreset &
-xvfb_pid=$!
-app_pid=""
+# Let Xvfb select a free display instead of trusting an old :99 socket after a
+# container restart. Only our new X server can write this private ready file.
+display_file=$(mktemp /tmp/qtopo-display.XXXXXX)
+xvfb_pid="" app_pid=""
 cleanup() {
   [[ -z "$app_pid" ]] || kill -TERM "$app_pid" 2>/dev/null || true
-  kill -TERM "$xvfb_pid" 2>/dev/null || true
+  [[ -z "$xvfb_pid" ]] || kill -TERM "$xvfb_pid" 2>/dev/null || true
+  rm -f "$display_file" "$display_file.error"
 }
 trap cleanup EXIT
-trap 'cleanup; exit 0' TERM INT
+trap 'exit 0' TERM INT
+Xvfb -displayfd 3 -screen 0 1024x768x24 -nolisten tcp -noreset 3>"$display_file" &
+xvfb_pid=$!
+display_number=""
 for _ in {1..50}; do
-  [[ -S "/tmp/.X11-unix/X${DISPLAY#:}" ]] && break
-  kill -0 "$xvfb_pid" 2>/dev/null || { echo "Xvfb failed"; exit 1; }
+  kill -0 "$xvfb_pid" 2>/dev/null || { echo "[DISPLAY] Xvfb exited during startup" >&2; exit 1; }
+  if read -r display_number < "$display_file" && [[ "$display_number" =~ ^[0-9]+$ ]]; then break; fi
+  display_number=""
   sleep 0.1
 done
-[[ -S "/tmp/.X11-unix/X${DISPLAY#:}" ]] || { echo "Xvfb not ready"; exit 1; }
+[[ -n "$display_number" ]] || { echo "[DISPLAY] Xvfb did not become ready" >&2; exit 1; }
+export DISPLAY=":$display_number"
+check_display() {
+  kill -0 "$xvfb_pid" 2>/dev/null && timeout 3s xdpyinfo -display "$DISPLAY" >/dev/null 2>"$display_file.error"
+}
+if ! check_display; then
+  echo "[DISPLAY] Xvfb $DISPLAY is not accepting connections; server will not start" >&2
+  cat "$display_file.error" >&2 2>/dev/null || true
+  exit 1
+fi
+echo "[DISPLAY] Xvfb ready on $DISPLAY (PID $xvfb_pid)"
 node server.js &
 app_pid=$!
+# An HTTP-only health check cannot detect a dead graphics server. Stop the
+# container on display failure so its restart policy can recover the service.
+while kill -0 "$app_pid" 2>/dev/null; do
+  sleep 2
+  kill -0 "$app_pid" 2>/dev/null || break
+  if ! check_display; then
+    echo "[DISPLAY] Xvfb $DISPLAY failed; stopping the server so the container can restart" >&2
+    cat "$display_file.error" >&2 2>/dev/null || true
+    exit 1
+  fi
+done
 wait "$app_pid"
