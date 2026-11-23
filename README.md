@@ -107,7 +107,7 @@ Additional endpoints:
 | VECTOR_UPSTREAM | QLD service | Optional QLD template containing {z}, {x}, {y} |
 | RENDER_CONCURRENCY | 2 | Maximum simultaneous reusable native workers, 1–16 |
 | RENDER_QUEUE_LIMIT | 64 | Maximum queued distinct renders |
-| PREFETCH_RADIUS | 1 | Pre-render the eight adjacent tiles after requested tiles finish; 0 disables, 2 extends to 24 neighbours |
+| PREFETCH_RADIUS | 1 | Nearby tile radius, 0–10; 0 disables prefetch. Radius 1 considers 8 neighbours, 2 considers 24, and 10 considers 440. The queue limit bounds retained work, favouring the nearest tiles around recent requests |
 | PREFETCH_ZOOM | 1 | Pre-render one parent at z−1 and four children at z+1, after same-zoom neighbours; 0 disables zoom prefetch |
 | PREFETCH_CONCURRENCY | RENDER_CONCURRENCY − 1 | Maximum simultaneous prefetch groups, at least 1; QLD vector siblings share a grid group, while other tile types count individually. The render queue also caps background jobs to leave a slot for requests when possible. |
 | PREFETCH_QUEUE_LIMIT | 64 | Maximum pending neighbouring tiles; older queued tiles are dropped when full |
