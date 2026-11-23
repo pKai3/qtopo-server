@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
+const http = require('node:http');
 const { createApp } = require('../server');
 const { loadConfig } = require('../lib/config');
 const { atomicWrite } = require('../lib/utils');
@@ -12,9 +13,9 @@ const { validateStyleMin } = require('@maplibre/maplibre-gl-style-spec');
 const logger = require('../lib/logger');
 const { setTimeout: sleep } = require('node:timers/promises');
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/YYbL4QAAAAASUVORK5CYII=', 'base64');
-async function server(t, dependencies = {}) {
+async function server(t, dependencies = {}, env = {}) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-app-test-'));
-  const config = loadConfig({ DATA_DIR: dir, PORT: '0', CLEANUP_INTERVAL_MINUTES: '0', PREFETCH_RADIUS: '0' });
+  const config = loadConfig({ DATA_DIR: dir, PORT: '0', CLEANUP_INTERVAL_MINUTES: '0', PREFETCH_RADIUS: '0', ADMIN_ALLOWED_NETWORKS: '127.0.0.1/32', ...env });
   const instance = await createApp(config, dependencies);
   const listener = await new Promise(resolve => { const s = instance.app.listen(0, '127.0.0.1', () => resolve(s)); });
   const url = 'http://127.0.0.1:' + listener.address().port;
@@ -24,6 +25,10 @@ async function server(t, dependencies = {}) {
 }
 const actionHeaders = { 'Content-Type': 'application/json', 'X-QTopo-Action': 'status-page' };
 const action = (s, route, body = {}, headers = actionHeaders) => fetch(s.url + '/api/actions/' + route, { method: 'POST', headers, body: JSON.stringify(body) });
+// Fetch controls the Host header; use HTTP directly to exercise hostile hosts.
+const statusWithHeaders = (url, headers) => new Promise((resolve, reject) => {
+  http.get(url, { headers }, response => { response.resume(); response.on('end', () => resolve(response.statusCode)); }).on('error', reject);
+});
 async function waitForActions(s, predicate) {
   for (let i = 0; i < 150; i++) {
     const state = (await (await fetch(s.url + '/readyz')).json()).actions;
@@ -32,6 +37,64 @@ async function waitForActions(s, predicate) {
   }
   assert.fail('Status action did not reach the expected state');
 }
+test('public listener denies all management by default while still serving map tiles', async t => {
+  let renders = 0;
+  const s = await server(t, { renderer: { close() {}, async render(job) { renders++; await atomicWrite(job.outPath, PNG); } } }, { ADMIN_ALLOWED_NETWORKS: '' });
+  const retained = path.join(s.config.rasterDir, 'v2/retained.png');
+  await atomicWrite(retained, PNG);
+  for (const route of ['/status', '/status.html', '/status.js', '/status.css', '/readyz', '/api/logs', '/STATUS', '/status/']) {
+    const response = await fetch(s.url + route);
+    assert.equal(response.status, 403, route);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.equal(response.headers.get('access-control-allow-origin'), null);
+    await response.arrayBuffer();
+  }
+  for (const [route, body] of [['tile-test/start', { width: 1, height: 1 }], ['tile-test/stop', {}], ['cache/clear', { confirm: 'clear-rendered-tiles' }]]) {
+    assert.equal((await action(s, route, body)).status, 403, route);
+    assert.equal((await action(s, route, body, { ...actionHeaders, 'X-Forwarded-For': '127.0.0.1', 'X-Real-IP': '127.0.0.1' })).status, 403);
+  }
+  assert.deepEqual(await fs.readFile(retained), PNG);
+  assert.equal(renders, 0, 'denied controls must never schedule rendering');
+  for (const route of ['/%73tatus.html', '/status%2ejs', '/admin/status.html', '/public/status.html']) {
+    assert.ok([403, 404].includes((await fetch(s.url + route)).status), route);
+  }
+  for (const method of ['HEAD', 'OPTIONS']) assert.equal((await fetch(s.url + '/readyz', { method })).status, 403);
+  assert.equal((await fetch(s.url + '/healthz')).status, 200);
+  assert.equal((await fetch(s.url + '/')).status, 200);
+  assert.equal((await fetch(s.url + '/api/providers')).status, 200);
+  for (const route of ['/raster/16/60500/37950.png', '/16/60500/37950.png']) {
+    const response = await fetch(s.url + route, { headers: { Origin: 'https://www.gaiagps.com' } });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('access-control-allow-origin'), '*');
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), PNG);
+  }
+});
+test('management uses explicit networks and hostnames, not private-looking forwarded headers', async t => {
+  const s = await server(t);
+  assert.equal((await fetch(s.url + '/status')).status, 200);
+  for (const headers of [
+    { Host: 'attacker.example' },
+    { Host: '127.0.0.1.attacker.example' },
+    { 'X-Forwarded-For': '127.0.0.1' },
+    { 'X-Forwarded-Host': 'localhost' },
+    { 'X-Real-IP': '127.0.0.1' },
+  ]) assert.equal(await statusWithHeaders(s.url + '/readyz', headers), 403, JSON.stringify(headers));
+  for (const headers of [{ Origin: 'https://attacker.example' }, { Origin: 'null' }, { 'Sec-Fetch-Site': 'same-site' }]) {
+    assert.equal((await action(s, 'tile-test/stop', {}, { ...actionHeaders, ...headers })).status, 403);
+  }
+  assert.equal((await action(s, 'tile-test/stop', {}, { ...actionHeaders, Origin: s.url })).status, 200);
+});
+test('a trusted proxy must supply an allowed actual client; spoofed earlier hops cannot grant management access', async t => {
+  const s = await server(t, {}, { TRUSTED_PROXIES: '127.0.0.1/32', ADMIN_ALLOWED_NETWORKS: '192.0.2.0/24,2001:db8:1::/64' });
+  for (const client of ['192.0.2.42', '2001:db8:1::2']) {
+    assert.equal((await fetch(s.url + '/readyz', { headers: { 'X-Forwarded-For': client } })).status, 200);
+  }
+  for (const headers of [{}, { 'X-Forwarded-For': '198.51.100.2' }, { 'X-Forwarded-For': '192.0.2.42, 198.51.100.2' }, { 'X-Forwarded-For': 'not-an-address' }]) {
+    assert.equal((await fetch(s.url + '/readyz', { headers })).status, 403);
+    assert.equal((await action(s, 'cache/clear', { confirm: 'clear-rendered-tiles' }, { ...actionHeaders, ...headers })).status, 403);
+  }
+  assert.equal((await action(s, 'tile-test/stop', {}, { ...actionHeaders, 'X-Forwarded-For': '192.0.2.42' })).status, 200);
+});
 test('status controls run one local tile test, reject unsafe inputs and stop without aborting accepted tiles', async t => {
   let release, renders = 0;
   const blocked = new Promise(resolve => { release = resolve; });
@@ -112,7 +175,7 @@ test('browser preview loads its MapLibre module from an existing JavaScript asse
   assert.equal(library.status, 200);
   assert.match(library.headers.get('content-type'), /javascript/);
 });
-test('public map endpoints support cross-origin clients without exposing status or logs', async t => {
+test('public map endpoints support cross-origin clients without allowing cross-origin status or log reads', async t => {
   const s = await server(t, { renderer: { close() {}, async render(job) { await atomicWrite(job.outPath, PNG); } } });
   const headers = { Origin: 'https://www.gaiagps.com' };
   for (const route of ['/raster/qld/3/7/4.png', '/styles/qld.json', '/api/providers', '/fonts/Open%20Sans%20Regular,Arial%20Unicode%20MS%20Regular/0-255.pbf', '/fonts/Open%20Sans%20Regular,Arial%20Unicode%20MS%20Regular/8192-8447.pbf']) {

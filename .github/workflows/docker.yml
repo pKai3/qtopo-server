@@ -48,13 +48,13 @@ jobs:
           for pixels in 1024 512 256; do
             compression=3
             if [ "$pixels" = 256 ]; then compression=6; fi
-            docker run -d --name qtopo-smoke-$pixels -e TILE_PX=$pixels -e PNG_COMPRESSION_LEVEL=$compression -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 -e PREFETCH_RADIUS=0 qtopo:test
+            docker run -d --name qtopo-smoke-$pixels -e ADMIN_ALLOWED_NETWORKS=127.0.0.1/32 -e TILE_PX=$pixels -e PNG_COMPRESSION_LEVEL=$compression -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 -e PREFETCH_RADIUS=0 qtopo:test
             docker exec qtopo-smoke-$pixels node scripts/smoke.js
             if [ "$pixels" = 1024 ]; then docker exec qtopo-smoke-$pixels node scripts/smoke-metatile.js; fi
             docker cp qtopo-smoke-$pixels:/tmp/smoke/. test-results/
             docker stop qtopo-smoke-$pixels
           done
-          docker run -d --name qtopo-prefetch -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 -e RENDER_CONCURRENCY=4 qtopo:test
+          docker run -d --name qtopo-prefetch -e ADMIN_ALLOWED_NETWORKS=127.0.0.1/32 -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 -e RENDER_CONCURRENCY=4 qtopo:test
           docker exec qtopo-prefetch node scripts/smoke-prefetch.js
           docker cp qtopo-prefetch:/tmp/smoke/. test-results/
           docker stop qtopo-prefetch

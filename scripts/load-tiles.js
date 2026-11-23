@@ -27,7 +27,7 @@ function tilesFor(o) {
   return tiles.sort((a, b) => ((a.y % 2) * 2 + a.x % 2) - ((b.y % 2) * 2 + b.x % 2));
 }
 
-async function run(o, log = console.log, { signal, onProgress = () => {} } = {}) {
+async function run(o, log = console.log, { signal, readStatus, onProgress = () => {} } = {}) {
   const tiles = tilesFor(o), latencies = [], failures = [];
   let cursor = 0, active = 0, peakRequests = 0, peakRenders = 0, peakQueued = 0, bytes = 0, lastProgress = 0, observedStatus = false;
   const started = performance.now(), stop = new AbortController();
@@ -36,9 +36,13 @@ async function run(o, log = console.log, { signal, onProgress = () => {} } = {})
     peakRenderJobsObserved: observedStatus ? peakRenders : null, peakQueuedJobsObserved: observedStatus ? peakQueued : null });
   const status = async () => {
     try {
-      const response = await fetch(o.url + '/readyz', { signal: AbortSignal.any([stop.signal, AbortSignal.timeout(2000)]) });
-      if (!response.ok) return;
-      const data = await response.json();
+      let data;
+      if (readStatus) data = await readStatus();
+      else {
+        const response = await fetch(o.url + '/readyz', { signal: AbortSignal.any([stop.signal, AbortSignal.timeout(2000)]) });
+        if (!response.ok) return;
+        data = await response.json();
+      }
       observedStatus = true;
       peakRenders = Math.max(peakRenders, data.renderer?.active || 0);
       peakQueued = Math.max(peakQueued, data.renderer?.queued || 0);
