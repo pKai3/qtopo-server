@@ -83,9 +83,11 @@ ssh root@your-server 'docker exec -i qtopo-server-latest node scripts/profiles.j
 
 Use `docker exec -u <PUID>:<PGID>` when the container runs as a configured Unraid user. The CLI also accepts ordinary file paths and has `list` and `validate` commands. The JSON's `id` determines the URL: keeping `mobile-3x` updates that existing source; changing it to a new name creates another source. Classic is protected from file overrides, and syncing does not change `DEFAULT_PROFILE`.
 
-One file contains both state styles. Sync validates it before installation and keeps the previous file under `/data/profiles/history`. Sync a history file to roll back. New requests detect changes within 250 ms; in-flight requests finish with their captured style. Only changed styles get new raster cache identities, and old tiles remain available for rollback. Live profiles use immediate HTTP revalidation, but Gaia's downloaded/offline tiles may still need refreshing in the app. Invalid file edits keep the last valid in-memory profile; always use the CLI to avoid leaving invalid data on disk across a restart.
+One file contains both state styles. Sync validates it before installation and keeps the previous file under `/data/styles/history`. Sync a history file to roll back. New requests detect changes within 250 ms; in-flight requests finish with their captured style. Only changed styles get new raster cache identities, and old tiles remain available for rollback. Live profiles use immediate HTTP revalidation, but Gaia's downloaded/offline tiles may still need refreshing in the app. Invalid file edits keep the last valid in-memory profile; always use the CLI to avoid leaving invalid data on disk across a restart.
 
-Live files in `/data/profiles` override committed defaults in the image's `profiles/` directory. To include an approved profile in a later release, export it, validate it and commit it as `profiles/<id>.json`. Image updates never overwrite live files. To resume following the bundled profile, move the corresponding live JSON out of `/data/profiles` after saving a copy.
+Live files in `/data/styles` override committed defaults in the image's `styles/` directory. The original provider styles and named profiles share this folder. Upgrading automatically moves files and history from the former `/data/profiles` default, preserving newer files already in `styles/` and archiving conflicting older copies. Explicit custom `PROFILE_DIR` settings are honoured. To include an approved profile in a later release, export it, validate it and commit it as `styles/<id>.json`. Image updates never overwrite live files. To resume following the bundled profile, move the corresponding live JSON out of `/data/styles` after saving a copy.
+
+Style exports, syncing and generation use indented JSON with one layer per row and aligned short columns. Run `node scripts/format-styles.js` to apply the same layout to existing files. Live cartography is versioned on `codex/live-styles`, whose pushes do not publish Docker images.
 
 Profile files contain complete MapLibre styles, including layer filters and zoom thresholds. Provider tile URLs are normalized to the server's existing proxies. QLD uses the bundled symbols by default; setting `styles.qld.sprite` to `/resources/qld/sprites/sprite` selects official QTopo symbols and fonts through the existing resource proxy. Match `icon-image` names and font stacks to that resource set. NSW retains its official symbols. There is no HTTP upload or editing endpoint.
 
@@ -133,7 +135,7 @@ Additional endpoints:
 | DATA_DIR | /data | Data root |
 | VECTOR_DIR / RASTER_DIR / STYLE_DIR | Under DATA_DIR | Optional directory overrides |
 | STYLE_PATH | /data/styles/style.json | Editable QLD style |
-| PROFILE_DIR | /data/profiles | Validated live profile JSON files; persistent overrides of bundled profiles |
+| PROFILE_DIR | STYLE_DIR (/data/styles) | Validated live profile JSON files; persistent overrides of bundled profiles |
 | FONT_DIR | Bundled fonts | Local QLD glyph directory |
 | DEFAULT_PROFILE | classic | Appearance for unqualified raster/style URLs; a built-in or installed profile name. Named URLs remain independent of this choice. |
 | DEFAULT_PROVIDER | qld | Initial viewer location: qld, nsw, nsw-topo; automatic GPS coverage is always enabled |

@@ -2,7 +2,7 @@
 // Rebuild the lightweight choices from the maintained detailed styles.
 // Keep drawing order, road hierarchy and every terrain/track rule unchanged.
 const fs = require('node:fs'), path = require('node:path');
-const { formatStyleJson } = require('./style-format');
+const { formatStyleJson } = require('../lib/style-format');
 const directory = path.resolve(__dirname, '../styles');
 
 const qldOmit = new Set([

@@ -7,6 +7,7 @@
 */
 const fs = require('fs');
 const path = require('path');
+const { formatStyleJson } = require('../lib/style-format');
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(name);
@@ -160,5 +161,5 @@ if (!outPath) {
   outPath = path.resolve('styles', name);
 }
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
-fs.writeFileSync(outPath, JSON.stringify(out));
+fs.writeFileSync(outPath, formatStyleJson(out));
 console.log(`[OK] wrote ${outPath}`);
