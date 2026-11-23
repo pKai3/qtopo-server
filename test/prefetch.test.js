@@ -25,18 +25,17 @@ test('neighbour prefetch proceeds during outstanding requests, stays bounded and
   for (let x = 1; x < 7; x++) prefetch.begin('auto', { z: 3, x, y: 1 })(true);
   assert.ok(prefetch.stats.queued <= 8);
 });
-test('zoom prefetch waits for outstanding requests while neighbours use spare capacity', async t => {
+test('zoom prefetch follows queued neighbours without waiting for outstanding requests', async t => {
   const seen = [];
   const prefetch = createPrefetch({ delayMs: 1, concurrency: 3, render: async (_provider, _tile, priority) => seen.push(priority) });
   t.after(() => prefetch.close());
   const pending = prefetch.begin('auto', { z: 6, x: 40, y: 40 });
   prefetch.begin('auto', { z: 6, x: 10, y: 10 })(true);
-  for (let i = 0; i < 100 && seen.length < 8; i++) await wait(5);
-  assert.equal(seen.length, 8); assert.ok(seen.every(priority => priority === 1));
-  await wait(15); assert.equal(seen.length, 8);
-  pending(false);
   for (let i = 0; i < 100 && seen.length < 13; i++) await wait(5);
-  assert.equal(seen.length, 13); assert.ok(seen.slice(8).every(priority => priority === 2));
+  assert.equal(seen.length, 13); assert.ok(seen.slice(0, 8).every(priority => priority === 1));
+  assert.ok(seen.slice(8).every(priority => priority === 2));
+  assert.equal(prefetch.stats.requests, 1, 'an outstanding request must not hold spare prefetch capacity idle');
+  pending(false);
 });
 test('disabled or failed requests do not schedule speculative work', async t => {
   for (const radius of [0, 1]) {
@@ -104,11 +103,11 @@ test('overlapping queued neighbours are moved to the new request, and zoom never
   assert.ok(seen.every(job => job.priority === 1));
 });
 
-test('prefetch uses available concurrency but waits for all neighbours before zoom', async t => {
+test('prefetch fills free slots with zoom while the final neighbours are still running', async t => {
   const seen = [], releases = [];
   const prefetch = createPrefetch({ concurrency: 3, delayMs: 1, render: async (_provider, tile, priority) => {
     seen.push({ tile, priority });
-    if (priority === 1) await new Promise(resolve => releases.push(resolve));
+    await new Promise(resolve => releases.push(resolve));
   } });
   t.after(() => prefetch.close());
   prefetch.begin('auto', { z: 6, x: 10, y: 10 })(true);
@@ -121,7 +120,60 @@ test('prefetch uses available concurrency but waits for all neighbours before zo
   }
   assert.ok(seen.every(job => job.priority === 1));
   assert.equal(prefetch.stats.completedZoom, 0);
-  while (releases.length) releases.shift()();
-  for (let i = 0; i < 100 && seen.length < 13; i++) await wait(5);
+  releases.shift()();
+  for (let i = 0; i < 100 && seen.length < 9; i++) await wait(5);
+  assert.equal(seen.length, 9, 'the next free slot starts zoom without waiting for all neighbours');
+  assert.equal(seen[8].priority, 2);
+  assert.equal(prefetch.stats.active, 3, 'two neighbours and one zoom use the configured three slots');
+  assert.equal(releases.length, 3);
+  for (let i = 0; i < 100 && (prefetch.stats.active || prefetch.stats.queued); i++) {
+    while (releases.length) releases.shift()();
+    await wait(5);
+  }
   assert.equal(seen.length, 13);
+  assert.equal(prefetch.stats.completedZoom, 5);
+  assert.equal(prefetch.stats.active, 0);
+});
+
+test('metatile siblings share admission capacity and retain it until the last sibling settles', async t => {
+  const seen = [], releases = [];
+  const prefetch = createPrefetch({ radius: 1, zoom: false, concurrency: 1, delayMs: 1,
+    groupKey: (_provider, tile) => `${tile.z}/${Math.floor(tile.x / 2)}/${Math.floor(tile.y / 2)}`,
+    render: (_provider, tile) => new Promise((resolve, reject) => { seen.push(tile); releases.push({ resolve, reject }); }),
+  });
+  t.after(() => { prefetch.close(); for (const release of releases) release.resolve(); });
+  prefetch.begin('qld', { z: 6, x: 10, y: 10 })(true);
+  for (let i = 0; i < 100 && seen.length < 2; i++) await wait(5);
+  assert.deepEqual(seen, [{ z: 6, x: 10, y: 9 }, { z: 6, x: 11, y: 9 }], 'a sibling behind other pending grids must still be admitted');
+  assert.equal(prefetch.stats.active, 2);
+  assert.equal(prefetch.stats.activeGroups, 1);
+  assert.equal(prefetch.stats.queued, 6);
+  releases.shift().resolve();
+  await wait(10);
+  assert.equal(seen.length, 2, 'the first tile finishing must not release its still-active grid');
+  assert.equal(prefetch.stats.active, 1);
+  assert.equal(prefetch.stats.activeGroups, 1);
+  assert.equal(prefetch.stats.completed, 1);
+  releases.shift().reject(new Error('second tile failed'));
+  for (let i = 0; i < 100 && seen.length < 4; i++) await wait(5);
+  assert.equal(seen.length, 4, 'the next grid can start after the final sibling rejects');
+  assert.equal(prefetch.stats.activeGroups, 1);
+  assert.equal(prefetch.stats.completed, 1, 'a failed sibling is not counted as successful');
+  prefetch.close();
+  while (releases.length) releases.shift().resolve();
+  for (let i = 0; i < 100 && prefetch.stats.active; i++) await wait(5);
+  assert.equal(prefetch.stats.activeGroups, 0, 'settled siblings leave no occupied groups');
+});
+
+test('without a grouping hint prefetch retains per-tile admission limits', async t => {
+  const releases = [];
+  const prefetch = createPrefetch({ radius: 1, zoom: false, concurrency: 2, delayMs: 1,
+    render: () => new Promise(resolve => releases.push(resolve)),
+  });
+  t.after(() => { prefetch.close(); while (releases.length) releases.shift()(); });
+  prefetch.begin('nsw', { z: 6, x: 10, y: 10 })(true);
+  for (let i = 0; i < 100 && releases.length < 2; i++) await wait(5);
+  assert.equal(prefetch.stats.active, 2);
+  assert.equal(prefetch.stats.activeGroups, 2);
+  assert.equal(prefetch.stats.queued, 6);
 });

@@ -40,6 +40,13 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     radius: config.prefetchRadius, zoom: config.prefetchZoom, concurrency: config.prefetchConcurrency,
     limit: config.prefetchQueueLimit, logger: L,
     zoomRange: id => id === 'auto' ? { minzoom: 0, maxzoom: providers.qld.maxzoom } : providers[id],
+    groupKey: (id, tile) => {
+      // Only QLD has one vector style variant across the whole metatile.
+      // NSW variants, border composites and image tiles retain per-tile slots.
+      if (id !== 'qld' && !(id === 'auto' && coverage(tile).region === 'qld')) return;
+      const layout = metatileLayout(tile, config);
+      return `qld/${tile.z}/${layout.x}/${layout.y}`;
+    },
     render: async (id, tile, priority, rank) => {
       const result = await (id === 'auto' ? automaticRasterFile(tile, priority, rank) : rasterFile(providers[id], tile, priority, rank));
       requests.prefetched(result);

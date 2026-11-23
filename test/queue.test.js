@@ -40,16 +40,47 @@ test('prefetch reserves foreground capacity and cannot fill the foreground queue
   await rejected; release(); await first; queue.close();
 });
 
-test('seven background renders can run with an eighth slot reserved, and zoom waits', async () => {
+test('zoom fills a free background slot while other neighbours keep running', async () => {
   const queue = new WorkQueue(8, 16), releases = [];
   const nearby = Array.from({ length: 7 }, () => queue.run(() => new Promise(resolve => releases.push(resolve)), { priority: PRIORITY.NEIGHBOUR }));
-  let zoomStarted = false;
-  const zoom = queue.run(() => { zoomStarted = true; }, { priority: PRIORITY.ZOOM });
+  let zoomStarted = false, releaseZoom;
+  const zoom = queue.run(() => new Promise(resolve => { zoomStarted = true; releaseZoom = resolve; }), { priority: PRIORITY.ZOOM });
   assert.equal(await queue.run(() => 'foreground'), 'foreground');
   assert.equal(queue.stats.peakActive, 8);
   assert.equal(zoomStarted, false);
+  releases.shift()();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(zoomStarted, true, 'zoom must not wait for the remaining six neighbours');
+  assert.deepEqual(queue.stats.activeByPriority, { requested: 0, neighbours: 6, zoom: 1 });
+  assert.equal(queue.stats.active, 7, 'the eighth slot remains reserved for requests');
   for (const release of releases) release();
+  releaseZoom();
   await Promise.all([...nearby, zoom]); assert.equal(zoomStarted, true); queue.close();
+});
+
+test('zoom uses spare capacity during requested work while background and total limits stay bounded', async () => {
+  const queue = new WorkQueue(5, 16, 2), releases = [], started = [];
+  const work = name => () => new Promise(resolve => { started.push(name); releases.push(resolve); });
+  const jobs = [
+    queue.run(work('requested')),
+    queue.run(work('neighbour'), { priority: PRIORITY.NEIGHBOUR }),
+    queue.run(work('zoom'), { priority: PRIORITY.ZOOM }),
+    queue.run(work('later zoom'), { priority: PRIORITY.ZOOM }),
+  ];
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(started, ['requested', 'neighbour', 'zoom']);
+  assert.deepEqual(queue.stats.activeByPriority, { requested: 1, neighbours: 1, zoom: 1 });
+  assert.equal(queue.stats.queued, 1, 'background work still obeys its separate limit');
+  jobs.push(queue.run(work('second request')), queue.run(work('third request')));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(queue.stats.active, 5);
+  assert.equal(queue.stats.peakActive, 5);
+  assert.deepEqual(started.slice(3), ['second request', 'third request'], 'requests use the capacity reserved from background work');
+  while (releases.length) releases.shift()();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(started.at(-1), 'later zoom');
+  while (releases.length) releases.shift()();
+  await Promise.all(jobs); queue.close();
 });
 
 test('queued prefetch honours recency without raising zoom above neighbours', async () => {
