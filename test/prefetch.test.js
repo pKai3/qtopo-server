@@ -9,6 +9,21 @@ test('adjacent prefetch stays within the XYZ grid and includes diagonals', () =>
   assert.equal(neighbours({ z: 0, x: 0, y: 0 }, 1).length, 0);
   assert.equal(neighbours({ z: 3, x: 0, y: 0 }, 1).length, 3);
 });
+test('radius ten retains only the nearest neighbours allowed by the queue limit', async t => {
+  const tile = { z: 8, x: 128, y: 128 }, seen = [];
+  const candidates = neighbours(tile, 10);
+  assert.equal(candidates.length, 440);
+  const prefetch = createPrefetch({ radius: 10, limit: 64, delayMs: 1,
+    render: async (_provider, neighbour) => seen.push(neighbour) });
+  t.after(() => prefetch.close());
+  prefetch.begin('auto', tile)(true);
+  assert.equal(prefetch.stats.queued, 64);
+  assert.equal(prefetch.stats.queuedZoom, 0, 'nearby tiles retain priority when the queue is full');
+  for (let i = 0; i < 200 && (prefetch.stats.queued || prefetch.stats.active); i++) await wait(5);
+  assert.deepEqual(seen, candidates.slice(0, 64));
+  assert.equal(prefetch.stats.queued, 0);
+  assert.equal(prefetch.stats.active, 0);
+});
 test('neighbour prefetch proceeds during outstanding requests, stays bounded and never expands recursively', async t => {
   const seen = [];
   const prefetch = createPrefetch({ radius: 1, zoom: false, limit: 8, delayMs: 1, render: async (provider, tile) => seen.push(`${provider}/${tile.z}/${tile.x}/${tile.y}`) });
