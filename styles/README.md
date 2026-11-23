@@ -68,3 +68,13 @@ z16. Terrain-only Mt Barney samples at z16/z17 were essentially unchanged: the
 contours remain. These are sample render timings, not a promise about network or
 Gaia performance. The separate lossless PNG encoder improvement benefits both
 light and detailed variants.
+
+Mountain names and elevations are 25% larger in every QLD choice. The NSW
+MountainLike class receives the same increase without resizing other landforms.
+Ferry icons and names in the named QLD styles switch to valid z17 point data
+from z17 upward. The upstream z18+ ferry records contain an unsupported empty
+symbol value that native symbol rendering drops even with its filter removed.
+The icon and name share a symbol to prevent self-collision. Two combined rules
+(one below z17, one above) and one capped source keep those landmarks visible while
+all other layers, including 1 m contours, retain their existing source resolution.
+Verified with native previews at West End z18, UQ St Lucia z19 and Guyatt Park z17.
