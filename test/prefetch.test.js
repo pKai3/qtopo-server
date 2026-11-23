@@ -47,6 +47,24 @@ test('disabled or failed requests do not schedule speculative work', async t => 
   }
 });
 
+test('cache maintenance discards pending prefetch and resumes without suppressing recently cleared tiles', async t => {
+  const seen = [], tile = { z: 6, x: 10, y: 10 };
+  const prefetch = createPrefetch({ radius: 1, zoom: false, delayMs: 1, render: async (_provider, neighbour) => seen.push(neighbour) });
+  t.after(() => prefetch.close());
+  prefetch.begin('auto', tile)(true);
+  for (let i = 0; i < 100 && seen.length < 8; i++) await wait(5);
+  assert.equal(seen.length, 8);
+  const unfinished = prefetch.begin('auto', tile);
+  prefetch.begin('auto', { z: 6, x: 20, y: 20 })(true);
+  assert.ok(prefetch.stats.queued);
+  prefetch.pause(); unfinished(true);
+  assert.equal(prefetch.stats.queued, 0); assert.equal(prefetch.stats.requests, 0);
+  await wait(10); assert.equal(seen.length, 8);
+  prefetch.resume(); prefetch.begin('auto', tile)(true);
+  for (let i = 0; i < 100 && seen.length < 16; i++) await wait(5);
+  assert.equal(seen.length, 16);
+});
+
 test('zoom prefetch covers one parent and four children within provider limits', () => {
   const tile = { z: 13, x: 7578, y: 4746 };
   assert.deepEqual(zoomNeighbours(tile), [

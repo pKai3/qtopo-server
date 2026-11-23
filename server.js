@@ -15,6 +15,8 @@ const { createTileIndex } = require('./lib/tile-index');
 const { createPrefetch } = require('./lib/prefetch');
 const { PRIORITY } = require('./lib/queue');
 const { createRequestMetrics } = require('./lib/metrics');
+const { metatileLayout } = require('./lib/metatile');
+const { createStatusActions } = require('./lib/status-actions');
 
 async function createApp(config = loadConfig(), dependencies = {}) {
   process.umask(0o002);
@@ -29,6 +31,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   const nativeZoom = dependencies.nativeZoom || createTileIndex(config, cache);
   const stopCleaner = startCleaner(config, L);
   const app = express();
+  let activeRasterRequests = 0;
   const prefetch = createPrefetch({
     radius: config.prefetchRadius, zoom: config.prefetchZoom, concurrency: config.prefetchConcurrency,
     limit: config.prefetchQueueLimit, logger: L,
@@ -38,9 +41,28 @@ async function createApp(config = loadConfig(), dependencies = {}) {
       requests.prefetched(result);
     },
   });
+  const actions = createStatusActions({
+    origin: () => app.locals.internalOrigin, rasterDir: path.join(config.rasterDir, 'v2'), maxzoom: providers.qld.maxzoom,
+    busy: () => { const render = renderer.stats; return activeRasterRequests || render?.active || render?.queued || prefetch.stats.active; },
+    pause: () => prefetch.pause(), resume: () => prefetch.resume(), logger: L,
+  });
   app.disable('x-powered-by');
+  const shortTile = /^\/(\d+)\/(\d+)\/(\d+)\.png$/;
+  // Public map data can be used directly by Gaia and other browser clients.
+  // Keep status/log endpoints outside this policy, and never enable credentials.
+  app.use(['/raster', '/vector', '/tiles_raster', '/tiles_vector', '/styles', '/style.json', '/fonts', '/resources', '/assets', '/api/providers', shortTile], (req, res, next) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Expose-Headers', 'ETag, Retry-After');
+    if (req.method === 'OPTIONS') {
+      res.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      res.set('Access-Control-Allow-Headers', 'Accept, Content-Type, If-None-Match, If-Modified-Since, Range');
+      res.set('Access-Control-Max-Age', '600');
+      return res.status(204).end();
+    }
+    next();
+  });
   app.use((req, res, next) => {
-    if (/^\/(raster|vector|tiles_raster|tiles_vector)\//.test(req.path)) {
+    if (shortTile.test(req.path) || /^\/(raster|vector|tiles_raster|tiles_vector)\//.test(req.path)) {
       const started = Date.now();
       L.log('REQ', `${req.method} ${req.path}`);
       res.once('finish', () => L.log('RES', `${res.statusCode} ${req.path} (${Date.now() - started} ms)`));
@@ -105,7 +127,18 @@ async function createApp(config = loadConfig(), dependencies = {}) {
       } else {
         const internalOrigin = app.locals.internalOrigin;
         if (!internalOrigin) throw httpError('Renderer not ready', 503);
-        Object.assign(job, { kind: 'vector', origin: internalOrigin, style: absoluteStyle(renderStyle(style, config.labelScale, p.id === 'qld'), internalOrigin) });
+        const layout = metatileLayout(tile, config);
+        // Sparse NSW coverage can change source zoom within a grid. Only save
+        // siblings that use this exact style variant; never cache reduced detail
+        // under another tile's higher-resolution revision.
+        const variants = p.tileMap ? await Promise.all(layout.tiles.map(t => styleForRaster(p, t))) : layout.tiles.map(() => ({ revision }));
+        const outputs = layout.tiles.filter((_, i) => variants[i].revision === revision).map(t => ({
+          ...t, outPath: path.join(config.rasterDir, 'v2', p.id, revision, String(t.z), String(t.x), `${t.y}.png`),
+        }));
+        Object.assign(job, { kind: 'vector', layout, outputs,
+          renderKey: path.join(config.rasterDir, 'v2', p.id, revision, 'metatile', String(tile.z), `${layout.x}-${layout.y}`),
+          origin: internalOrigin, style: absoluteStyle(renderStyle(style, config.labelScale, p.id === 'qld'), internalOrigin),
+        });
       }
       await renderer.render(job);
       cached = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
@@ -126,7 +159,9 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     await serveRaster(req, res);
   }
   async function serveRaster(req, res, p) {
+    if (actions.cacheBusy) throw httpError('Rendered tiles are being cleared; please retry shortly.', 503);
     const tile = coordinates(req, p || providers.qld);
+    activeRasterRequests++;
     const measured = requests.begin();
     res.once('finish', () => measured.finish(res.statusCode, false, res.statusCode === 304 ? 0 : res.getHeader('content-length')));
     res.once('close', () => { if (!res.writableFinished) measured.finish(res.statusCode, true); });
@@ -137,7 +172,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
       measured.ready(result);
       await deliverRaster(res, result);
       success = true;
-    } finally { finish(success); }
+    } finally { activeRasterRequests--; finish(success); }
   }
   async function automaticRasterFile(tile, priority = PRIORITY.REQUEST, rank = 0) {
     const area = coverage(tile);
@@ -182,6 +217,10 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   app.get('/vector/:z/:x/:y.pbf', vector);
   app.get('/raster/:provider/:z/:x/:y.png', raster);
   app.get('/raster/:z/:x/:y.png', automaticRaster);
+  app.get(shortTile, (req, res) => {
+    req.params = { z: req.params[0], x: req.params[1], y: req.params[2] };
+    return automaticRaster(req, res);
+  });
   for (const [old, current, extension] of [['tiles_raster', 'raster', 'png'], ['tiles_vector', 'vector', 'pbf']]) {
     app.get(`/${old}/:z/:x/:y.${extension}`, (req, res) => {
       if (!parseTile(req.params)) throw httpError('Invalid tile coordinates', 400);
@@ -214,10 +253,27 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   app.get('/readyz', (_req, res) => res.set('Cache-Control', 'no-store').json({
     status: 'ok', startedAt, version: require('./package.json').version,
     revision: process.env.BUILD_REVISION || 'development',
-    settings: { tilePx: config.tilePx, pngCompression: config.pngCompression, renderConcurrency: config.renderConcurrency, renderQueueLimit: config.renderQueueLimit, upstreamConcurrency: config.upstreamConcurrency, prefetchConcurrency: config.prefetchConcurrency, prefetchQueueLimit: config.prefetchQueueLimit, prefetchRadius: config.prefetchRadius, prefetchZoom: config.prefetchZoom },
+    settings: { tilePx: config.tilePx, metatileSize: config.metatileSize, renderBufferPx: config.renderBufferPx, pngCompression: config.pngCompression, renderConcurrency: config.renderConcurrency, renderQueueLimit: config.renderQueueLimit, upstreamConcurrency: config.upstreamConcurrency, prefetchConcurrency: config.prefetchConcurrency, prefetchQueueLimit: config.prefetchQueueLimit, prefetchRadius: config.prefetchRadius, prefetchZoom: config.prefetchZoom },
     providers: Object.keys(providers), renderer: renderer.stats, cache: cache.stats, prefetch: prefetch.stats,
-    requests: requests.stats, styles: styles.stats,
+    requests: requests.stats, styles: styles.stats, actions: actions.stats,
   }));
+  // These explicit POST actions are outside the public map CORS policy.
+  // A custom header and JSON body prevent cross-site form/image requests;
+  // cross-origin scripts cannot pass the required preflight.
+  const controls = express.Router();
+  controls.use((req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    if (req.method !== 'POST' || req.get('X-QTopo-Action') !== 'status-page' || !req.is('application/json') || req.get('Sec-Fetch-Site') === 'cross-site') return res.status(403).json({ error: 'Use the controls on this server’s status page.' });
+    next();
+  }, express.json({ limit: '2kb' }));
+  controls.post('/tile-test/start', (req, res) => res.status(202).json(actions.start(req.body)));
+  controls.post('/tile-test/stop', (_req, res) => res.json(actions.stop()));
+  controls.post('/cache/clear', (req, res) => {
+    if (req.body?.confirm !== 'clear-rendered-tiles') throw httpError('Confirm clearing rendered tiles first.', 400);
+    res.status(202).json(actions.clear());
+  });
+  controls.use((error, _req, res, _next) => res.status(error.status || 500).json({ error: error.status ? error.message : 'Could not perform this action.' }));
+  app.use('/api/actions', controls);
   app.get('/status', (_req, res) => res.sendFile(path.join(config.root, 'public/status.html')));
   app.get('/api/logs', (req, res) => {
     const after = req.query.after ?? '0', session = req.query.session;
@@ -234,7 +290,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     if (status === 503) res.set('Retry-After', '3');
     res.status(status).json({ error: status === 400 || status === 404 ? err.message : 'Map service temporarily unavailable; please retry.' });
   });
-  return { app, providers, close() { prefetch.close(); stopCleaner(); renderer.close(); cache.close?.(); } };
+  return { app, providers, close() { actions.close(); prefetch.close(); stopCleaner(); renderer.close(); cache.close?.(); } };
 }
 async function main() {
   const config = loadConfig();
@@ -243,6 +299,7 @@ async function main() {
     instance.app.locals.internalOrigin = `http://127.0.0.1:${server.address().port}`;
     L.sys(`Listening on port ${server.address().port}; /raster/{z}/{x}/{y}.png serves QLD + NSW vectors automatically (${config.tilePx}px)`);
     L.sys(`Render concurrency ${config.renderConcurrency}; prefetch ${config.prefetchRadius ? `up to ${config.prefetchConcurrency} tiles, radius ${config.prefetchRadius}, zoom ${config.prefetchZoom ? '±1' : 'off'}` : 'off'}`);
+    L.sys(`Vector renders ${config.metatileSize}×${config.metatileSize} tiles with ${config.renderBufferPx}px logical padding; each output remains ${config.tilePx}px`);
   });
   let stopping = false;
   const stop = () => {

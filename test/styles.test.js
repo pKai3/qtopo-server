@@ -6,7 +6,7 @@ const path = require('node:path');
 const { loadConfig } = require('../lib/config');
 const { createProviders } = require('../lib/providers');
 const { seedStyles, getStyle, styleRevision, createStyleCache } = require('../lib/styles');
-test('reuse prepared styles, preserve existing cache keys, and isolate NSW zoom variants', async t => {
+test('reuse prepared styles, revision raster settings, and isolate NSW zoom variants', async t => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-styles-'));
   t.after(() => fs.rm(dir, { recursive: true, force: true }));
   const config = loadConfig({ DATA_DIR: dir }), providers = createProviders(config);
@@ -17,6 +17,10 @@ test('reuse prepared styles, preserve existing cache keys, and isolate NSW zoom 
     assert.equal(a, b);
     assert.equal(a.revision, styleRevision(await getStyle(config, provider), config, provider));
     assert.equal(a.revision, styleRevision(a.style, { ...config, pngCompression: 6 }, provider), 'lossless compression does not invalidate existing pixels');
+    if (provider.type === 'vector') {
+      assert.notEqual(a.revision, styleRevision(a.style, { ...config, metatileSize: 1 }, provider));
+      assert.notEqual(a.revision, styleRevision(a.style, { ...config, renderBufferPx: 0 }, provider));
+    }
   }
   const nsw = await cache.get(providers.nsw), original = JSON.stringify(nsw.style);
   const sixteen = nsw.atZoom(16), twelve = nsw.atZoom(12);
