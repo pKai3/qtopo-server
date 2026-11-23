@@ -4,6 +4,8 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { createRenderer } = require('../lib/render');
+const { createPrefetch } = require('../lib/prefetch');
+const { metatileLayout } = require('../lib/metatile');
 const { PRIORITY } = require('../lib/queue');
 const { atomicWrite, cachedRaster } = require('../lib/utils');
 const { prune } = require('../lib/cleaner');
@@ -125,6 +127,44 @@ test('concurrency eight actually starts eight separate workers simultaneously', 
     assert.equal(renderer.stats.active, 8);
     assert.equal(renderer.stats.peakActive, 8);
   } finally { await fs.writeFile(gate, 'go'); await complete; }
+});
+
+test('prefetch fills distinct metatile workers instead of spending its budget on sibling waiters', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-prefetch-grid-test-'));
+  const renderer = createRenderer({ renderConcurrency: 8, prefetchConcurrency: 7, renderQueueLimit: 64,
+    rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 10000 }, path.join(__dirname, 'fixtures/render-worker.js'));
+  const file = tile => path.join(root, `${tile.z}-${tile.x}-${tile.y}.png`);
+  const gate = path.join(root, 'go'), centre = { z: 6, x: 10, y: 10 };
+  const group = tile => { const layout = metatileLayout(tile); return `${tile.z}/${layout.x}/${layout.y}`; };
+  for (const tile of metatileLayout(centre).tiles) await fs.writeFile(file(tile), 'cached');
+  const prefetch = createPrefetch({ radius: 2, zoom: false, concurrency: 7, delayMs: 1,
+    groupKey: (_provider, tile) => group(tile),
+    render: async (_provider, tile, priority, rank) => {
+      if (await cachedRaster(file(tile), 10000, 1000)) return;
+      const layout = metatileLayout(tile);
+      await renderer.render({ ...tile, outPath: file(tile), priority, rank, renderKey: group(tile), gate,
+        outputs: layout.tiles.map(sibling => ({ ...sibling, outPath: file(sibling) })),
+      });
+    },
+  });
+  t.after(async () => { prefetch.close(); renderer.close(); await fs.rm(root, { recursive: true, force: true }); });
+  prefetch.begin('qld', centre)(true);
+  for (let i = 0; i < 200 && renderer.stats.workers < 7; i++) await new Promise(resolve => setTimeout(resolve, 5));
+  assert.equal(renderer.stats.workers, 7);
+  assert.equal(renderer.stats.active, 7);
+  assert.equal(prefetch.stats.activeGroups, 7);
+  assert.ok(prefetch.stats.active > 7, 'siblings retain their individual promises without taking extra grid slots');
+  assert.ok(prefetch.stats.queued > 0, 'additional grids remain bounded by the prefetch limit');
+  const foreground = renderer.render({ outPath: path.join(root, 'foreground.png'), gate });
+  for (let i = 0; i < 100 && renderer.stats.workers < 8; i++) await new Promise(resolve => setTimeout(resolve, 5));
+  assert.equal(renderer.stats.active, 8, 'a requested render can still use the reserved eighth slot');
+  assert.deepEqual(renderer.stats.activeByPriority, { requested: 1, neighbours: 7, zoom: 0 });
+  await fs.writeFile(gate, 'go');
+  await foreground;
+  for (let i = 0; i < 200 && (prefetch.stats.active || prefetch.stats.queued); i++) await new Promise(resolve => setTimeout(resolve, 5));
+  assert.equal(prefetch.stats.completed, 24);
+  assert.equal(prefetch.stats.activeGroups, 0);
+  assert.equal(renderer.stats.peakActive, 8, 'group admission must not change the real renderer concurrency cap');
 });
 
 test('a client joining an active prefetch shares the worker and reclassifies counters and timing logs', async t => {
