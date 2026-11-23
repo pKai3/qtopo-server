@@ -19,6 +19,7 @@ const { metatileLayout } = require('./lib/metatile');
 const { createStatusActions } = require('./lib/status-actions');
 const { createAdminAccess } = require('./lib/admin-access');
 const { listenControl, socketPath } = require('./lib/local-control');
+const { createRequestFocus } = require('./lib/request-focus');
 
 async function createApp(config = loadConfig(), dependencies = {}) {
   const admin = createAdminAccess(config);
@@ -31,9 +32,11 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   if (config.clearRaster) await fs.rm(path.join(config.rasterDir, 'v2'), { recursive: true, force: true });
   const cache = dependencies.cache || createCache({ timeoutMs: config.upstreamTimeoutMs, emptyTTL: config.emptyTTL, concurrency: config.upstreamConcurrency, logger: L });
   const renderer = dependencies.renderer || createRenderer(config);
+  const requestFocus = createRequestFocus({ distance: config.requestPanThreshold });
   const nativeZoom = dependencies.nativeZoom || createTileIndex(config, cache);
   const stopCleaner = startCleaner(config, L);
   const app = express();
+  const interruptedResponses = new WeakSet();
   app.set('trust proxy', admin.trustProxy);
   let activeRasterRequests = 0;
   const prefetch = createPrefetch({
@@ -47,8 +50,8 @@ async function createApp(config = loadConfig(), dependencies = {}) {
       const layout = metatileLayout(tile, config);
       return `qld/${tile.z}/${layout.x}/${layout.y}`;
     },
-    render: async (id, tile, priority, rank) => {
-      const result = await (id === 'auto' ? automaticRasterFile(tile, priority, rank) : rasterFile(providers[id], tile, priority, rank));
+    render: async (id, tile, priority, rank, interest) => {
+      const result = await (id === 'auto' ? automaticRasterFile(tile, priority, rank, interest) : rasterFile(providers[id], tile, priority, rank, interest));
       requests.prefetched(result);
     },
   });
@@ -104,7 +107,11 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   function headers(res, seconds = 3600) { res.set('Cache-Control', `public, max-age=${seconds}`); }
   function sendFile(res, file, type) {
     res.type(type);
-    return new Promise((resolve, reject) => res.sendFile(file, err => err ? reject(err) : resolve()));
+    return new Promise((resolve, reject) => res.sendFile(file, err => {
+      if (!err) return resolve();
+      if ((res.destroyed || res.req.aborted || res.req.socket.destroyed) && ['ECONNABORTED', 'ECONNRESET', 'EPIPE'].includes(err.code)) interruptedResponses.add(err);
+      reject(err);
+    }));
   }
   async function vector(req, res) {
     const p = providerFor(req, 'vector');
@@ -122,7 +129,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     return p.tileMap ? prepared.atZoom(await nativeZoom(p, tile)) : prepared;
   }
   const renderTag = priority => ['RDR', 'PREFETCH', 'PREFETCH-Z'][priority];
-  async function rasterFile(p, tile, priority = PRIORITY.REQUEST, rank = 0) {
+  async function rasterFile(p, tile, priority = PRIORITY.REQUEST, rank = 0, interest) {
     const { style, revision } = await styleForRaster(p, tile);
     const outPath = path.join(config.rasterDir, 'v2', p.id, revision, String(tile.z), String(tile.x), `${tile.y}.png`);
     let cached = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
@@ -152,7 +159,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
           origin: internalOrigin, style: absoluteStyle(renderStyle(style, config.labelScale, p.id === 'qld'), internalOrigin),
         });
       }
-      await renderer.render(job);
+      await renderer.render(job, interest);
       cached = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
     } else if (priority === PRIORITY.REQUEST) L.log('RDR', `Cached tile: ${outPath}`);
     if (!cached) throw httpError('Rendered tile is unavailable');
@@ -177,20 +184,22 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     const measured = requests.begin();
     res.once('finish', () => measured.finish(res.statusCode, false, res.statusCode === 304 ? 0 : res.getHeader('content-length')));
     res.once('close', () => { if (!res.writableFinished) measured.finish(res.statusCode, true); });
-    const finish = prefetch.begin(p?.id || 'auto', tile);
+    const focus = requestFocus.observe(req.ip, tile), interest = focus.forTile(tile);
+    const finish = prefetch.begin(p?.id || 'auto', tile, focus);
     let success = false;
     try {
-      const result = await (p ? rasterFile(p, tile) : automaticRasterFile(tile));
+      const result = await (p ? rasterFile(p, tile, PRIORITY.REQUEST, 0, interest) : automaticRasterFile(tile, PRIORITY.REQUEST, 0, interest));
+      if (req.aborted || res.destroyed) return;
       measured.ready(result);
       await deliverRaster(res, result);
       success = true;
     } finally { activeRasterRequests--; finish(success); }
   }
-  async function automaticRasterFile(tile, priority = PRIORITY.REQUEST, rank = 0) {
+  async function automaticRasterFile(tile, priority = PRIORITY.REQUEST, rank = 0, interest) {
     const area = coverage(tile);
     if (priority === PRIORITY.REQUEST) L.log('AUTO', `${tile.z}/${tile.x}/${tile.y}: ${area.region === 'border' ? 'QLD + NSW border' : area.region.toUpperCase()} vectors`);
-    if (area.region === 'qld') return rasterFile(providers.qld, tile, priority, rank);
-    if (area.region === 'nsw') return rasterFile(providers.nsw, tile, priority, rank);
+    if (area.region === 'qld') return rasterFile(providers.qld, tile, priority, rank, interest);
+    if (area.region === 'nsw') return rasterFile(providers.nsw, tile, priority, rank, interest);
     const [qldStyle, nswStyle] = await Promise.all([styleForRaster(providers.qld, tile), styleForRaster(providers.nsw, tile)]);
     const revision = hash(JSON.stringify({ version: 2, boundaryRevision, qld: qldStyle.revision, nsw: nswStyle.revision }));
     const outPath = path.join(config.rasterDir, 'v2', 'auto', revision, String(tile.z), String(tile.x), `${tile.y}.png`);
@@ -198,9 +207,9 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     const hit = !!cached;
     if (!cached) {
       L.log(renderTag(priority), `Generating border tile: ${outPath}`);
-      const [backgroundPath, foregroundPath] = await Promise.all([rasterFile(providers.qld, tile, priority, rank), rasterFile(providers.nsw, tile, priority, rank)]);
+      const [backgroundPath, foregroundPath] = await Promise.all([rasterFile(providers.qld, tile, priority, rank, interest), rasterFile(providers.nsw, tile, priority, rank, interest)]);
       const rect = [0, 0, config.tilePx, config.tilePx];
-      await renderer.render({ ...tile, outPath, priority, rank, size: config.tilePx, kind: 'composite', backgroundPath: backgroundPath.path, images: [{ path: foregroundPath.path, source: rect, destination: rect }], clip: area.rings });
+      await renderer.render({ ...tile, outPath, priority, rank, size: config.tilePx, kind: 'composite', backgroundPath: backgroundPath.path, images: [{ path: foregroundPath.path, source: rect, destination: rect }], clip: area.rings }, interest);
       cached = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
     } else if (priority === PRIORITY.REQUEST) L.log('RDR', `Cached border tile: ${outPath}`);
     if (!cached) throw httpError('Rendered border tile is unavailable');
@@ -265,7 +274,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   function status() { return {
     status: 'ok', startedAt, version: require('./package.json').version,
     revision: process.env.BUILD_REVISION || 'development',
-    settings: { tilePx: config.tilePx, metatileSize: config.metatileSize, renderBufferPx: config.renderBufferPx, pngCompression: config.pngCompression, renderConcurrency: config.renderConcurrency, renderQueueLimit: config.renderQueueLimit, upstreamConcurrency: config.upstreamConcurrency, prefetchConcurrency: config.prefetchConcurrency, prefetchQueueLimit: config.prefetchQueueLimit, prefetchRadius: config.prefetchRadius, prefetchZoom: config.prefetchZoom },
+    settings: { tilePx: config.tilePx, metatileSize: config.metatileSize, renderBufferPx: config.renderBufferPx, pngCompression: config.pngCompression, renderConcurrency: config.renderConcurrency, renderQueueLimit: config.renderQueueLimit, requestPanThreshold: config.requestPanThreshold, upstreamConcurrency: config.upstreamConcurrency, prefetchConcurrency: config.prefetchConcurrency, prefetchQueueLimit: config.prefetchQueueLimit, prefetchRadius: config.prefetchRadius, prefetchZoom: config.prefetchZoom },
     providers: Object.keys(providers), renderer: renderer.stats, cache: cache.stats, prefetch: prefetch.stats,
     requests: requests.stats, styles: styles.stats,
   }; }
@@ -291,7 +300,11 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   app.get('/raster', (_req, res) => res.redirect(302, '/?mode=raster'));
   app.use(express.static(path.join(config.root, 'public')));
   app.use((err, req, res, next) => {
+    // A cancelled map download is already counted/logged by the close handler.
+    // Do not send another response or ask Express to print a duplicate stack.
+    if (interruptedResponses.has(err)) return;
     L.err('HTTP', `${req.method} ${req.path}: ${err.message}`);
+    if (req.aborted || res.destroyed) return;
     if (res.headersSent) return next(err);
     res.set('Cache-Control', 'no-store');
     const status = err.status && err.status >= 400 && err.status <= 599 ? err.status : 502;

@@ -1,6 +1,42 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { WorkQueue, PRIORITY } = require('../lib/queue');
+const { createRequestFocus } = require('../lib/request-focus');
+
+test('latest zoom moves all matching requested tiles ahead without cancelling older work', async () => {
+  const queue = new WorkQueue(1, 16), focus = createRequestFocus(), seen = [];
+  let release;
+  const blocker = queue.run(() => new Promise(resolve => { release = resolve; }));
+  const add = (name, tile) => queue.run(() => seen.push(name), focus.observe('a', tile).forTile(tile));
+  const jobs = [
+    add('old zoom first', { z: 12, x: 100, y: 100 }),
+    add('latest zoom already waiting', { z: 13, x: 200, y: 200 }),
+    add('old zoom second', { z: 12, x: 101, y: 100 }),
+    add('latest zoom new', { z: 13, x: 201, y: 200 }),
+  ];
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(queue.stats.queued, 4);
+  release(); await Promise.all([blocker, ...jobs]);
+  assert.deepEqual(seen, ['latest zoom already waiting', 'latest zoom new', 'old zoom first', 'old zoom second']);
+  queue.close();
+});
+
+test('large pans favour the new area while preserving other clients and request-before-prefetch priority', async () => {
+  const queue = new WorkQueue(1, 16), focus = createRequestFocus({ distance: 8 }), seen = [];
+  let release;
+  const blocker = queue.run(() => new Promise(resolve => { release = resolve; }));
+  const add = (name, client, tile, priority = PRIORITY.REQUEST) => queue.run(() => seen.push(name), {
+    ...focus.observe(client, tile).forTile(tile), priority,
+  });
+  const origin = { z: 12, x: 100, y: 100 }, distant = { ...origin, x: 120 };
+  const jobs = [add('old area', 'a', origin), add('other client', 'b', origin),
+    add('new area first', 'a', distant), add('new area second', 'a', { ...distant, x: 121 }),
+    add('current prefetch', 'a', distant, PRIORITY.NEIGHBOUR)];
+  await new Promise(resolve => setImmediate(resolve)); release();
+  await Promise.all([blocker, ...jobs]);
+  assert.deepEqual(seen, ['other client', 'new area first', 'new area second', 'old area', 'current prefetch']);
+  queue.close();
+});
 test('bound concurrency and backpressure while releasing failed jobs', async () => {
   const queue = new WorkQueue(1, 1); let release;
   const gate = new Promise(r => release = r); const events = [];

@@ -297,6 +297,82 @@ test('NSW grid outputs stay isolated when neighbouring tiles have different nati
   assert.deepEqual(jobs[1].outputs.map(t => t.x), [60001, 60001]);
   assert.notEqual(jobs[0].styleKey, jobs[1].styleKey);
 });
+test('request focus uses trusted client IPs and cache hits update existing render interests', async t => {
+  const seen = [];
+  const s = await server(t, { renderer: { close() {}, async render(job, interest) {
+    seen.push(interest); await atomicWrite(job.outPath, PNG);
+  } } }, { TRUSTED_PROXIES: '127.0.0.1/32', REQUEST_PAN_THRESHOLD: '3' });
+  const get = (tile, client) => fetch(s.url + '/raster/qld/' + tile + '.png', { headers: { 'X-Forwarded-For': client } });
+  assert.equal((await get('13/7578/4746', '192.0.2.1')).status, 200);
+  assert.equal((await get('14/15156/9492', '192.0.2.1')).status, 200);
+  assert.equal((await get('13/7579/4746', '192.0.2.2')).status, 200);
+  assert.deepEqual(seen.map(interest => interest.score()), [0, 2, 2]);
+  assert.equal((await get('13/7578/4746', '192.0.2.1')).status, 200);
+  assert.equal(seen.length, 3, 'the final request is a cache hit');
+  assert.deepEqual(seen.map(interest => interest.score()), [2, 0, 2]);
+  const status = await (await fetch(s.url + '/readyz')).json();
+  assert.equal(status.settings.requestPanThreshold, 3);
+  assert.doesNotMatch(JSON.stringify(status), /192\.0\.2\.[12]|7578|15156/);
+});
+
+test('untrusted forwarded addresses cannot split one client into separate focus buckets', async t => {
+  const seen = [];
+  const s = await server(t, { renderer: { close() {}, async render(job, interest) {
+    seen.push(interest); await atomicWrite(job.outPath, PNG);
+  } } });
+  await fetch(s.url + '/raster/qld/13/7578/4746.png', { headers: { 'X-Forwarded-For': '192.0.2.1' } });
+  await fetch(s.url + '/raster/qld/14/15156/9492.png', { headers: { 'X-Forwarded-For': '192.0.2.2' } });
+  assert.deepEqual(seen.map(interest => interest.score()), [0, 2]);
+});
+
+test('client cancellation before or during delivery counts one disconnect without an HTTP error stack', async t => {
+  for (const stage of ['rendering', 'delivery']) {
+    let started, release;
+    const began = new Promise(resolve => { started = resolve; });
+    const gate = new Promise(resolve => { release = resolve; });
+    t.after(() => release());
+    const s = await server(t, { renderer: { close() {}, async render(job) {
+      started();
+      if (stage === 'rendering') await gate;
+      await atomicWrite(job.outPath, stage === 'delivery' ? Buffer.concat([PNG, Buffer.alloc(16 * 1024 * 1024)]) : PNG);
+    } } });
+    const cursor = logger.read();
+    const request = http.get(s.url + '/raster/qld/13/7578/4746.png', response => {
+      response.once('data', () => response.destroy());
+    });
+    request.on('error', () => {});
+    const closed = new Promise(resolve => request.once('close', resolve));
+    await began;
+    if (stage === 'rendering') request.destroy();
+    await closed; release();
+    let status;
+    for (let i = 0; i < 100; i++) {
+      status = await (await fetch(s.url + '/readyz')).json();
+      if (status.requests.disconnected === 1 && status.prefetch.requests === 0) break;
+      await sleep(5);
+    }
+    // Give sendFile's deferred close callback a chance to settle as well.
+    await sleep(20);
+    assert.equal(status.requests.disconnected, 1);
+    assert.equal(status.requests.errors, 0);
+    assert.equal(status.requests.active, 0);
+    const logs = logger.read(cursor.next, cursor.session).entries.map(entry => entry.line).join('\n');
+    assert.match(logs, /Disconnected:/);
+    assert.doesNotMatch(logs, /\[HTTP\]/);
+    assert.equal((await fetch(s.url + '/healthz')).status, 200);
+  }
+});
+
+test('a transport-style error from a renderer is still reported while the client is connected', async t => {
+  const s = await server(t, { renderer: { close() {}, async render() {
+    throw Object.assign(new Error('fixture renderer write failed'), { code: 'EPIPE' });
+  } } });
+  const cursor = logger.read();
+  assert.equal((await fetch(s.url + '/raster/qld/13/7578/4746.png')).status, 502);
+  const logs = logger.read(cursor.next, cursor.session).entries.map(entry => entry.line).join('\n');
+  assert.match(logs, /\[HTTP\].*fixture renderer write failed/);
+});
+
 test('configuration and ArcGIS tile order are explicit', () => {
   assert.equal(loadConfig({}).tilePx, 1024);
   assert.equal(loadConfig({ TILE_PX: '512' }).tilePx, 512);
@@ -306,6 +382,10 @@ test('configuration and ArcGIS tile order are explicit', () => {
   assert.equal(loadConfig({ PREFETCH_RADIUS: '0' }).prefetchRadius, 0);
   assert.equal(loadConfig({ PREFETCH_RADIUS: '3' }).prefetchRadius, 3);
   assert.equal(loadConfig({ PREFETCH_RADIUS: '10' }).prefetchRadius, 10);
+  assert.equal(loadConfig({}).requestPanThreshold, 8);
+  assert.equal(loadConfig({ REQUEST_PAN_THRESHOLD: '3' }).requestPanThreshold, 3);
+  assert.throws(() => loadConfig({ REQUEST_PAN_THRESHOLD: '0' }), /REQUEST_PAN_THRESHOLD/);
+  assert.throws(() => loadConfig({ REQUEST_PAN_THRESHOLD: '1.5' }), /REQUEST_PAN_THRESHOLD/);
   for (const radius of ['-1', '1.5', '11', 'Infinity', 'invalid']) {
     assert.throws(() => loadConfig({ PREFETCH_RADIUS: radius }), /PREFETCH_RADIUS must be an integer between 0 and 10/);
   }
