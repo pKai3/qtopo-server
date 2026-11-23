@@ -127,6 +127,24 @@ test('reuse workers across tiles, deduplicate requests, and replace failed worke
   assert.equal(renderer.stats.spawned, 2);
 });
 
+test('replace an oversized worker after successful output and wait for it to exit before reusing its slot', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-memory-test-'));
+  const renderer = createRenderer({ renderConcurrency: 1, renderQueueLimit: 4, renderWorkerMaxRssMb: 256,
+    rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 2000 }, path.join(__dirname, 'fixtures/render-worker.js'));
+  t.after(async () => { renderer.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const tile = i => ({ outPath: path.join(root, `${i}.png`), recordPid: path.join(root, `${i}.pid`) });
+  await renderer.render({ ...tile(1), rssBytes: 256 * 1024 ** 2 });
+  await renderer.render({ ...tile(2), rssBytes: 100 * 1024 ** 2, assertExitedPidFile: tile(1).recordPid });
+  await renderer.render({ ...tile(3), rssBytes: 100 * 1024 ** 2 });
+  assert.notEqual(await fs.readFile(tile(1).recordPid, 'utf8'), await fs.readFile(tile(2).recordPid, 'utf8'));
+  assert.equal(await fs.readFile(tile(2).recordPid, 'utf8'), await fs.readFile(tile(3).recordPid, 'utf8'), 'reuse workers below the memory threshold');
+  assert.equal(renderer.stats.recycledForMemory, 1);
+  assert.equal(renderer.stats.peakWorkerRssBytes, 256 * 1024 ** 2);
+  assert.equal(renderer.stats.workerMaxRssBytes, 256 * 1024 ** 2);
+  assert.equal(renderer.stats.spawned, 2);
+  for (let i = 1; i <= 3; i++) assert.equal(await fs.readFile(tile(i).outPath, 'utf8'), 'rendered-test-output');
+});
+
 test('native worker crash output reaches the application log and subsequent work can recover', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-crash-test-'));
   const renderer = createRenderer({ renderConcurrency: 1, renderQueueLimit: 4, rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 2000 }, path.join(__dirname, 'fixtures/render-worker.js'));

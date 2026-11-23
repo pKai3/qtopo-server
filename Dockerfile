@@ -30,6 +30,11 @@ RUN npm run build:sprites && npm prune --omit=dev
 FROM base
 ARG BUILD_REVISION=development
 ENV BUILD_REVISION=$BUILD_REVISION
+# Parallelism comes from the render process pool. Do not multiply it by every
+# visible host CPU inside each Mesa process, or retain freed multi-MB buffers in
+# glibc's growing heaps. These remain overridable Docker environment settings.
+ENV LP_NUM_THREADS=1 MALLOC_ARENA_MAX=2 \
+    MALLOC_MMAP_THRESHOLD_=131072 MALLOC_TRIM_THRESHOLD_=131072
 LABEL org.opencontainers.image.revision=$BUILD_REVISION
 COPY --from=dependencies /usr/src/app/node_modules ./node_modules
 COPY . .
