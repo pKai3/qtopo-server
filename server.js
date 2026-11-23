@@ -4,6 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const L = require('./lib/logger');
 const { loadConfig } = require('./lib/config');
+const { profiles, getProfile } = require('./lib/profiles');
 const { createProviders, tileURL, parseTile, hash } = require('./lib/providers');
 const { createCache } = require('./lib/cache');
 const { cachedRaster, httpError } = require('./lib/utils');
@@ -42,16 +43,21 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   const prefetch = createPrefetch({
     radius: config.prefetchRadius, zoom: config.prefetchZoom, concurrency: config.prefetchConcurrency,
     limit: config.prefetchQueueLimit, logger: L,
-    zoomRange: id => id === 'auto' ? { minzoom: 0, maxzoom: providers.qld.maxzoom } : providers[id],
-    groupKey: (id, tile) => {
+    zoomRange: source => {
+      const [, id] = source.split(':');
+      return id === 'auto' ? { minzoom: 0, maxzoom: providers.qld.maxzoom } : providers[id];
+    },
+    groupKey: (source, tile) => {
+      const [profile, id] = source.split(':');
       // Only QLD has one vector style variant across the whole metatile.
       // NSW variants, border composites and image tiles retain per-tile slots.
       if (id !== 'qld' && !(id === 'auto' && coverage(tile).region === 'qld')) return;
       const layout = metatileLayout(tile, config);
-      return `qld/${tile.z}/${layout.x}/${layout.y}`;
+      return `${profile}/qld/${tile.z}/${layout.x}/${layout.y}`;
     },
-    render: async (id, tile, priority, rank, interest) => {
-      const result = await (id === 'auto' ? automaticRasterFile(tile, priority, rank, interest) : rasterFile(providers[id], tile, priority, rank, interest));
+    render: async (source, tile, priority, rank, interest) => {
+      const [profile, id] = source.split(':');
+      const result = await (id === 'auto' ? automaticRasterFile(tile, priority, rank, interest, profile) : rasterFile(providers[id], tile, priority, rank, interest, profile));
       requests.prefetched(result);
     },
   });
@@ -63,9 +69,10 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   });
   app.disable('x-powered-by');
   const shortTile = /^\/(\d+)\/(\d+)\/(\d+)\.png$/;
+  const profileTile = /^\/([a-z][a-z0-9-]*)\/(\d+)\/(\d+)\/(\d+)\.png$/;
   // Public map data can be used directly by Gaia and other browser clients.
   // Keep status/log endpoints outside this policy, and never enable credentials.
-  app.use(['/raster', '/vector', '/tiles_raster', '/tiles_vector', '/styles', '/style.json', '/fonts', '/resources', '/assets', '/api/providers', shortTile], (req, res, next) => {
+  app.use(['/raster', '/vector', '/tiles_raster', '/tiles_vector', '/styles', '/style.json', '/fonts', '/resources', '/assets', '/api/providers', shortTile, profileTile], (req, res, next) => {
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Expose-Headers', 'ETag, Retry-After');
     if (req.method === 'OPTIONS') {
@@ -77,7 +84,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     next();
   });
   app.use((req, res, next) => {
-    if (shortTile.test(req.path) || /^\/(raster|vector|tiles_raster|tiles_vector)\//.test(req.path)) {
+    if (shortTile.test(req.path) || profileTile.test(req.path) || /^\/(raster|vector|tiles_raster|tiles_vector)\//.test(req.path)) {
       const started = Date.now();
       L.log('REQ', `${req.method} ${req.path}`);
       res.once('finish', () => L.log('RES', `${res.statusCode} ${req.path} (${Date.now() - started} ms)`));
@@ -98,6 +105,11 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     const p = Object.hasOwn(providers, id) ? providers[id] : null;
     if (!p || (type && p.type !== type)) throw httpError('Unknown map provider', 404);
     return p;
+  }
+  function profileFor(req) {
+    const id = req.params.profile || config.defaultProfile;
+    if (!getProfile(id)) throw httpError('Unknown map profile', 404);
+    return id;
   }
   function coordinates(req, p) {
     const tile = parseTile(req.params, p.maxzoom);
@@ -124,13 +136,13 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     if (result.empty) return res.status(204).end();
     await sendFile(res, result.path, 'application/x-protobuf');
   }
-  async function styleForRaster(p, tile) {
-    const prepared = await styles.get(p);
+  async function styleForRaster(p, tile, profile) {
+    const prepared = await styles.get(p, profile);
     return p.tileMap ? prepared.atZoom(await nativeZoom(p, tile)) : prepared;
   }
   const renderTag = priority => ['RDR', 'PREFETCH', 'PREFETCH-Z'][priority];
-  async function rasterFile(p, tile, priority = PRIORITY.REQUEST, rank = 0, interest) {
-    const { style, revision } = await styleForRaster(p, tile);
+  async function rasterFile(p, tile, priority = PRIORITY.REQUEST, rank = 0, interest, profile = config.defaultProfile) {
+    const { style, revision } = await styleForRaster(p, tile, profile);
     const outPath = path.join(config.rasterDir, 'v2', p.id, revision, String(tile.z), String(tile.x), `${tile.y}.png`);
     let cached = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
     const hit = !!cached;
@@ -150,7 +162,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
         // Sparse NSW coverage can change source zoom within a grid. Only save
         // siblings that use this exact style variant; never cache reduced detail
         // under another tile's higher-resolution revision.
-        const variants = p.tileMap ? await Promise.all(layout.tiles.map(t => styleForRaster(p, t))) : layout.tiles.map(() => ({ revision }));
+        const variants = p.tileMap ? await Promise.all(layout.tiles.map(t => styleForRaster(p, t, profile))) : layout.tiles.map(() => ({ revision }));
         const outputs = layout.tiles.filter((_, i) => variants[i].revision === revision).map(t => ({
           ...t, outPath: path.join(config.rasterDir, 'v2', p.id, revision, String(t.z), String(t.x), `${t.y}.png`),
         }));
@@ -178,6 +190,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     await serveRaster(req, res);
   }
   async function serveRaster(req, res, p) {
+    const profile = profileFor(req);
     if (actions.cacheBusy) throw httpError('Rendered tiles are being cleared; please retry shortly.', 503);
     const tile = coordinates(req, p || providers.qld);
     activeRasterRequests++;
@@ -185,29 +198,29 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     res.once('finish', () => measured.finish(res.statusCode, false, res.statusCode === 304 ? 0 : res.getHeader('content-length')));
     res.once('close', () => { if (!res.writableFinished) measured.finish(res.statusCode, true); });
     const focus = requestFocus.observe(req.ip, tile), interest = focus.forTile(tile);
-    const finish = prefetch.begin(p?.id || 'auto', tile, focus);
+    const finish = prefetch.begin(`${profile}:${p?.id || 'auto'}`, tile, focus);
     let success = false;
     try {
-      const result = await (p ? rasterFile(p, tile, PRIORITY.REQUEST, 0, interest) : automaticRasterFile(tile, PRIORITY.REQUEST, 0, interest));
+      const result = await (p ? rasterFile(p, tile, PRIORITY.REQUEST, 0, interest, profile) : automaticRasterFile(tile, PRIORITY.REQUEST, 0, interest, profile));
       if (req.aborted || res.destroyed) return;
       measured.ready(result);
       await deliverRaster(res, result);
       success = true;
     } finally { activeRasterRequests--; finish(success); }
   }
-  async function automaticRasterFile(tile, priority = PRIORITY.REQUEST, rank = 0, interest) {
+  async function automaticRasterFile(tile, priority = PRIORITY.REQUEST, rank = 0, interest, profile = config.defaultProfile) {
     const area = coverage(tile);
     if (priority === PRIORITY.REQUEST) L.log('AUTO', `${tile.z}/${tile.x}/${tile.y}: ${area.region === 'border' ? 'QLD + NSW border' : area.region.toUpperCase()} vectors`);
-    if (area.region === 'qld') return rasterFile(providers.qld, tile, priority, rank, interest);
-    if (area.region === 'nsw') return rasterFile(providers.nsw, tile, priority, rank, interest);
-    const [qldStyle, nswStyle] = await Promise.all([styleForRaster(providers.qld, tile), styleForRaster(providers.nsw, tile)]);
+    if (area.region === 'qld') return rasterFile(providers.qld, tile, priority, rank, interest, profile);
+    if (area.region === 'nsw') return rasterFile(providers.nsw, tile, priority, rank, interest, profile);
+    const [qldStyle, nswStyle] = await Promise.all([styleForRaster(providers.qld, tile, profile), styleForRaster(providers.nsw, tile, profile)]);
     const revision = hash(JSON.stringify({ version: 2, boundaryRevision, qld: qldStyle.revision, nsw: nswStyle.revision }));
     const outPath = path.join(config.rasterDir, 'v2', 'auto', revision, String(tile.z), String(tile.x), `${tile.y}.png`);
     let cached = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
     const hit = !!cached;
     if (!cached) {
       L.log(renderTag(priority), `Generating border tile: ${outPath}`);
-      const [backgroundPath, foregroundPath] = await Promise.all([rasterFile(providers.qld, tile, priority, rank, interest), rasterFile(providers.nsw, tile, priority, rank, interest)]);
+      const [backgroundPath, foregroundPath] = await Promise.all([rasterFile(providers.qld, tile, priority, rank, interest, profile), rasterFile(providers.nsw, tile, priority, rank, interest, profile)]);
       const rect = [0, 0, config.tilePx, config.tilePx];
       await renderer.render({ ...tile, outPath, priority, rank, size: config.tilePx, kind: 'composite', backgroundPath: backgroundPath.path, images: [{ path: foregroundPath.path, source: rect, destination: rect }], clip: area.rings }, interest);
       cached = await cachedRaster(outPath, config.rasterTTL, config.emptyTTL);
@@ -218,7 +231,8 @@ async function createApp(config = loadConfig(), dependencies = {}) {
 
   app.get('/api/providers', (req, res) => {
     res.set('Cache-Control', 'no-cache').json({
-      defaultProvider: config.defaultProvider,
+      defaultProvider: config.defaultProvider, defaultProfile: config.defaultProfile,
+      profiles: profiles.map(p => ({ id: p.id, name: p.name, factor: p.factor, refined: p.refined, raster: `${origin(req)}/${p.id}/{z}/{x}/{y}.png` })),
       automatic: { raster: `${origin(req)}/raster/{z}/{x}/{y}.png`, tileSize: config.tilePx, maxzoom: providers.qld.maxzoom, bounds: [137.8, -37.6, 162.7, -9], attribution: `${providers.qld.attribution}; ${providers.nsw.attribution}` },
       providers: Object.values(providers).map(p => ({
         id: p.id, name: p.name, type: p.type, bounds: p.bounds, center: p.center, zoom: p.zoom,
@@ -230,16 +244,22 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   });
   async function style(req, res) {
     const p = providerFor(req);
-    res.set('Cache-Control', 'no-cache').json(absoluteStyle((await styles.get(p)).style, origin(req)));
+    res.set('Cache-Control', 'no-cache').json(absoluteStyle((await styles.get(p, profileFor(req))).style, origin(req)));
   }
   app.get('/style.json', style);
   app.get('/styles/:provider.json', style);
+  app.get('/styles/:profile/:provider.json', style);
   app.get('/vector/:provider/:z/:x/:y.pbf', vector);
   app.get('/vector/:z/:x/:y.pbf', vector);
+  app.get('/raster/:profile/:provider/:z/:x/:y.png', raster);
   app.get('/raster/:provider/:z/:x/:y.png', raster);
   app.get('/raster/:z/:x/:y.png', automaticRaster);
   app.get(shortTile, (req, res) => {
     req.params = { z: req.params[0], x: req.params[1], y: req.params[2] };
+    return automaticRaster(req, res);
+  });
+  app.get(profileTile, (req, res) => {
+    req.params = { profile: req.params[0], z: req.params[1], x: req.params[2], y: req.params[3] };
     return automaticRaster(req, res);
   });
   for (const [old, current, extension] of [['tiles_raster', 'raster', 'png'], ['tiles_vector', 'vector', 'pbf']]) {
@@ -274,7 +294,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   function status() { return {
     status: 'ok', startedAt, version: require('./package.json').version,
     revision: process.env.BUILD_REVISION || 'development',
-    settings: { tilePx: config.tilePx, metatileSize: config.metatileSize, renderBufferPx: config.renderBufferPx, pngCompression: config.pngCompression, renderConcurrency: config.renderConcurrency, renderQueueLimit: config.renderQueueLimit, requestPanThreshold: config.requestPanThreshold, upstreamConcurrency: config.upstreamConcurrency, prefetchConcurrency: config.prefetchConcurrency, prefetchQueueLimit: config.prefetchQueueLimit, prefetchRadius: config.prefetchRadius, prefetchZoom: config.prefetchZoom },
+    settings: { defaultProfile: config.defaultProfile, tilePx: config.tilePx, metatileSize: config.metatileSize, renderBufferPx: config.renderBufferPx, pngCompression: config.pngCompression, renderConcurrency: config.renderConcurrency, renderQueueLimit: config.renderQueueLimit, requestPanThreshold: config.requestPanThreshold, upstreamConcurrency: config.upstreamConcurrency, prefetchConcurrency: config.prefetchConcurrency, prefetchQueueLimit: config.prefetchQueueLimit, prefetchRadius: config.prefetchRadius, prefetchZoom: config.prefetchZoom },
     providers: Object.keys(providers), renderer: renderer.stats, cache: cache.stats, prefetch: prefetch.stats,
     requests: requests.stats, styles: styles.stats,
   }; }
