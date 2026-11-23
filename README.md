@@ -147,6 +147,7 @@ Additional endpoints:
 | LABEL_SCALE | 1 | Legacy extra raster text/icon multiplier, 0.5–3, applied on top of every profile; keep 1 when comparing named profiles. |
 | VECTOR_UPSTREAM | QLD service | Optional QLD template containing {z}, {x}, {y} |
 | RENDER_CONCURRENCY | 2 | Maximum simultaneous reusable native workers, 1–16 |
+| RENDER_WORKER_MAX_RSS_MB | 384 | Replace a worker after its completed render if resident memory reaches this many MiB (64–4096). The old process exits before its slot is reused. This bounds retention between jobs, not peak memory during a single render; keep a Docker RAM limit as well. |
 | LP_NUM_THREADS | 1 (Docker) | Mesa software-rendering threads per worker. Independent of `RENDER_CONCURRENCY`; avoids multiplying each worker by the host CPU count. |
 | MALLOC_ARENA_MAX | 2 (Docker) | Limit glibc allocator arenas per process to reduce retained native memory. |
 | MALLOC_MMAP_THRESHOLD_ | 131072 (Docker) | Allocate large native buffers separately so freeing them can return their memory to the OS. Bytes; explicit setting prevents the threshold growing with repeated renders. |

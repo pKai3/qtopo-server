@@ -37,7 +37,7 @@ async function main() {
   // Observe monitor failures promptly; await it again in finally to propagate.
   monitor.catch(() => { stop = true; });
   try {
-    for (const x of [15126, 15134, 15142, 15150, 15158, 15166]) {
+    for (const x of [15110, 15118, 15126, 15134, 15142, 15150, 15158, 15166, 15174, 15182]) {
       const started = Date.now();
       // One request per 2x2 grid starts eight independent renders. Prefetch is
       // enabled as in production, and the next pan arrives before it goes idle.
@@ -66,6 +66,7 @@ async function main() {
     assert.equal(after.startedAt, before.startedAt);
     assert.equal(after.renderer.peakActive, 8, 'must exercise all eight native workers');
     assert.equal(after.requests.errors, 0);
+    assert.ok(after.renderer.recycledForMemory > 0, 'must exercise replacement of retained native memory');
     report.after = after;
     report.events = counters(await fs.readFile('/sys/fs/cgroup/memory.events', 'utf8'));
     assert.equal(report.events.oom, initialEvents.oom, 'no allocation failures');

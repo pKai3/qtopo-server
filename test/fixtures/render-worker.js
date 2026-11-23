@@ -7,6 +7,12 @@ process.on('message', async job => {
   if (job.hang) return setInterval(() => {}, 1000);
   if (job.fail) return process.send({ error: 'fixture failure' });
   if (job.recordPid) fs.writeFileSync(job.recordPid, String(process.pid));
+  if (job.assertExitedPidFile) {
+    try {
+      process.kill(Number(fs.readFileSync(job.assertExitedPidFile, 'utf8')), 0);
+      return process.send({ error: 'replacement started before previous worker exited' });
+    } catch (err) { if (err.code !== 'ESRCH') throw err; }
+  }
   while (job.gate && !fs.existsSync(job.gate)) await new Promise(resolve => setTimeout(resolve, 5));
   for (const tile of job.outputs || [job]) {
     fs.mkdirSync(require('node:path').dirname(tile.outPath), { recursive: true });
@@ -15,5 +21,5 @@ process.on('message', async job => {
     if (job.failAfterFirst) return process.send({ error: 'fixture partial failure' });
     while (job.encodeGate && !fs.existsSync(job.encodeGate)) await new Promise(resolve => setTimeout(resolve, 5));
   }
-  process.send({ done: true, timings: job.timings });
+  process.send({ done: true, timings: job.timings, rssBytes: job.rssBytes });
 });
