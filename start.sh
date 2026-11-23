@@ -4,6 +4,7 @@ export DATA_DIR="${DATA_DIR:-/data}"
 export VECTOR_DIR="${VECTOR_DIR:-$DATA_DIR/vector}"
 export RASTER_DIR="${RASTER_DIR:-$DATA_DIR/raster}"
 export STYLE_DIR="${STYLE_DIR:-$DATA_DIR/styles}"
+export PROFILE_DIR="${PROFILE_DIR:-$DATA_DIR/profiles}"
 # Numeric Unraid users may not have a writable home directory. Share compiled
 # shaders across workers in the mounted data directory instead.
 export MESA_SHADER_CACHE_DIR="${MESA_SHADER_CACHE_DIR:-$DATA_DIR/resources/mesa}"
@@ -11,16 +12,16 @@ umask 0002
 # Unraid normally uses nobody:users (99:100). Ownership changes are opt-in.
 if [[ "$(id -u)" == 0 && -n "${PUID:-}" ]]; then
   [[ "$PUID" =~ ^[0-9]+$ && "$PUID" -gt 0 && "${PGID:-}" =~ ^[0-9]+$ ]] || { echo "PUID and PGID must both be numeric"; exit 2; }
-  for dir in "$DATA_DIR" "$VECTOR_DIR" "$RASTER_DIR" "$STYLE_DIR" "$DATA_DIR/resources" "$MESA_SHADER_CACHE_DIR"; do
+  for dir in "$DATA_DIR" "$VECTOR_DIR" "$RASTER_DIR" "$STYLE_DIR" "$PROFILE_DIR" "$DATA_DIR/resources" "$MESA_SHADER_CACHE_DIR"; do
     mkdir -p "$dir"
     chown "$PUID:$PGID" "$dir"
   done
   if [[ "${FIX_PERMISSIONS:-0}" == 1 ]]; then
-    chown -R "$PUID:$PGID" "$DATA_DIR" "$VECTOR_DIR" "$RASTER_DIR" "$STYLE_DIR"
+    chown -R "$PUID:$PGID" "$DATA_DIR" "$VECTOR_DIR" "$RASTER_DIR" "$STYLE_DIR" "$PROFILE_DIR"
   fi
   exec gosu "$PUID:$PGID" "$0" "$@"
 fi
-mkdir -p "$VECTOR_DIR" "$RASTER_DIR" "$STYLE_DIR" "$MESA_SHADER_CACHE_DIR"
+mkdir -p "$VECTOR_DIR" "$RASTER_DIR" "$STYLE_DIR" "$PROFILE_DIR" "$MESA_SHADER_CACHE_DIR"
 # Workers connect only while rendering. Keep the display alive between jobs so
 # disconnecting the last worker does not reset it and recompile the keyboard map.
 # Let Xvfb select a free display instead of trusting an old :99 socket after a
