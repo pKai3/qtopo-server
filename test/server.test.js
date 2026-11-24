@@ -348,6 +348,43 @@ test('untrusted forwarded addresses cannot split one client into separate focus 
   assert.deepEqual(seen.map(interest => interest.score()), [0, 2]);
 });
 
+test('cancellation during live profile discovery releases the request without starting render work', async t => {
+  let started, release, renders = 0;
+  const began = new Promise(resolve => { started = resolve; });
+  const gate = new Promise(resolve => { release = resolve; });
+  t.after(() => release());
+  const s = await server(t, { renderer: { close() {}, async render(job) {
+    renders++; await atomicWrite(job.outPath, PNG);
+  } } });
+  const readdir = fs.readdir;
+  t.mock.method(fs, 'readdir', async (...args) => {
+    if (args[0] === s.config.profileDir) { started(); await gate; }
+    return readdir(...args);
+  });
+  // Let the catalog's 250 ms freshness window expire so this request rescans.
+  await sleep(260);
+  const request = http.get(s.url + '/raster/qld/13/7578/4746.png');
+  request.on('error', () => {});
+  const closed = new Promise(resolve => request.once('close', resolve));
+  await began;
+  request.destroy(); await closed;
+  // Observe the close before allowing discovery to return.
+  let status;
+  for (let i = 0; i < 100; i++) {
+    status = await (await fetch(s.url + '/readyz')).json();
+    if (status.requests.disconnected === 1) break;
+    await sleep(5);
+  }
+  assert.equal(status.requests.disconnected, 1);
+  assert.equal(status.requests.active, 0);
+  release();
+  await fetch(s.url + '/api/providers'); // Wait for the shared scan to settle.
+  status = await (await fetch(s.url + '/readyz')).json();
+  assert.equal(status.requests.active, 0);
+  assert.equal(status.prefetch.requests, 0);
+  assert.equal(renders, 0);
+});
+
 test('client cancellation before or during delivery counts one disconnect without an HTTP error stack', async t => {
   for (const stage of ['rendering', 'delivery']) {
     let started, release;

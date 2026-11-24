@@ -201,14 +201,17 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     await serveRaster(req, res);
   }
   async function serveRaster(req, res, p) {
+    // Listen before style discovery can yield: the client may disconnect while
+    // the live catalog is being read, before any rendering has started.
+    const measured = requests.begin();
+    res.once('finish', () => measured.finish(res.statusCode, false, res.statusCode === 304 ? 0 : res.getHeader('content-length')));
+    res.once('close', () => { if (!res.writableFinished) measured.finish(res.statusCode, true); });
     const profile = await profileFor(req);
+    if (req.aborted || res.destroyed) return;
     if (actions.cacheBusy) throw httpError('Rendered tiles are being cleared; please retry shortly.', 503);
     const tile = coordinates(req, p || providers.qld);
     L.log('PROFILE', `${profile.id} ${tile.z}/${tile.x}/${tile.y}`);
     activeRasterRequests++;
-    const measured = requests.begin();
-    res.once('finish', () => measured.finish(res.statusCode, false, res.statusCode === 304 ? 0 : res.getHeader('content-length')));
-    res.once('close', () => { if (!res.writableFinished) measured.finish(res.statusCode, true); });
     const focus = requestFocus.observe(req.ip, tile), interest = focus.forTile(tile);
     const finish = prefetch.begin(`${profile.id}@${profile.token}:${p?.id || 'auto'}`, tile, focus);
     let success = false;

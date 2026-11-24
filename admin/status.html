@@ -19,7 +19,7 @@
     </section>
     <section class="panel queue-panel" aria-labelledby="queue-heading">
       <div class="queue-heading"><h2 id="queue-heading">Render queue</h2><label class="flyby-control"><input id="flyby-toggle" type="checkbox" disabled> Tile flyby</label></div>
-      <p id="flyby-status" class="hint">Connecting to tile flyby…</p>
+      <p id="flyby-status" class="hint">A sample of fresh renders drifting up the right edge. Cached tiles do not appear here.</p>
       <div class="queue-charts">
         <div class="queue-chart">
           <div class="stack-heading"><h3>Rendering</h3><span id="rendering-total">— workers busy</span></div>
@@ -66,6 +66,6 @@
     </details>
     <footer><span id="release">Release —</span><a href="/readyz">View raw status</a></footer>
   </main>
-  <aside id="flyby-lane" hidden aria-hidden="true"><div class="flyby-title">Fresh tiles <span>New renders</span></div><div id="flyby-tiles"></div></aside>
+  <aside id="flyby-lane" hidden aria-hidden="true"><div class="flyby-title">Fresh tiles <span id="flyby-state">Waiting for renders</span></div><div id="flyby-tiles"></div></aside>
 </body>
 </html>

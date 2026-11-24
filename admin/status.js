@@ -146,8 +146,7 @@ function updateFlyby() {
   const enabled = flybyWanted && flybyAllowed;
   $('flyby-toggle').checked = enabled;
   $('flyby-lane').hidden = !enabled;
-  document.body.classList.toggle('flyby-enabled', enabled);
-  text($('flyby-status'), !flybyAllowed ? 'Tile flyby is temporarily unavailable.' : enabled ? 'Waiting for fresh renders… Cached tiles do not appear here.' : 'Show newly rendered tiles drifting up the right edge.');
+  text($('flyby-state'), !flybyAllowed ? 'Unavailable' : 'Waiting for renders');
   if (enabled && !document.hidden) refreshFlyby();
 }
 function showTile(entry) {
@@ -177,9 +176,9 @@ async function refreshFlyby() {
     if (controller.signal.aborted) return;
     flybySession = data.session; flybyCursor = data.next;
     for (const entry of data.entries) showTile(entry);
-    if (data.entries.length) text($('flyby-status'), 'Live · a sample of fresh renders. Cached tiles do not appear here.');
+    if (data.entries.length) text($('flyby-state'), 'Live');
   } catch (error) {
-    if (!controller.signal.aborted) text($('flyby-status'), 'Tile flyby is temporarily unavailable.');
+    if (!controller.signal.aborted) text($('flyby-state'), 'Unavailable');
   } finally {
     clearTimeout(timeout);
     if (flybyController === controller) {
