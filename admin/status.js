@@ -66,7 +66,7 @@ async function refresh() {
     $('download-detail').textContent = `${number(c.downloads.queued)} queued · ${number(c.errors)} errors since restart`;
     const summaries = [
       ['Cached tile ready', q.cachedTimings.readyMs], ['Cached response', q.cachedTimings.responseMs],
-      ['All tile responses', q.timings.responseMs], ['Render queue', r.timings.queueMs],
+      ['All tile responses', q.timings.responseMs], ['Requested render queue', r.requestedTimings?.queueMs], ['All render queue', r.timings.queueMs],
       ['First tile ready', r.timings.firstTileMs], ['Worker elapsed', r.timings.workerMs], ['Resource waiting', r.timings.resourceWaitMs],
       ['PNG encoding', r.timings.encodeMs], ['Worker CPU', r.timings.cpuMs],
     ];
