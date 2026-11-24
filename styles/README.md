@@ -79,6 +79,11 @@ The icon and name share a symbol to prevent self-collision. Two combined rules
 all other layers, including 1 m contours, retain their existing source resolution.
 Verified with native previews at West End z18, UQ St Lucia z19 and Guyatt Park z17.
 
+All five named styles show full 1 m contour elevation labels from z17. Mobile
+downloads do not need z18 or z19 to obtain those labels. The 5 m contours remain;
+the former z17 overview filter only admitted multiples of five from an
+intermediate-contour class that contains the elevations between them.
+
 NSW colors in Readable, Mobile 2x, Mobile 3x and their Light derivatives now use
 the corresponding QLD palette. Open land is tan, water blue, protected land
 muted green, contours brown, and road colors follow the same hierarchy. These
