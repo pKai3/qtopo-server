@@ -19,25 +19,24 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Preserve the previous stable image and promote the approved release
+      - name: Promote the approved unguarded comparison release
         shell: bash
         run: |
           set -euo pipefail
           image=pkai3/qtopo-server
-          previous=sha256:084289494298734ba34fc894f119bf956e2228e1e50ad3c9574f2721dcdd24e1
-          approved=sha256:0393cd2d9e38100f05c9ab47a6a537becb8c9cecdec4f55ec1153d5c1c1647e3
+          previous=sha256:0393cd2d9e38100f05c9ab47a6a537becb8c9cecdec4f55ec1153d5c1c1647e3
+          approved=sha256:8068794e9898c40956068a275b4a839cf616065b1af6cec5b53bd60be390ebfe
           fallback=sha256:c321de21fd723fea8d30e9cee16043fb662c3a5df66bdae54acfb3439c9731eb
           digest() { docker buildx imagetools inspect "$image:$1" | awk '/^Digest:/ {print $2}'; }
-          test "$(digest latest)" = "$approved"
+          test "$(digest sha-5d5f2ae)" = "$approved"
           test "$(digest fallback)" = "$fallback"
+          latest=$(digest latest)
           current=$(digest stable)
           test "$current" = "$previous" || test "$current" = "$approved"
           # Retag the exact tested manifests. Do not rebuild or wrap a single
           # manifest in a new index, which would change its digest.
-          docker buildx imagetools create --prefer-index=false --tag "$image:stable-before-15a5c79" "$image@$previous"
-          test "$(digest stable-before-15a5c79)" = "$previous"
           docker buildx imagetools create --prefer-index=false --tag "$image:stable" "$image@$approved"
           test "$(digest stable)" = "$approved"
-          test "$(digest latest)" = "$approved"
+          test "$(digest latest)" = "$latest"
           test "$(digest fallback)" = "$fallback"
           docker buildx imagetools inspect "$image:stable"

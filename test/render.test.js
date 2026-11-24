@@ -332,3 +332,23 @@ test('speculative work yields under memory pressure even without a waiting clien
   assert.equal(renderer.stats.yieldedPrefetch, 0);
   assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' });
 });
+
+test('client queue attribution follows shared and promoted renders without exposing tile keys', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-client-queue-'));
+  const renderer = createRenderer({renderConcurrency:1,renderQueueLimit:8,rasterTTL:10000,emptyTTL:1000,renderTimeoutMs:5000}, path.join(__dirname,'fixtures/render-worker.js'));
+  t.after(async()=>{renderer.close();await fs.rm(root,{recursive:true,force:true});});
+  const focus=createRequestFocus(),tile={z:16,x:60500,y:38000};
+  const a=focus.observe('192.0.2.1',tile),b=focus.observe('192.0.2.2',tile);
+  const gate=path.join(root,'go');
+  const active=renderer.render({outPath:path.join(root,'active.png'),gate},a.forTile(tile));
+  const job={outPath:path.join(root,'shared.png'),priority:PRIORITY.ZOOM};
+  const waiting=renderer.render(job,a.forTile(tile));
+  assert.equal(renderer.render({...job,priority:PRIORITY.REQUEST},b.forTile(tile)),waiting);
+  const rows=renderer.clientQueues;
+  assert.equal(rows.find(row=>row.id==='client-1').rendering.requested,1);
+  assert.equal(rows.find(row=>row.id==='shared').waiting.requested,1);
+  assert.equal(rows.reduce((n,row)=>n+Object.values(row.rendering).reduce((a,b)=>a+b,0),0),renderer.stats.active);
+  assert.equal(rows.reduce((n,row)=>n+Object.values(row.waiting).reduce((a,b)=>a+b,0),0),renderer.stats.queued);
+  assert.doesNotMatch(JSON.stringify(rows),/192\.0\.2|60500|38000/);
+  await fs.writeFile(gate,'go'); await Promise.all([active,waiting]);
+});

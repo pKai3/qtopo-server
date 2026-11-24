@@ -32,13 +32,79 @@ function stack(id, counts, capacity) {
   text($(`${id}-total`), id === 'rendering' ? `${number(total)} of ${number(capacity)} workers busy` : `${number(total)} work items waiting`);
   text($(`${id}-space`), id === 'rendering' ? `${number(remaining)} idle ${remaining === 1 ? 'worker' : 'workers'} · grey space` : `Scale: ${number(capacity)} combined queue spaces · grey is unused`);
 }
+let splitClients = false, clientSession;
+try { splitClients = localStorage.getItem('qtopo-client-queues') === 'on'; } catch {}
+const clientRows = new Map();
+function renderClientQueues(data) {
+  if (!splitClients) return;
+  const list = $('client-queue-list'), now = performance.now();
+  if (clientSession !== data.startedAt) {
+    for (const row of clientRows.values()) row.element.remove();
+    clientRows.clear(); clientSession = data.startedAt;
+  }
+  const live = new Map((data.clientQueues || []).map(row => [row.id, row]));
+  for (const [id, counts] of live) {
+    if (!clientRows.has(id)) {
+      const element = document.createElement('article'), title = document.createElement('h4');
+      element.className = 'client-queue';
+      title.textContent = id === 'shared' ? 'Shared' : id === 'other' ? 'Other work' : `Client ${id.slice(7)}`;
+      element.append(title);
+      const stages = {};
+      for (const state of ['rendering', 'waiting']) {
+        const section = document.createElement('div'), heading = document.createElement('div');
+        const bar = document.createElement('div'), legend = document.createElement('ul');
+        heading.className = 'stack-heading'; bar.className = 'stack'; bar.setAttribute('role', 'img');
+        legend.className = 'stack-counts';
+        const parts = {};
+        for (const [key, label] of [['requested', 'Requested'], ['neighbours', 'Nearby'], ['zoom', 'Zoom']]) {
+          const segment = document.createElement('span'), item = document.createElement('li');
+          const swatch = document.createElement('i'), count = document.createElement('strong');
+          segment.className = swatch.className = key; swatch.setAttribute('aria-hidden', 'true');
+          item.append(swatch, label + ' ', count); legend.append(item); bar.append(segment);
+          parts[key] = { segment, count };
+        }
+        section.append(heading, bar, legend); element.append(section);
+        stages[state] = { heading, bar, parts };
+      }
+      clientRows.set(id, { element, stages });
+      list.append(element);
+    }
+    clientRows.get(id).seen = now;
+  }
+  for (const [id, row] of clientRows) {
+    // Keep brief gaps from making the rows flicker between successive pans.
+    if (!live.has(id) && (now - row.seen > 10000 || clientRows.size > Math.max(32, live.size))) { row.element.remove(); clientRows.delete(id); continue; }
+    for (const [state, stage] of Object.entries(row.stages)) {
+      const counts = live.get(id)?.[state] || { requested: 0, neighbours: 0, zoom: 0 };
+      const total = counts.requested + counts.neighbours + counts.zoom;
+      const capacity = state === 'rendering' ? data.renderer.concurrency : data.settings.renderQueueLimit + (data.prefetch.enabled ? data.settings.prefetchQueueLimit : 0);
+      const scale = Math.max(1, capacity, total), label = state === 'rendering' ? 'Rendering' : 'Waiting';
+      text(stage.heading, `${label} · ${total}`);
+      stage.bar.style.setProperty('--slot-size', `${100 / scale}%`);
+      stage.bar.setAttribute('aria-label', `${label}: ${counts.requested} requested, ${counts.neighbours} nearby, ${counts.zoom} zoom`);
+      for (const [key, part] of Object.entries(stage.parts)) {
+        part.segment.style.width = `${100 * counts[key] / scale}%`; text(part.count, counts[key]);
+      }
+    }
+  }
+  $('clients-empty').hidden = clientRows.size > 0;
+}
+$('clients-toggle').checked = splitClients;
+$('client-queues').hidden = !splitClients;
+$('clients-toggle').addEventListener('change', () => {
+  splitClients = $('clients-toggle').checked;
+  $('client-queues').hidden = !splitClients;
+  try { localStorage.setItem('qtopo-client-queues', splitClients ? 'on' : 'off'); } catch {}
+  refresh();
+});
+
 let previous, timer, loading = false;
 async function refresh() {
   clearTimeout(timer);
   if (document.hidden || loading) return;
   loading = true;
   try {
-    const response = await fetch('/readyz', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+    const response = await fetch('/readyz' + (splitClients ? '?clients=1' : ''), { cache: 'no-store', signal: AbortSignal.timeout(10000) });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     const r = data.renderer, c = data.cache, p = data.prefetch, q = data.requests, s = data.settings;
@@ -47,7 +113,7 @@ async function refresh() {
     text($('updated'), `Updated ${new Date().toLocaleTimeString()}`);
     $('error').hidden = true;
     $('workers').textContent = `${r.active} / ${r.concurrency}`;
-    $('workers-detail').textContent = `${r.workers} processes · peak ${r.peakActive} busy`;
+    $('workers-detail').textContent = r.active ? `${r.workers} processes · ${r.idleWorkers ?? 0} idle · peak ${r.peakActive} busy` : `${r.idleWorkers ?? r.workers} workers kept ready · peak ${r.peakActive} busy`;
     $('memory-detail').textContent = r.memory?.enabled
       ? r.memory.readFailed ? 'Waiting for a valid memory reading.'
         : `Memory ${bytes(r.memory.workingBytes)} / ${bytes(r.memory.limitBytes)} · peak ${bytes(r.memory.peakWorkingBytes)}. Concurrency adjusts to available memory.`
@@ -72,6 +138,7 @@ async function refresh() {
     ];
     rows($('timings'), summaries.map(([label, value]) => [label, ms(value?.p50), ms(value?.p95)]));
     $('samples').textContent = `Recent samples: ${q.cachedTimings.samples} cached responses, ${q.timings.samples} total responses, ${r.timings.samples} renders. Each window holds up to 256 samples.`;
+    renderClientQueues(data);
     stack('rendering', r.activeByPriority, r.concurrency);
     stack('waiting', waiting, s.renderQueueLimit + (p.enabled ? s.prefetchQueueLimit : 0));
     $('prefetch').textContent = p.enabled ? `Radius ${s.prefetchRadius} · up to ${p.concurrency} workers · zoom prefetch ${p.zoomEnabled ? 'enabled, lowest priority' : 'disabled'}.` : 'Prefetch is disabled.';
