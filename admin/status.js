@@ -43,11 +43,15 @@ async function refresh() {
     const data = await response.json();
     const r = data.renderer, c = data.cache, p = data.prefetch, q = data.requests, s = data.settings;
     const busy = q.active || r.active || c.activeDownloads;
-    $('activity').textContent = busy ? 'Working' : r.queued || p.queued ? 'Waiting' : 'Idle';
+    $('activity').textContent = r.memory?.limited ? 'Memory limited' : busy ? 'Working' : r.queued || p.queued ? 'Waiting' : 'Idle';
     text($('updated'), `Updated ${new Date().toLocaleTimeString()}`);
     $('error').hidden = true;
     $('workers').textContent = `${r.active} / ${r.concurrency}`;
     $('workers-detail').textContent = `${r.workers} processes · peak ${r.peakActive} busy`;
+    $('memory-detail').textContent = r.memory?.enabled
+      ? r.memory.readFailed ? 'Waiting for a valid memory reading.'
+        : `Memory ${bytes(r.memory.workingBytes)} / ${bytes(r.memory.limitBytes)} · peak ${bytes(r.memory.peakWorkingBytes)}. Concurrency adjusts to available memory.`
+      : 'Set a container memory limit to enable memory-aware concurrency.';
     $('workers-meter').style.width = `${100 * r.active / r.concurrency}%`;
     $('hit-rate').textContent = q.hitPercent == null ? '—' : `${q.hitPercent}%`;
     $('cache-detail').textContent = `${number(q.hits)} cached · ${number(q.misses)} required preparation`;

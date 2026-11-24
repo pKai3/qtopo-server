@@ -42,6 +42,13 @@ jobs:
           build-args: BUILD_REVISION=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Exercise sustained panning with sixteen workers under a four GiB cap
+        run: |
+          mkdir -p test-results
+          docker run -d --name qtopo-memory --cpus=4 --memory=4g --memory-swap=4g --pids-limit=1024 -e RENDER_CONCURRENCY=16 -e RENDER_TIMEOUT_SECONDS=90 -e PREFETCH_RADIUS=2 qtopo:test
+          docker exec qtopo-memory node scripts/smoke-memory.js
+          docker cp qtopo-memory:/tmp/smoke/. test-results/
+          docker stop qtopo-memory
       - name: Exercise native rendering and neighbouring tile prefetch
         run: |
           mkdir -p test-results
@@ -64,10 +71,6 @@ jobs:
           docker exec qtopo-prefetch node scripts/smoke-prefetch.js
           docker cp qtopo-prefetch:/tmp/smoke/. test-results/
           docker stop qtopo-prefetch
-          docker run -d --name qtopo-memory --cpus=4 --memory=4g --memory-swap=4g --pids-limit=1024 -e RENDER_CONCURRENCY=8 -e PREFETCH_RADIUS=2 qtopo:test
-          docker exec qtopo-memory node scripts/smoke-memory.js
-          docker cp qtopo-memory:/tmp/smoke/. test-results/
-          docker stop qtopo-memory
       - name: Container logs
         if: always()
         run: |

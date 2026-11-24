@@ -20,9 +20,10 @@ async function main() {
     try { before = await status(); break; } catch (err) { if (i === 59) throw err; }
     await sleep(500);
   }
-  assert.equal(before.settings.renderConcurrency, 8);
+  assert.equal(before.settings.renderConcurrency, 16);
+  assert.equal(before.renderer.memory.enabled, true);
   const initialEvents = counters(await fs.readFile('/sys/fs/cgroup/memory.events', 'utf8'));
-  const report = { limit, samples: 0, peakCurrent: 0, peakAnonymous: 0, pans: [] };
+  const report = { limit, samples: 0, peakCurrent: 0, peakAnonymous: 0, pans: [], history: [] };
   let stop = false;
   const monitor = (async () => {
     while (!stop) {
@@ -31,19 +32,26 @@ async function main() {
       report.samples++;
       report.peakCurrent = Math.max(report.peakCurrent, current);
       report.peakAnonymous = Math.max(report.peakAnonymous, memory.anon);
+      if (report.samples % 10 === 0) report.history.push({ elapsedMs: Date.now() - Date.parse(before.startedAt), current, anonymous: memory.anon });
       await sleep(100);
     }
   })();
   // Observe monitor failures promptly; await it again in finally to propagate.
   monitor.catch(() => { stop = true; });
   try {
-    for (const x of [15110, 15118, 15126, 15134, 15142, 15150, 15158, 15166, 15174, 15182]) {
+    for (let pan = 0; pan < 16; pan++) {
+      const [profile, z, baseX, baseY] = [
+        ['readable', 14, 15110, 9494], ['mobile-light', 15, 30280, 18988],
+        ['mobile-3x', 16, 60580, 37976], ['readable', 15, 30280, 19004],
+      ][pan % 4];
+      const x = baseX + Math.floor(pan / 4) * 8;
       const started = Date.now();
-      // One request per 2x2 grid starts eight independent renders. Prefetch is
-      // enabled as in production, and the next pan arrives before it goes idle.
-      await Promise.all(Array.from({ length: 8 }, async (_, i) => {
-        const res = await fetch(`${origin}/readable/14/${x + (i % 4) * 2}/${9528 + Math.floor(i / 4) * 2}.png`, {
-          signal: AbortSignal.timeout(90000),
+      // Sixteen distinct grids demand the full configured pool. Repeated zoom
+      // and style changes exercise both retained maps and fresh allocations.
+      // Prefetch remains enabled and overlaps subsequent pans.
+      await Promise.all(Array.from({ length: 16 }, async (_, i) => {
+        const res = await fetch(`${origin}/${profile}/${z}/${x + (i % 4) * 2}/${baseY + Math.floor(i / 4) * 2}.png`, {
+          signal: AbortSignal.timeout(120000),
         });
         assert.equal(res.status, 200);
         const png = Buffer.from(await res.arrayBuffer());
@@ -52,9 +60,9 @@ async function main() {
       }));
       const current = await status();
       assert.equal(current.startedAt, before.startedAt, 'the server must not restart during panning');
-      report.pans.push({ x, ms: Date.now() - started, completedRenders: current.renderer.completed });
+      report.pans.push({ profile, z, x, ms: Date.now() - started, completedRenders: current.renderer.completed,
+        active: current.renderer.active, memory: current.renderer.memory });
       console.log('Memory pan:', JSON.stringify(report.pans.at(-1)));
-      await sleep(2000);
     }
     let after;
     for (let i = 0; i < 180; i++) {
@@ -64,9 +72,11 @@ async function main() {
     }
     assert.equal(after.renderer.active + after.renderer.queued + after.prefetch.active + after.prefetch.queued, 0, 'background work must finish');
     assert.equal(after.startedAt, before.startedAt);
-    assert.equal(after.renderer.peakActive, 8, 'must exercise all eight native workers');
+    assert.ok(after.renderer.peakActive > 1 && after.renderer.peakActive <= 16, 'admission adapts below the configured ceiling');
+    assert.ok(after.renderer.memory.pauses > 0, 'must exercise memory-aware backpressure');
+    assert.equal(after.renderer.memory.limited, false, 'idle status must clear after draining');
     assert.equal(after.requests.errors, 0);
-    assert.ok(after.renderer.recycledForMemory > 0, 'must exercise replacement of retained native memory');
+    assert.ok(after.renderer.recycledForMemory + after.renderer.memory.releasedIdleWorkers > 0, 'must exercise release of retained native memory');
     report.after = after;
     report.events = counters(await fs.readFile('/sys/fs/cgroup/memory.events', 'utf8'));
     assert.equal(report.events.oom, initialEvents.oom, 'no allocation failures');
@@ -79,6 +89,6 @@ async function main() {
     try { await monitor; }
     finally { await fs.writeFile('/tmp/smoke/memory.json', JSON.stringify(report, null, 2)); }
   }
-  console.log('Eight-worker memory check:', JSON.stringify({ peakCurrent: report.peakCurrent, peakAnonymous: report.peakAnonymous, events: report.events }));
+  console.log('Sixteen-worker memory admission check:', JSON.stringify({ peakCurrent: report.peakCurrent, peakAnonymous: report.peakAnonymous, events: report.events }));
 }
 main().catch(error => { console.error(error); process.exit(1); });
