@@ -45,7 +45,7 @@ jobs:
       - name: Load the deployed styles for sustained-panning validation
         uses: actions/checkout@v7.0.1
         with:
-          ref: fa4e84312a4a4efa906690af412951e42bdef739
+          ref: 4e90dc8fb0bc142764998cee4f6da4e23ccea01e
           path: memory-styles
       - name: Exercise sustained panning with sixteen workers under a four GiB cap
         run: |
