@@ -25,12 +25,13 @@ async function main() {
   let status;
   for (let i = 0; i < 180; i++) {
     status = await (await fetch(origin + '/readyz')).json();
-    if (status.prefetch.completed >= 13 && status.prefetch.active === 0) break;
+    if (status.prefetch.completed >= 13 && status.prefetch.tracked === 0) break;
     await sleep(500);
   }
   assert.equal(status.prefetch.completed, 13, 'only eight neighbours plus five zoom tiles, with no recursive prefetch');
   assert.equal(status.prefetch.completedZoom, 5);
-  assert.equal(status.prefetch.queued, 0);
+  assert.equal(status.renderer.queued, 0);
+  assert.equal(status.prefetch.queued, undefined);
   assert.ok(status.renderer.peakActive >= 3, 'native prefetch must actually use multiple workers');
   assert.ok(status.renderer.peakActive <= config.prefetchConcurrency, 'background capacity must remain bounded');
   const expected = [...neighbours(tile, 1), ...zoomNeighbours(tile)];

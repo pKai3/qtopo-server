@@ -30,7 +30,7 @@ function stack(id, counts, capacity) {
   const remaining = Math.max(0, capacity - total);
   $(`${id}-stack`).setAttribute('aria-label', `${id === 'rendering' ? 'Rendering' : 'Waiting'}: ${counts.requested} requested, ${counts.neighbours} nearby prefetch, ${counts.zoom} zoom prefetch. ${remaining} ${id === 'rendering' ? 'idle workers' : 'unused queue spaces'}.`);
   text($(`${id}-total`), id === 'rendering' ? `${number(total)} of ${number(capacity)} workers busy` : `${number(total)} work items waiting`);
-  text($(`${id}-space`), id === 'rendering' ? `${number(remaining)} idle ${remaining === 1 ? 'worker' : 'workers'} · grey space` : `Scale: ${number(capacity)} combined queue spaces · grey is unused`);
+  text($(`${id}-space`), id === 'rendering' ? `${number(remaining)} idle ${remaining === 1 ? 'worker' : 'workers'} · grey space` : `Scale: ${number(capacity)} shared queue spaces · grey is unused`);
 }
 let splitClients = false, clientSession;
 try { splitClients = localStorage.getItem('qtopo-client-queues') === 'on'; } catch {}
@@ -77,7 +77,7 @@ function renderClientQueues(data) {
     for (const [state, stage] of Object.entries(row.stages)) {
       const counts = live.get(id)?.[state] || { requested: 0, neighbours: 0, zoom: 0 };
       const total = counts.requested + counts.neighbours + counts.zoom;
-      const capacity = state === 'rendering' ? data.renderer.concurrency : data.settings.renderQueueLimit + (data.prefetch.enabled ? data.settings.prefetchQueueLimit : 0);
+      const capacity = state === 'rendering' ? data.renderer.concurrency : data.settings.renderQueueLimit;
       const scale = Math.max(1, capacity, total), label = state === 'rendering' ? 'Rendering' : 'Waiting';
       text(stage.heading, `${label} · ${total}`);
       stage.bar.style.setProperty('--slot-size', `${100 / scale}%`);
@@ -109,7 +109,7 @@ async function refresh() {
     const data = await response.json();
     const r = data.renderer, c = data.cache, p = data.prefetch, q = data.requests, s = data.settings;
     const busy = q.active || r.active || c.activeDownloads;
-    $('activity').textContent = r.memory?.limited ? 'Memory limited' : busy ? 'Working' : r.queued || p.queued ? 'Waiting' : 'Idle';
+    $('activity').textContent = r.memory?.limited ? 'Memory limited' : busy ? 'Working' : r.queued ? 'Waiting' : 'Idle';
     text($('updated'), `Updated ${new Date().toLocaleTimeString()}`);
     $('error').hidden = true;
     $('workers').textContent = `${r.active} / ${r.concurrency}`;
@@ -124,13 +124,13 @@ async function refresh() {
     $('cache-detail').textContent = `${number(q.hits)} cached · ${number(q.misses)} required preparation`;
     const waiting = {
       requested: r.queuedByPriority.requested,
-      neighbours: r.queuedByPriority.neighbours + p.queuedNeighbours,
-      zoom: r.queuedByPriority.zoom + p.queuedZoom,
+      neighbours: r.queuedByPriority.neighbours,
+      zoom: r.queuedByPriority.zoom,
     };
-    $('queued').textContent = number(r.queued + p.queued);
+    $('queued').textContent = number(r.queued);
     $('queue-detail').textContent = `${waiting.requested} requested · ${waiting.neighbours + waiting.zoom} prefetch`;
     $('downloads').textContent = `${c.activeDownloads} / ${s.upstreamConcurrency}`;
-    $('download-detail').textContent = `${number(c.downloads.queued)} queued · ${number(c.errors)} errors since restart`;
+    $('download-detail').textContent = `${number(c.downloads.queued)} queued · ${number(c.cancelled)} cancelled · ${number(c.errors)} errors since restart`;
     const summaries = [
       ['Cached tile ready', q.cachedTimings.readyMs], ['Cached response', q.cachedTimings.responseMs],
       ['All tile responses', q.timings.responseMs], ['Requested render queue', r.requestedTimings?.queueMs], ['All render queue', r.timings.queueMs],
@@ -141,8 +141,8 @@ async function refresh() {
     $('samples').textContent = `Recent samples: ${q.cachedTimings.samples} cached responses, ${q.timings.samples} total responses, ${r.timings.samples} renders. Each window holds up to 256 samples.`;
     renderClientQueues(data);
     stack('rendering', r.activeByPriority, r.concurrency);
-    stack('waiting', waiting, s.renderQueueLimit + (p.enabled ? s.prefetchQueueLimit : 0));
-    $('prefetch').textContent = p.enabled ? `Radius ${s.prefetchRadius} · up to ${p.concurrency} workers · zoom prefetch ${p.zoomEnabled ? 'enabled, lowest priority' : 'disabled'}.` : 'Prefetch is disabled.';
+    stack('waiting', waiting, s.renderQueueLimit);
+    $('prefetch').textContent = p.enabled ? `Radius ${s.prefetchRadius} · up to ${s.prefetchConcurrency} workers · zoom prefetch ${p.zoomEnabled ? 'enabled, lowest priority' : 'disabled'}.` : 'Prefetch is disabled.';
     $('prefetch-use').textContent = `${number(p.completed)} prefetch checks completed; ${number(q.prefetchUsed)} subsequently served from cache to clients. Reuse tracking covers the most recent 1,024 newly prefetched files.`;
     const now = performance.now();
     const rate = previous?.startedAt === data.startedAt ? `${Math.max(0, (q.completed - previous.completed) * 1000 / (now - previous.time)).toFixed(1)} tiles/s` : '—';
@@ -156,7 +156,7 @@ async function refresh() {
       ['Pan/zoom reprioritization', s.requestReprioritize ? 'Enabled' : 'Disabled'],
       ['Pan threshold', `${number(s.requestPanThreshold)} tiles`],
       ['Interrupt prefetch for requests', s.prefetchPreempt ? 'Enabled' : 'Disabled'],
-      ['Prefetch concurrency', number(s.prefetchConcurrency)], ['Render queue limit', number(s.renderQueueLimit)], ['Download concurrency', number(s.upstreamConcurrency)], ['Zoom prefetch', s.prefetchZoom && s.prefetchRadius ? 'Enabled · lowest priority' : 'Disabled'], ['Started', new Date(data.startedAt).toLocaleString()]], true);
+      ['Prefetch concurrency', number(s.prefetchConcurrency)], ['Shared queue limit', number(s.renderQueueLimit)], ['Download concurrency', number(s.upstreamConcurrency)], ['Zoom prefetch', s.prefetchZoom && s.prefetchRadius ? 'Enabled · lowest priority' : 'Disabled'], ['Started', new Date(data.startedAt).toLocaleString()]], true);
     $('release').textContent = `QTopo ${data.version} · ${data.revision.slice(0, 12)}`;
     $('logs-panel').hidden = !data.logsAvailable;
     setFlybyAccess(!!data.flybyAvailable);

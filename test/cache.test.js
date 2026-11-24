@@ -67,19 +67,76 @@ test('expired positive files refresh on access even before cleanup', async t => 
   await cache.get(opts); await fs.utimes(opts.file, new Date(0), new Date(0)); await cache.get(opts);
   assert.equal(calls, 2);
 });
-test('upstream downloads are bounded and reserve capacity for foreground requests', async t => {
+test('prefetch borrows idle download slots and yields promptly to foreground resources', async t => {
   const dir = await setup(t), seen = [];
   let release;
   const gate = new Promise(resolve => { release = resolve; });
-  const cache = createCache({ concurrency: 4, fetchImpl: async url => { seen.push(url); await gate; return pbf(); } });
+  const cache = createCache({ concurrency: 4, fetchImpl: (url, { signal }) => {
+    seen.push(url);
+    return new Promise((resolve, reject) => {
+      const onAbort = () => reject(signal.reason);
+      signal.addEventListener('abort', onAbort, { once: true });
+      gate.then(() => { signal.removeEventListener('abort', onAbort); resolve(pbf()); });
+    });
+  } });
   t.after(() => { release(); cache.close(); });
   const background = Array.from({ length: 5 }, (_, i) => cache.get({ file: path.join(dir, `${i}.pbf`), url: `https://example.test/${i}`, priority: PRIORITY.NEIGHBOUR }));
-  for (let i = 0; i < 100 && seen.length < 2; i++) await new Promise(resolve => setTimeout(resolve, 2));
-  assert.equal(seen.length, 2, 'prefetch uses only half the download capacity');
+  await until(() => cache.stats.activeDownloads === 4);
   const foreground = cache.get({ file: path.join(dir, 'requested.pbf'), url: 'https://example.test/requested' });
-  for (let i = 0; i < 100 && !seen.includes('https://example.test/requested'); i++) await new Promise(resolve => setTimeout(resolve, 2));
-  assert.ok(seen.includes('https://example.test/requested'), 'foreground starts without waiting for prefetch downloads');
-  assert.equal(cache.stats.activeDownloads, 3);
+  await until(() => seen.includes('https://example.test/requested'));
+  assert.equal(cache.stats.activeDownloads, 4);
+  assert.equal(cache.stats.yielded, 1);
   release(); await Promise.all([...background, foreground]);
-  assert.ok(cache.stats.peakDownloads <= 4);
+  assert.ok(cache.stats.peakDownloads <= 4); assert.equal(cache.stats.errors, 0);
+});
+
+const { createWorkOwner } = require('../lib/work-owner');
+const tick = () => new Promise(resolve => setImmediate(resolve));
+async function until(predicate) {
+  for (let i = 0; i < 200 && !predicate(); i++) await new Promise(resolve => setTimeout(resolve, 2));
+  assert.ok(predicate(), 'condition did not become true');
+}
+test('obsolete downloads leave both the waiting queue and network without counting as upstream errors', async t => {
+  const dir = await setup(t), signals = [], owner = createWorkOwner(PRIORITY.ZOOM);
+  const cache = createCache({ concurrency: 1, fetchImpl: (_url, { signal }) => {
+    signals.push(signal);
+    return new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
+  } });
+  t.after(() => cache.close());
+  const jobs = Array.from({ length: 6 }, (_, i) => assert.rejects(cache.get({ file: path.join(dir, `${i}.pbf`), url: `https://example.test/${i}`, owner }), { status: 503 }));
+  await until(() => cache.stats.downloads.queued === 5);
+  owner.cancel(Object.assign(new Error('old view'), { status: 503 })); await Promise.all(jobs); await tick();
+  assert.equal(cache.stats.downloads.queued, 0); assert.equal(cache.stats.activeDownloads, 0);
+  assert.equal(signals.length, 1); assert.equal(signals[0].aborted, true);
+  assert.equal(cache.stats.errors, 0); assert.equal(cache.stats.cancelled, 6);
+  assert.deepEqual(await fs.readdir(dir), []);
+});
+
+test('cancelling one owner preserves a resource shared with another consumer', async t => {
+  const dir = await setup(t), background = createWorkOwner(PRIORITY.ZOOM), request = createWorkOwner(PRIORITY.REQUEST);
+  let release, signal, calls = 0;
+  const cache = createCache({ fetchImpl: (_url, opts) => { calls++; signal = opts.signal; return new Promise(resolve => { release = () => resolve(pbf()); }); } });
+  t.after(() => cache.close());
+  const opts = { file: path.join(dir, 'shared.pbf'), url: 'https://example.test/shared' };
+  const obsolete = assert.rejects(cache.get({ ...opts, owner: background }), { status: 503 });
+  const required = cache.get({ ...opts, owner: request }); await until(() => !!release);
+  background.cancel(Object.assign(new Error('old view'), { status: 503 })); await obsolete;
+  assert.equal(signal.aborted, false); release(); await required;
+  assert.equal(calls, 1); assert.equal(cache.stats.cancelled, 0);
+});
+
+test('render promotion promotes resources already queued, ahead of other prefetch', async t => {
+  const dir = await setup(t), seen = [], releases = [], owner = createWorkOwner(PRIORITY.ZOOM);
+  const cache = createCache({ concurrency: 1, fetchImpl: url => new Promise(resolve => { seen.push(url); releases.push(() => resolve(pbf())); }) });
+  t.after(() => cache.close());
+  const get = (name, more = {}) => cache.get({ file: path.join(dir, name), url: 'https://example.test/' + name, ...more });
+  const blocker = get('blocker'); await until(() => seen.length === 1);
+  const neighbour = get('nearby', { priority: PRIORITY.NEIGHBOUR });
+  const promoted = get('promoted', { owner }); await until(() => cache.stats.downloads.queued === 2);
+  owner.promote(PRIORITY.REQUEST);
+  assert.equal(cache.stats.downloads.queuedByPriority.requested, 1);
+  releases.shift()(); await blocker; await until(() => seen.length === 2);
+  assert.equal(seen[1], 'https://example.test/promoted');
+  releases.shift()(); await promoted; await until(() => releases.length === 1);
+  releases.shift()(); await neighbour;
 });
