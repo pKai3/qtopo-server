@@ -11,6 +11,7 @@ The reusable [benchmark toolkit](scripts/benchmark/README.md) includes sequentia
 - `docker.io/pkai3/qtopo-server:latest` — tested QLD + NSW release.
 - `docker.io/pkai3/qtopo-server:stable` — an explicitly approved, tested release, promoted from an existing commit image without rebuilding.
 - `docker.io/pkai3/qtopo-server:fallback` — original pre-chat, pre-NSW image, preserved by digest without rebuilding it.
+- `:sha-30852c2` — previous Stable image, retained for rollback after promotion of `cb6060f`.
 - `:stable-before-15a5c79` — previous stable release through PR #12, retained for rollback.
 - `:pre-nsw` — another permanent reference to that same pre-NSW image.
 - `:stable-before-nsw` — the older stable image.
@@ -20,17 +21,21 @@ The pre-NSW source is tagged `pre-nsw` in GitHub. New builds publish **latest on
 
 ## Unraid
 
+For a fresh install, use the [Unraid template](unraid/qtopo-server.xml). Save it as `/boot/config/plugins/dockerMan/templates-user/my-qtopo-server.xml`, then choose `qtopo-server` from the template menu under **Docker → Add Container**. It defaults to the approved Stable image, a 4 GiB RAM limit, eight render workers, a **20 GiB maximum cache**, and **5 GiB minimum free disk space**. The two storage settings appear in the normal settings view. Change the host port or data folder if another QTopo instance already uses them. This template is stored in this repository; it is not an automatic Community Applications listing.
+
 Keep the existing container port **8080**, host port (for example 9878), and host folder mounted at **/data**. Map delivery does not require a template change. The status page is public and read-only. Tests and cache clearing run only through the container CLI. Raw application logs remain private unless the configured networks and hostnames permit access. No second network port or extra login is required.
 
 | Setting | Value |
 |---|---|
-| Repository | `pkai3/qtopo-server:latest` |
+| Repository | `pkai3/qtopo-server:stable` for the approved release; `:latest` for testing |
 | Container port | `8080` |
 | Host port | Your current port, e.g. `9878` |
 | Container data path | `/data` |
 | Host data path | Your existing appdata folder |
 | Optional timezone | `Australia/Brisbane` |
 | Optional ownership | `PUID=99`, `PGID=100` (Unraid nobody:users) |
+| Maximum cache size | `CACHE_MAX_GIB=20` |
+| Minimum free disk space | `CACHE_MIN_FREE_GIB=5` |
 
 Existing `/data/styles/style.json` edits are retained. NSW's style is seeded into `/data/styles/nsw.style.json` on first boot. New caches live in `vector/v2`, `raster/v2`, and `resources/v2`; older cache files are left in place for rollback.
 
