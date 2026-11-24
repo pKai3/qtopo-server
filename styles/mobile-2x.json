@@ -92,9 +92,9 @@
         { "id": "minor-dam-wall",          "type": "line", "source": "qld", "source-layer": "Minor Dam Wall",            "paint": { "line-color": "#b22222", "line-width": 1.92 } },
         { "id": "paths",                   "type": "line", "source": "qld", "source-layer": "Paths",                     "paint": { "line-color": "#698064", "line-width": 1.472, "line-opacity": 0.95, "line-dasharray": [ 3, 2 ] }, "minzoom": 13 },
         { "id": "pipelines",               "type": "line", "source": "qld", "source-layer": "Pipelines",                 "paint": { "line-color": "#a7aaa2", "line-dasharray": [ 2, 2 ], "line-width": 0.768 }, "minzoom": 17 },
-        { "id": "powerlines-energex",      "type": "line", "source": "qld", "source-layer": "Powerlines (Energex)",      "paint": { "line-color": "#858a8b", "line-width": 1, "line-opacity": 0.75, "line-dasharray": [ 4, 3 ] }, "minzoom": 15 },
-        { "id": "powerlines-ergon",        "type": "line", "source": "qld", "source-layer": "Powerlines (Ergon)",        "paint": { "line-color": "#858a8b", "line-width": 1, "line-opacity": 0.75, "line-dasharray": [ 4, 3 ] }, "minzoom": 15 },
-        { "id": "powerlines-high-voltage", "type": "line", "source": "qld", "source-layer": "Powerlines (High Voltage)", "paint": { "line-color": "#858a8b", "line-width": 1, "line-opacity": 0.75, "line-dasharray": [ 4, 3 ] }, "minzoom": 15 },
+        { "id": "powerlines-energex",      "type": "line", "source": "qld", "source-layer": "Powerlines (Energex)",      "paint": { "line-color": "#858a8b", "line-width": 1, "line-opacity": 0.75, "line-dasharray": [ 4, 3 ] }, "minzoom": 14 },
+        { "id": "powerlines-ergon",        "type": "line", "source": "qld", "source-layer": "Powerlines (Ergon)",        "paint": { "line-color": "#858a8b", "line-width": 1, "line-opacity": 0.75, "line-dasharray": [ 4, 3 ] }, "minzoom": 14 },
+        { "id": "powerlines-high-voltage", "type": "line", "source": "qld", "source-layer": "Powerlines (High Voltage)", "paint": { "line-color": "#858a8b", "line-width": 1, "line-opacity": 0.75, "line-dasharray": [ 4, 3 ] }, "minzoom": 14 },
 
         { "id": "trails", "type": "line", "source": "qld", "source-layer": "QPWS Trails", "paint": { "line-color": "#698064", "line-width": 1.472, "line-opacity": 0.95, "line-dasharray": [ 3, 2 ] }, "minzoom": 13 },
 

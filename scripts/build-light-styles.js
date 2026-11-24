@@ -24,8 +24,9 @@ const qldLabels = new Set([
   'Emergency Services', 'Police', 'Fire Station', 'Ambulance', 'Railway Stations',
   'Surf Life Saving Club', 'Helipads',
 ]);
-function keepQld(layer) {
+function keepQld(layer, mobile = false) {
   const source = (layer['source-layer'] || '').replace(/\/label.*$/, '').trim();
+  if (mobile && source.startsWith('Powerlines (')) return true;
   if (/Contour/.test(source) || /^Roads \(/.test(source)) return true;
   if (qldOmit.has(source)) return false;
   if (layer.type !== 'symbol') return true;
@@ -56,9 +57,11 @@ for (const [baseId, id, name] of [
   const counts = {};
   for (const [provider, style] of Object.entries(doc.styles)) {
     const before = style.layers.length;
-    style.layers = style.layers.filter(provider === 'qld' ? keepQld : keepNsw);
+    style.layers = style.layers.filter(layer => provider === 'qld' ? keepQld(layer, id === 'mobile-light') : keepNsw(layer));
     style.metadata = { ...style.metadata, 'qtopo:light-source': baseId,
-      'qtopo:light-purpose': 'Retain hiking terrain, trails, water, roads and navigation landmarks; omit dense buildings, utilities and minor urban POIs.' };
+      'qtopo:light-purpose': id === 'mobile-light'
+        ? 'Retain hiking terrain, trails, water, roads, powerlines and navigation landmarks; omit dense buildings, other utilities and minor urban POIs.'
+        : 'Retain hiking terrain, trails, water, roads and navigation landmarks; omit dense buildings, utilities and minor urban POIs.' };
     counts[provider] = { before, after: style.layers.length };
   }
   fs.writeFileSync(path.join(directory, id + '.json'), formatStyleJson(doc));
