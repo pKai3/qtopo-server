@@ -11,15 +11,15 @@
 <body>
   <main id="map" aria-label="Topographic map"></main>
   <details class="panel" open>
-    <summary><strong>QTopo</strong><span>Queensland & New South Wales</span></summary>
+    <summary><strong>QTopo</strong><span>Queensland & New South Wales · <b id="mode-label">Vector</b></span></summary>
     <div class="controls">
       <p class="hint">One tile source for Gaia and other GPS apps. QLD and NSW maps are selected automatically by location.</p>
+      <label for="mode">Map view</label>
+      <select id="mode"><option value="vector">Vector · interactive map</option><option value="raster">Raster · GPS preview</option></select>
       <label for="profile">Appearance</label><select id="profile" aria-label="Map appearance"></select>
       <button id="copy-url" type="button">Copy QLD + NSW tile URL</button>
       <details><summary>Advanced previews</summary>
       <label for="provider">Map</label><select id="provider" aria-label="Map provider"></select>
-      <label for="mode">View</label>
-      <select id="mode"><option value="vector">Interactive vector map</option><option value="raster">Raster tiles / GPS preview</option></select>
       <fieldset id="layers"><legend>Show on map</legend></fieldset>
       </details>
       <label class="check"><input id="regions" type="checkbox"> Regions of interest</label>

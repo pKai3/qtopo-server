@@ -10,6 +10,26 @@ const reader = files => file => {
   return files[file];
 };
 
+test('disabled admission guard retains measurements without restricting workers or triggering pressure', () => {
+  const memory = createRenderMemory({ enabled: false, read: () => snapshot(4000) });
+  assert.equal(admit(memory, 15), true);
+  assert.equal(memory.pressure, false);
+  assert.equal(memory.stats().enabled, false);
+  assert.equal(memory.stats().guardEnabled, false);
+  assert.equal(memory.stats().workingBytes, 4000 * MIB);
+  assert.equal(memory.stats().reservedBytes, 0);
+  assert.equal(createRenderMemory({ enabled: false, read: () => { throw new Error('unreadable'); } }).canStart(), true);
+});
+
+test('configured headroom uses the larger of the absolute and proportional reserves', () => {
+  const memory = createRenderMemory({ read: () => snapshot(3000), headroomBytes: 256 * MIB, headroomPercent: 25 });
+  assert.equal(memory.stats().headroomBytes, 1024 * MIB);
+  assert.equal(memory.canStart(), false);
+  const floor = createRenderMemory({ read: () => snapshot(3000), headroomBytes: 768 * MIB, headroomPercent: 5, initialWorkerBytes: 256 * MIB });
+  assert.equal(floor.stats().headroomBytes, 768 * MIB);
+  assert.equal(floor.canStart(), true);
+});
+
 test('read real container limits and exclude only reclaimable inactive file cache', () => {
   for (const v2 of [true, false]) {
     const prefix = v2 ? '/sys/fs/cgroup/' : '/sys/fs/cgroup/memory/';

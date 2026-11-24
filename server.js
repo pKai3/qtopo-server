@@ -40,7 +40,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   const cache = dependencies.cache || createCache({ timeoutMs: config.upstreamTimeoutMs, emptyTTL: config.emptyTTL, concurrency: config.upstreamConcurrency, logger: L });
   const flyby = dependencies.flyby || createRenderFlyby();
   const renderer = dependencies.renderer || createRenderer(config, undefined, flyby);
-  const requestFocus = createRequestFocus({ distance: config.requestPanThreshold });
+  const requestFocus = createRequestFocus({ distance: config.requestPanThreshold, reprioritize: config.requestReprioritize });
   const nativeZoom = dependencies.nativeZoom || createTileIndex(config, cache);
   const stopCleaner = startCleaner(config, L);
   const app = express();
@@ -318,7 +318,10 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   function status() { return {
     status: 'ok', startedAt, version: require('./package.json').version,
     revision: process.env.BUILD_REVISION || 'development',
-    settings: { defaultProfile: config.defaultProfile, tilePx: config.tilePx, metatileSize: config.metatileSize, renderBufferPx: config.renderBufferPx, pngCompression: config.pngCompression, renderConcurrency: config.renderConcurrency, renderQueueLimit: config.renderQueueLimit, requestPanThreshold: config.requestPanThreshold, upstreamConcurrency: config.upstreamConcurrency, prefetchConcurrency: config.prefetchConcurrency, prefetchQueueLimit: config.prefetchQueueLimit, prefetchRadius: config.prefetchRadius, prefetchZoom: config.prefetchZoom },
+    settings: { defaultProfile: config.defaultProfile, tilePx: config.tilePx, metatileSize: config.metatileSize, renderBufferPx: config.renderBufferPx, pngCompression: config.pngCompression, renderConcurrency: config.renderConcurrency, renderQueueLimit: config.renderQueueLimit,
+      renderMemoryGuard: config.renderMemoryGuard, renderMemoryHeadroomMb: config.renderMemoryHeadroomMb, renderMemoryHeadroomPercent: config.renderMemoryHeadroomPercent, renderMemoryInitialWorkerMb: config.renderMemoryInitialWorkerMb, renderWorkerMaxRssMb: config.renderWorkerMaxRssMb,
+      requestReprioritize: config.requestReprioritize, requestPanThreshold: config.requestPanThreshold, prefetchPreempt: config.prefetchPreempt,
+      upstreamConcurrency: config.upstreamConcurrency, prefetchConcurrency: config.prefetchConcurrency, prefetchQueueLimit: config.prefetchQueueLimit, prefetchRadius: config.prefetchRadius, prefetchZoom: config.prefetchZoom },
     providers: Object.keys(providers), renderer: renderer.stats, cache: cache.stats, prefetch: prefetch.stats,
     requests: requests.stats, styles: styles.stats,
   }; }

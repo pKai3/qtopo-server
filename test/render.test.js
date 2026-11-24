@@ -268,6 +268,33 @@ test('a client joining an active prefetch shares the worker and reclassifies cou
 });
 
 
+test('startup switches allow unguarded rendering and let speculative work finish without interruption', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-startup-switches-'));
+  const MIB = 1024 ** 2;
+  const renderer = createRenderer({ renderConcurrency: 1, renderQueueLimit: 4, renderMemoryGuard: false, prefetchPreempt: false,
+    rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 5000 }, path.join(__dirname, 'fixtures/render-worker.js'), undefined, {
+    read: () => ({ limitBytes: 2048 * MIB, currentBytes: 2000 * MIB, workingBytes: 2000 * MIB }),
+  });
+  t.after(async () => { renderer.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const job = { outPath: path.join(root, 'zoom.png'), recordPid: path.join(root, 'pid'), gate: path.join(root, 'go'), priority: PRIORITY.ZOOM };
+  const zoom = renderer.render(job);
+  for (let i = 0; i < 200; i++) {
+    if (await fs.access(job.recordPid).then(() => true, () => false)) break;
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+  await fs.access(job.recordPid);
+  const requestedPath = path.join(root, 'requested.png');
+  const requested = renderer.render({ outPath: requestedPath, priority: PRIORITY.REQUEST });
+  await new Promise(resolve => setTimeout(resolve, 120));
+  assert.equal(renderer.stats.memory.guardEnabled, false);
+  assert.equal(renderer.stats.yieldedPrefetch, 0);
+  assert.equal(renderer.stats.preemptedForMemory, 0);
+  assert.equal(renderer.stats.queuedByPriority.requested, 1);
+  assert.equal(await fs.access(requestedPath).then(() => true, () => false), false);
+  await fs.writeFile(job.gate, 'go'); await Promise.all([zoom, requested]);
+  assert.equal(renderer.stats.completed, 2);
+});
+
 test('requested tiles interrupt memory-blocking zoom work and wait for its process to exit', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-yield-'));
   const MIB=1024**2; let pressure=false, zoomPid;

@@ -157,6 +157,10 @@ Additional endpoints:
 | LABEL_SCALE | 1 | Legacy extra raster text/icon multiplier, 0.5–3, applied on top of every profile; keep 1 when comparing named profiles. |
 | VECTOR_UPSTREAM | QLD service | Optional QLD template containing {z}, {x}, {y} |
 | RENDER_CONCURRENCY | 2 | Maximum simultaneous reusable native workers, 1–16. With a Docker memory cap, actual concurrency adapts to available memory. |
+| RENDER_MEMORY_GUARD | 1 | Adapt concurrency and release speculative work when approaching the Docker RAM cap. Set 0 for unguarded admission; Docker still enforces its hard memory limit and worker recycling remains enabled. |
+| RENDER_MEMORY_HEADROOM_MB | 512 | Minimum memory headroom in MiB (0–65536). The guard reserves the larger of this value and the percentage below. |
+| RENDER_MEMORY_HEADROOM_PERCENT | 12.5 | Proportional memory headroom, 0–50 percent of the Docker RAM cap. Applies while the guard is enabled. |
+| RENDER_MEMORY_INITIAL_WORKER_MB | 512 | Initial reservation for an unmeasured worker workload, 128–4096 MiB. Measured peaks refine it after enough renders. |
 | RENDER_WORKER_MAX_RSS_MB | 384 | Replace a worker after its completed render if resident memory reaches this many MiB (64–4096). The old process exits before its slot is reused. This bounds retention between jobs, not peak memory during a single render; keep a Docker RAM limit as well. |
 | LP_NUM_THREADS | 1 (Docker) | Mesa software-rendering threads per worker. Independent of `RENDER_CONCURRENCY`; avoids multiplying each worker by the host CPU count. |
 | MALLOC_ARENA_MAX | 2 (Docker) | Limit glibc allocator arenas per process to reduce retained native memory. |
@@ -164,6 +168,8 @@ Additional endpoints:
 | MALLOC_TRIM_THRESHOLD_ | 131072 (Docker) | Keep glibc's heap-trimming threshold fixed so releasable heap memory is returned between renders. Bytes. |
 | RENDER_QUEUE_LIMIT | 64 | Maximum queued distinct renders |
 | REQUEST_PAN_THRESHOLD | 8 | Tile distance from the current area anchor before a pan moves queued requests to a new area; positive integer, measured in either axis at the requested zoom |
+| REQUEST_REPRIORITIZE | 1 | Prefer each client IP's current area and zoom within a priority tier. Set 0 to keep requested jobs in arrival order across pans/zooms, including for devices sharing an IP. Requested tiles still take priority over prefetch. |
+| PREFETCH_PREEMPT | 1 | Allow requested tiles to interrupt active speculative renders when capacity is unavailable. Set 0 to let them finish; the enabled memory guard can still release speculative work under memory pressure. |
 | PREFETCH_RADIUS | 1 | Nearby tile radius, 0–10; 0 disables prefetch. Radius 1 considers 8 neighbours, 2 considers 24, and 10 considers 440. The queue limit bounds retained work, favouring the nearest tiles around recent requests |
 | PREFETCH_ZOOM | 1 | Pre-render one parent at z−1 and four children at z+1, after same-zoom neighbours; 0 disables zoom prefetch |
 | PREFETCH_CONCURRENCY | RENDER_CONCURRENCY − 1 | Maximum simultaneous prefetch groups, at least 1; QLD vector siblings share a grid group, while other tile types count individually. The render queue also caps background jobs to leave a slot for requests when possible. |
