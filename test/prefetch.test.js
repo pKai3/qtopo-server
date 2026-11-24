@@ -109,3 +109,16 @@ test('a new nearby interest promotes an already-submitted zoom candidate without
   assert.equal(interests.get('7/50/50'), parent);
   assert.equal(parent.priority(), 1); assert.equal(updates, 1);
 });
+
+test('zooming into a prefetched child preserves that work while the foreground request discovers its style', async t => {
+  const focus = createRequestFocus(), interests = new Map();
+  const prefetch = createPrefetch({ render: (_p, tile, _priority, _rank, interest) => {
+    interests.set(`${tile.z}/${tile.x}/${tile.y}`, interest);
+    return new Promise((resolve, reject) => interest.signal.addEventListener('abort', () => reject(interest.signal.reason), { once: true }));
+  } });
+  t.after(() => prefetch.close());
+  prefetch.begin('qld', tile, focus.observe('a', tile))(true); await turn();
+  focus.observe('a', { z: 9, x: 200, y: 200 }); prefetch.sweep();
+  assert.equal(interests.get('9/200/200').signal.aborted, false);
+  assert.equal(interests.get('7/50/50').signal.aborted, true);
+});

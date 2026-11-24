@@ -140,3 +140,18 @@ test('render promotion promotes resources already queued, ahead of other prefetc
   releases.shift()(); await promoted; await until(() => releases.length === 1);
   releases.shift()(); await neighbour;
 });
+
+test('promoting a render does not interrupt its other active resources during listener updates', async t => {
+  const dir = await setup(t), owner = createWorkOwner(PRIORITY.ZOOM), releases = [], signals = [];
+  const cache = createCache({ concurrency: 2, fetchImpl: (_url, { signal }) => new Promise((resolve, reject) => {
+    signals.push(signal); releases.push(() => resolve(pbf()));
+    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+  }) });
+  t.after(() => cache.close());
+  const get = i => cache.get({ file: path.join(dir, `${i}.pbf`), url: `https://example.test/${i}`, owner });
+  const jobs = [get(1), get(2), get(3)]; await until(() => cache.stats.downloads.queued === 1);
+  owner.promote(PRIORITY.REQUEST);
+  assert.equal(cache.stats.yielded, 0); assert.ok(signals.every(signal => !signal.aborted));
+  while (releases.length) releases.shift()();
+  await until(() => releases.length === 1); releases.shift()(); await Promise.all(jobs);
+});
