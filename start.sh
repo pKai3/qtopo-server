@@ -102,6 +102,15 @@ while kill -0 "$app_pid" 2>/dev/null; do
     display_failures=$((display_failures + 1))
     echo "[DISPLAY] Xvfb $DISPLAY (PID $xvfb_pid) check failed ($display_failures/3): $display_failure" >&2
     cat "$display_file.error" >&2 2>/dev/null || true
+    if (( display_failures == 1 )); then
+      # Preserve evidence before shutdown removes the container's cgroup. A
+      # display timeout alone cannot distinguish memory reclaim from CPU stalls.
+      for counter in memory.current memory.max memory.events memory.pressure cpu.pressure; do
+        if [[ -r "/sys/fs/cgroup/$counter" ]]; then
+          while IFS= read -r line; do echo "[DISPLAY] $counter: $line" >&2; done < "/sys/fs/cgroup/$counter"
+        fi
+      done
+    fi
     if [[ "$display_dead" == 1 ]] || (( display_failures >= 3 )); then
       echo "[DISPLAY] Xvfb $DISPLAY failed; stopping the server so the container can restart" >&2
       exit 1

@@ -158,6 +158,34 @@ test('native worker crash output reaches the application log and subsequent work
   assert.equal(renderer.stats.spawned, 2);
 });
 
+test('memory pressure releases a retained idle worker and queued rendering resumes', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-admission-test-'));
+  const MIB = 1024 ** 2;
+  let pressure = false, oldPid;
+  const renderer = createRenderer({ renderConcurrency: 16, renderQueueLimit: 8, renderWorkerMaxRssMb: 384,
+    rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 5000 }, path.join(__dirname, 'fixtures/render-worker.js'), undefined, {
+    read: () => {
+      let alive = false;
+      if (oldPid) { try { process.kill(oldPid, 0); alive = true; } catch {} }
+      const used = (pressure && alive ? 1400 : 100) * MIB;
+      return { limitBytes: 2048 * MIB, currentBytes: used, workingBytes: used };
+    },
+  });
+  t.after(async () => { renderer.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const pidFile = path.join(root, 'first.pid');
+  await renderer.render({ outPath: path.join(root, 'first.png'), recordPid: pidFile, rssBytes: 100 * MIB });
+  oldPid = Number(await fs.readFile(pidFile, 'utf8'));
+  for (let i = 0; i < 100 && renderer.stats.active; i++) await new Promise(resolve => setTimeout(resolve, 5));
+  pressure = true;
+  const next = renderer.render({ outPath: path.join(root, 'next.png'), assertExitedPidFile: pidFile });
+  assert.equal(renderer.stats.memory.limited, true);
+  await next;
+  assert.equal(renderer.stats.spawned, 2);
+  assert.equal(renderer.stats.memory.releasedIdleWorkers, 1);
+  assert.equal(renderer.stats.memory.limited, false);
+  assert.equal(renderer.stats.concurrency, 16, 'memory admission does not rewrite the configured ceiling');
+});
+
 test('concurrency eight actually starts eight separate workers simultaneously', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-parallel-test-'));
   const renderer = createRenderer({ renderConcurrency: 8, renderQueueLimit: 16, rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 10000 }, path.join(__dirname, 'fixtures/render-worker.js'));
