@@ -37,9 +37,9 @@ async function main() {
       for (let i = 0; i < pixels.length; i += 4) if (pixels[i + 3]) colours.add(`${pixels[i]},${pixels[i + 1]},${pixels[i + 2]}`);
       assert.ok(colours.size > 20, `${sample.name}/${profile.id} contains visible map detail`);
       seen.add(require('node:crypto').createHash('sha256').update(data).digest('hex'));
-      if (profile.id === 'classic') {
+      if (profile.id === 'readable') {
         const legacy = await fetch(origin + '/raster/' + xyz);
-        assert.deepEqual(Buffer.from(await legacy.arrayBuffer()), data, 'unqualified default must still be Classic');
+        assert.deepEqual(Buffer.from(await legacy.arrayBuffer()), data, 'unqualified default must be Readable');
       }
       const cached = await fetch(origin + route);
       assert.deepEqual(Buffer.from(await cached.arrayBuffer()), data);

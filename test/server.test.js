@@ -17,7 +17,7 @@ const { createRenderFlyby } = require('../lib/render-flyby');
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/YYbL4QAAAAASUVORK5CYII=', 'base64');
 async function server(t, dependencies = {}, env = {}) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-app-test-'));
-  const config = loadConfig({ DATA_DIR: dir, PORT: '0', CLEANUP_INTERVAL_MINUTES: '0', PREFETCH_RADIUS: '0', ADMIN_ALLOWED_NETWORKS: '127.0.0.1/32', ...env });
+  const config = loadConfig({ DATA_DIR: dir, PORT: '0', CLEANUP_INTERVAL_MINUTES: '0', PREFETCH_RADIUS: '0', ADMIN_ALLOWED_NETWORKS: '127.0.0.1/32', DEFAULT_PROFILE: 'classic', ...env });
   const instance = await createApp(config, dependencies);
   const listener = await new Promise(resolve => { const s = instance.app.listen(0, '127.0.0.1', () => resolve(s)); });
   const url = 'http://127.0.0.1:' + listener.address().port;
@@ -466,6 +466,13 @@ test('configuration and ArcGIS tile order are explicit', () => {
     assert.throws(() => loadConfig({ PREFETCH_RADIUS: radius }), /PREFETCH_RADIUS must be an integer between 0 and 10/);
   }
   assert.equal(loadConfig({ RENDER_CONCURRENCY: '8' }).prefetchConcurrency, 7);
+  assert.equal(loadConfig({}).renderConcurrency, 8);
+  assert.equal(loadConfig({}).prefetchConcurrency, 7);
+  assert.equal(loadConfig({ RENDER_CONCURRENCY: '20' }).renderConcurrency, 20);
+  assert.equal(loadConfig({ RENDER_CONCURRENCY: '24' }).prefetchConcurrency, 23);
+  assert.equal(loadConfig({ RENDER_CONCURRENCY: '24', PREFETCH_CONCURRENCY: '24' }).prefetchConcurrency, 23);
+  assert.throws(() => loadConfig({ RENDER_CONCURRENCY: '25' }), /RENDER_CONCURRENCY/);
+  assert.throws(() => loadConfig({ PREFETCH_CONCURRENCY: '25' }), /PREFETCH_CONCURRENCY/);
   assert.equal(loadConfig({ RENDER_CONCURRENCY: '8', PREFETCH_CONCURRENCY: '3' }).prefetchConcurrency, 3);
   assert.equal(loadConfig({ RENDER_CONCURRENCY: '2', PREFETCH_CONCURRENCY: '8' }).prefetchConcurrency, 1);
   assert.equal(loadConfig({ PREFETCH_ZOOM: '0' }).prefetchZoom, false);
@@ -533,7 +540,7 @@ test('named profile URLs isolate renders and aliases follow the configured defau
   } } }, { DEFAULT_PROFILE: 'readable' });
   const catalog = await (await fetch(s.url + '/api/providers')).json();
   assert.equal(catalog.defaultProfile, 'readable');
-  assert.deepEqual(catalog.profiles.map(p => p.id), ['classic', 'readable', 'size-2x', 'size-3x', 'mobile-2x', 'mobile-3x']);
+  assert.deepEqual(catalog.profiles.map(p => p.id), ['classic', 'readable', 'size-2x', 'size-3x', 'mobile-2x', 'mobile']);
   const tile = '/13/7578/4746.png';
   for (const profile of catalog.profiles) {
     const response = await fetch(s.url + '/' + profile.id + tile);
@@ -567,6 +574,34 @@ test('named profile URLs isolate renders and aliases follow the configured defau
   assert.ok(nswJobs.every(j => Object.values(j.style.sources).every(source => source.maxzoom === 12)), 'profile retains NSW indexed parent zoom');
   assert.deepEqual(new Set(nswJobs.map(j => j.style.layers.find(l => l.layout?.['icon-image']).layout['icon-size'] ?? 1)), new Set([1, 3]));
   assert.ok(jobs.some(j => j.kind === 'composite'), 'exercise automatic border composition');
+});
+
+test('Readable is the default and Mobile aliases preserve live styles and cache identity', async t => {
+  const jobs = [];
+  const s = await server(t, { renderer: { stats: {}, close() {}, async render(job) {
+    jobs.push(job); for (const output of job.outputs || [job]) await atomicWrite(output.outPath, PNG);
+  } } }, { DEFAULT_PROFILE: undefined });
+  let catalog = await (await fetch(s.url + '/api/providers')).json();
+  assert.equal(catalog.defaultProfile, 'readable');
+  assert.deepEqual(catalog.profiles.filter(p => !p.hidden).map(p => [p.id, p.name]), [['readable', 'Readable · desktop size'], ['mobile', 'Mobile']]);
+  assert.equal((await fetch(s.url + '/classic')).status, 200);
+  const tile = '/13/7578/4746.png';
+  for (const prefix of ['', '/readable', '/raster']) assert.equal((await fetch(s.url + prefix + tile)).status, 200);
+  assert.equal(jobs.length, 1, 'default requests reuse Readable');
+  for (const prefix of ['/mobile', '/mobile-3x', '/raster/mobile/qld']) assert.equal((await fetch(s.url + prefix + tile)).status, 200);
+  assert.equal(jobs.length, 2, 'both Mobile names share one render');
+  assert.deepEqual(await (await fetch(s.url + '/styles/mobile/qld.json')).json(), await (await fetch(s.url + '/styles/mobile-3x/qld.json')).json());
+  const { syncProfile } = require('../lib/profile-files');
+  const doc = { format: 1, id: 'mobile-3x', name: 'Mobile · 3×', styles: {
+    qld: await getStyle(s.config, s.providers.qld), nsw: await getStyle(s.config, s.providers.nsw),
+  } };
+  doc.styles.qld.layers.find(l => l.id === 'roads-high').paint['line-color'] = '#123456';
+  await syncProfile(s.config, doc); await sleep(270);
+  catalog = await (await fetch(s.url + '/api/providers')).json();
+  assert.equal(catalog.profiles.find(p => p.id === 'mobile').name, 'Mobile', 'live display names cannot undo the rename');
+  for (const prefix of ['/mobile', '/mobile-3x']) assert.equal((await fetch(s.url + prefix + tile)).status, 200);
+  assert.equal(jobs.length, 3, 'live updates through either alias share the new cache');
+  assert.equal(jobs.at(-1).style.layers.find(l => l.id === 'roads-high').paint['line-color'], '#123456');
 });
 
 test('prefetch keeps the requested profile for neighbouring tiles', async t => {

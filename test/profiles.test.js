@@ -74,7 +74,7 @@ test('profiles validate for both states, preserve Classic and keep independent c
 });
 
 test('default profile accepts built-ins or a valid custom name', () => {
-  assert.equal(loadConfig({}).defaultProfile, 'classic');
+  assert.equal(loadConfig({}).defaultProfile, 'readable');
   assert.equal(loadConfig({ DEFAULT_PROFILE: 'my-mobile' }).defaultProfile, 'my-mobile');
   for (const p of profiles) assert.equal(loadConfig({ DEFAULT_PROFILE: p.id }).defaultProfile, p.id);
   for (const value of ['constructor', '../classic', 'raster', 'UPPERCASE']) assert.throws(() => loadConfig({ DEFAULT_PROFILE: value }), /Unknown DEFAULT_PROFILE/);

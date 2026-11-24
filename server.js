@@ -249,9 +249,15 @@ async function createApp(config = loadConfig(), dependencies = {}) {
 
   app.get('/api/providers', async (req, res) => {
     await profileCatalog.refresh();
+    const available = profileCatalog.list();
+    const hidden = new Set(['classic', 'size-2x', 'size-3x', 'mobile-2x']);
     res.set('Cache-Control', 'no-cache').json({
       defaultProvider: config.defaultProvider, defaultProfile: config.defaultProfile,
-      profiles: profileCatalog.list().map(p => ({ id: p.id, name: p.name, factor: p.factor, refined: p.refined, raster: `${origin(req)}/${p.id}/{z}/{x}/{y}.png` })),
+      profiles: available.filter(p => p.id !== 'mobile-3x' || !available.some(other => other.id === 'mobile')).map(p => {
+        const id = p.id === 'mobile-3x' ? 'mobile' : p.id;
+        return { id, name: id === 'mobile' ? 'Mobile' : p.name, aliases: p.id === 'mobile-3x' ? ['mobile-3x'] : [],
+          hidden: hidden.has(id), factor: p.factor, refined: p.refined, raster: `${origin(req)}/${id}/{z}/{x}/{y}.png` };
+      }),
       automatic: { raster: `${origin(req)}/raster/{z}/{x}/{y}.png`, tileSize: config.tilePx, maxzoom: providers.qld.maxzoom, bounds: [137.8, -37.6, 162.7, -9], attribution: `${providers.qld.attribution}; ${providers.nsw.attribution}` },
       providers: Object.values(providers).map(p => ({
         id: p.id, name: p.name, type: p.type, bounds: p.bounds, center: p.center, zoom: p.zoom,
@@ -351,6 +357,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     res.set('Cache-Control', 'no-store').json(flyby.read(Number(after), session));
   });
   app.get('/raster', (_req, res) => res.redirect(302, '/?mode=raster'));
+  app.get('/classic', (_req, res) => res.sendFile(path.join(config.root, 'public/index.html')));
   app.use(express.static(path.join(config.root, 'public')));
   app.use((err, req, res, next) => {
     // A cancelled map download is already counted/logged by the close handler.

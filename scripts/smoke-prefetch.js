@@ -3,7 +3,8 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { loadConfig } = require('../lib/config');
 const { createProviders } = require('../lib/providers');
-const { getStyle, styleRevision } = require('../lib/styles');
+const { createStyleCache } = require('../lib/styles');
+const { createProfileCatalog } = require('../lib/profile-files');
 const { neighbours, zoomNeighbours } = require('../lib/prefetch');
 const origin = 'http://127.0.0.1:' + (process.env.PORT || 8080);
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -18,7 +19,9 @@ async function main() {
   const response = await fetch(url(tile));
   assert.equal(response.status, 200); await response.arrayBuffer();
   const config = loadConfig(), provider = createProviders(config).qld;
-  const revision = styleRevision(await getStyle(config, provider), config, provider);
+  const profiles = createProfileCatalog(config);
+  await profiles.refresh(true);
+  const { revision } = await createStyleCache(config).get(provider, profiles.get(config.defaultProfile));
   let status;
   for (let i = 0; i < 180; i++) {
     status = await (await fetch(origin + '/readyz')).json();

@@ -5,14 +5,14 @@ One XYZ tile source for Gaia GPS and other mapping apps, covering Queensland and
 ## Release channels
 
 - `docker.io/pkai3/qtopo-server:latest` — tested QLD + NSW release.
-- `docker.io/pkai3/qtopo-server:stable` — the last published release before adaptive memory admission (`5d5f2ae`, PR #27), promoted for comparison with Latest. The Stable server runs eight workers with a 4 GiB Docker cap; this image does not throttle admission against that cap.
+- `docker.io/pkai3/qtopo-server:stable` — an explicitly approved, tested release, promoted from an existing commit image without rebuilding.
 - `docker.io/pkai3/qtopo-server:fallback` — original pre-chat, pre-NSW image, preserved by digest without rebuilding it.
 - `:stable-before-15a5c79` — previous stable release through PR #12, retained for rollback.
 - `:pre-nsw` — another permanent reference to that same pre-NSW image.
 - `:stable-before-nsw` — the older stable image.
 - `:sha-<commit>` — individual new releases.
 
-The pre-NSW source is tagged `pre-nsw` in GitHub. New builds publish **latest only**, after unit tests and native Linux rendering checks. Both stable and fallback are protected by digest checks; promoting stable requires an explicit release decision.
+The pre-NSW source is tagged `pre-nsw` in GitHub. New builds publish **latest only**, after unit tests and native Linux rendering checks. Latest publication verifies that Stable stays unchanged and that Fallback retains its pinned digest. The manual **Promote approved stable image** workflow takes the full tested commit SHA, verifies the image revision, and promotes its exact digest without moving Latest or Fallback.
 
 ## Unraid
 
@@ -64,22 +64,21 @@ NSW’s published tile index selects the available vector parent at high zooms, 
 
 ### Appearance profiles
 
-The unqualified `/{z}/{x}/{y}.png` and `/raster/{z}/{x}/{y}.png` URLs follow `DEFAULT_PROFILE`, initially `classic`. Choose an **Appearance** in the viewer and use **Copy QLD + NSW tile URL** to add that profile as a separate Gaia source.
+The unqualified `/{z}/{x}/{y}.png` and `/raster/{z}/{x}/{y}.png` URLs follow `DEFAULT_PROFILE`, initially `readable`. Choose an **Appearance** in the viewer and use **Copy QLD + NSW tile URL** to add that profile as a separate Gaia source.
 
 | URL path | Appearance |
 |---|---|
 | `/classic/{z}/{x}/{y}.png` | Existing colours, symbols and desktop sizing |
 | `/readable/{z}/{x}/{y}.png` | Revised colours, water masking and icon-label placement, at original desktop size |
-| `/size-2x/{z}/{x}/{y}.png` | Original colours with text, symbols and strokes enlarged 2× |
-| `/size-3x/{z}/{x}/{y}.png` | Original colours with text, symbols and strokes enlarged 3× |
-| `/mobile-2x/{z}/{x}/{y}.png` | Revised colours and placement, 2× features with gentler contours |
-| `/mobile-3x/{z}/{x}/{y}.png` | Revised colours and placement, 3× features with gentler contours |
+| `/mobile/{z}/{x}/{y}.png` | Mobile sizing (formerly Mobile 3×) |
+
+`/mobile-3x/{z}/{x}/{y}.png` remains an alias to Mobile, using the same live style and rendered cache. Mobile 2× and the original enlarged variants are retired from the viewer choices; existing URLs remain compatible. Open `/classic` for the Classic viewer. Readable is the default on `/`.
 
 These names always select the current recipe; no version suffix is required. QLD/NSW selection remains automatic. The PNG dimensions, XYZ geography, source zoom thresholds and upstream features stay the same. Source data, fonts and sprites are shared; prepared styles, rendered tiles and prefetch groups are isolated by profile. Classic retains the previous cache revision exactly. Saved style files are never overwritten. Recipe changes get fresh server cache revisions without clearing any existing cache; Gaia's own saved/offline tiles still require a refresh or download to see changes.
 
 Readable and Mobile use softer land/contour colours and stronger text halos. Power lines are thin grey dashes at every display scale. In QLD, opaque water polygons cover waterway skeleton lines inside permanent water bodies while keeping external creek segments and drawing shorelines, roads and bridges above them. QLD point symbols that previously centred icon and text together let their label choose a clear side; the icon remains at its actual location. Existing custom label offsets are respected. NSW uses its own published ordering and collision rules, with larger features and revised water/contour colours. Pre-rendered NSW map sheets cannot be restyled.
 
-Advanced clients can request `/raster/{profile}/{provider}/{z}/{x}/{y}.png` or `/styles/{profile}/{provider}.json`. Legacy provider-specific routes follow the configured default. `/api/providers` lists all profiles and absolute tile templates; `/?profile=mobile-2x&mode=raster` opens a matching preview.
+Advanced clients can request `/raster/{profile}/{provider}/{z}/{x}/{y}.png` or `/styles/{profile}/{provider}.json`. Legacy provider-specific routes follow the configured default. `/api/providers` lists profiles, aliases, retired-choice visibility and absolute tile templates; `/?profile=mobile&mode=raster` opens the Mobile preview.
 
 ### Live profile updates
 
@@ -147,7 +146,7 @@ Additional endpoints:
 | STYLE_PATH | /data/styles/style.json | Editable QLD style |
 | PROFILE_DIR | STYLE_DIR (/data/styles) | Validated live profile JSON files; persistent overrides of bundled profiles |
 | FONT_DIR | Bundled fonts | Local QLD glyph directory |
-| DEFAULT_PROFILE | classic | Appearance for unqualified raster/style URLs; a built-in or installed profile name. Named URLs remain independent of this choice. |
+| DEFAULT_PROFILE | readable | Appearance for unqualified raster/style URLs; a built-in or installed profile name. Named URLs remain independent of this choice. |
 | DEFAULT_PROVIDER | qld | Initial viewer location: qld, nsw, nsw-topo; automatic GPS coverage is always enabled |
 | PUBLIC_URL | Request origin | External origin, e.g. https://maps.example.com, when using an HTTPS reverse proxy |
 | TILE_PX | 1024 | 256, 512 or 1024 output pixels for vector-to-raster maps |
@@ -156,7 +155,7 @@ Additional endpoints:
 | PNG_COMPRESSION_LEVEL | 3 | Lossless PNG compression, 0–9. Try 6 for slightly smaller files at the cost of more encoding CPU; resolution and colours are unchanged. Applies to newly rendered tiles only. |
 | LABEL_SCALE | 1 | Legacy extra raster text/icon multiplier, 0.5–3, applied on top of every profile; keep 1 when comparing named profiles. |
 | VECTOR_UPSTREAM | QLD service | Optional QLD template containing {z}, {x}, {y} |
-| RENDER_CONCURRENCY | 2 | Maximum simultaneous reusable native workers, 1–16. With a Docker memory cap, actual concurrency adapts to available memory. |
+| RENDER_CONCURRENCY | 8 | Maximum simultaneous reusable native workers, 1–24. With a Docker memory cap, actual concurrency adapts to available memory. |
 | RENDER_MEMORY_GUARD | 1 | Adapt concurrency and release speculative work when approaching the Docker RAM cap. Set 0 for unguarded admission; Docker still enforces its hard memory limit and worker recycling remains enabled. |
 | RENDER_MEMORY_HEADROOM_MB | 512 | Minimum memory headroom in MiB (0–65536). The guard reserves the larger of this value and the percentage below. |
 | RENDER_MEMORY_HEADROOM_PERCENT | 12.5 | Proportional memory headroom, 0–50 percent of the Docker RAM cap. Applies while the guard is enabled. |
@@ -204,7 +203,7 @@ Rendering workers are reused between tiles, including their loaded map style and
 
 When a finite Linux cgroup memory limit is present, render admission reads the whole container's working memory (including the server and idle workers, excluding reclaimable inactive file cache). It leaves 12.5% of the cap, at least 512 MiB, as headroom. Each new style/zoom/size class initially reserves at least 512 MiB (or a larger recent observed peak); after four completed renders in that class it uses the largest of its last 32 anonymous resident peaks, with a 128 MiB minimum. Dense zoom-prefetch peaks therefore do not set every foreground reservation. The shared headroom covers growth beyond those observations, without adding a second percentage margin to every worker. Shared file/library pages are counted by the container working set, rather than reserved repeatedly for each worker. Per-render peaks reset for each job; a process lifetime high-water mark is not reused for later smaller jobs. Reservations include jobs admitted before their processes start and expected growth in running workers. Pending jobs credit distinct warm idle workers whose retained allocations are already included in the container usage. Memory is sampled every 100ms and reread before admission. A failed reading pauses new renders until it recovers. Prefetch reserves room for an incoming requested render against both CPU slots and the effective memory budget; cached tiles bypass the gate. A blocked request can interrupt speculative renders, starting with zoom prefetch, and waits for their processes to exit before reusing the memory. Renders serving a real client are never interrupted. Under memory pressure, speculative work can also be released without waiting for a new request. Spare idle native maps are released one at a time when necessary, preserving warm reuse where possible. No configured CPU, RAM or worker setting is rewritten.
 
-`/readyz` exposes `renderer.memory` with current/peak working usage, current/peak total cgroup charges, worker reservation size, pause count, parent/worker/idle RSS, worker anonymous resident memory, and released idle workers. The status page shows **Memory limited** while queued work waits for room. Per-process RSS can double-count shared pages; the cgroup working set drives admission. This is a measured admission estimate, not a hard per-job memory guarantee: unusually large single renders can exceed previous peaks. Keep Docker's hard limit. Repeated pan tests exercise 16 configured workers with a 4 GiB cap, multiple styles/zooms and prefetch, record a memory history, and check that all work drains without an OOM or restart.
+`/readyz` exposes `renderer.memory` with current/peak working usage, current/peak total cgroup charges, worker reservation size, pause count, parent/worker/idle RSS, worker anonymous resident memory, and released idle workers. The status page shows **Memory limited** while queued work waits for room. Per-process RSS can double-count shared pages; the cgroup working set drives admission. This is a measured admission estimate, not a hard per-job memory guarantee: unusually large single renders can exceed previous peaks. Keep Docker's hard limit. Repeated pan tests exercise 24 configured workers with a 4 GiB cap, multiple styles/zooms and prefetch, record a memory history, and check that all work drains without an OOM or restart.
 
 Prefetch starts after a 500ms delay at the beginning of a new burst, then prepares same-zoom neighbours using spare rendering capacity even while other raster requests remain outstanding. Continuing requests do not keep resetting that initial delay. The render queue always selects waiting requested tiles first and reserves a foreground slot when possible. It never expands from prefetched tiles. Priority is: requested tiles, same-zoom neighbours, then zoom-out/zoom-in tiles. Within each prefetch tier, the newest requested location comes first, with nearer neighbours first within that location. Overlapping queued neighbours move to the newer request; an older request finishing late cannot jump ahead. When the queue fills, zoom tiles are discarded before same-zoom neighbours, then older/farther entries are discarded.
 
