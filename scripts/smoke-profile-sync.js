@@ -34,7 +34,7 @@ async function main() {
   const after = await (await fetch(origin + '/readyz')).json();
   assert.equal(after.startedAt, before.startedAt);
   assert.equal(after.revision, before.revision);
-  assert.equal(after.settings.defaultProfile, 'classic');
+  assert.equal(after.settings.defaultProfile, 'readable');
   console.log('Native live profile sync passed: changed pixels, invalid rejection, rollback, unchanged server start/revision/default');
 }
 main().catch(error => { console.error(error); process.exit(1); });

@@ -15,8 +15,9 @@ import { createStateSelector, selectPreview } from './preview.mjs';
     const initial = catalog.providers.find(p => p.id === catalog.defaultProvider);
     catalog.providers.unshift({ ...catalog.automatic, id: 'auto', name: 'QLD + NSW — automatic', type: 'vector', center: initial.center, zoom: initial.zoom });
     let provider = catalog.providers.find(p => p.id === params.get('provider')) || catalog.providers[0];
-    let profile = catalog.profiles.find(p => p.id === params.get('profile')) || catalog.profiles.find(p => p.id === catalog.defaultProfile);
-    for (const p of catalog.profiles) $('profile').add(new Option(p.name, p.id));
+    const findProfile = id => catalog.profiles.find(p => p.id === id || p.aliases?.includes(id));
+    let profile = findProfile(location.pathname.replace(/\/$/, '') === '/classic' ? 'classic' : params.get('profile')) || findProfile(catalog.defaultProfile);
+    for (const p of catalog.profiles.filter(p => !p.hidden || p === profile)) $('profile').add(new Option(p.name, p.id));
     $('profile').value = profile.id;
     let selection, currentStyle, revision = 0, stateSelector;
     for (const p of catalog.providers) $('provider').add(new Option(p.name, p.id));
@@ -64,7 +65,7 @@ import { createStateSelector, selectPreview } from './preview.mjs';
         : `Interactive vectors · ${selected.name}${provider.id === 'auto' ? ' · selected by map centre' : ''} · ${selected.attribution}`;
       $('status').textContent = ''; $('status').className = '';
       params.set('profile', profile.id); params.set('provider', provider.id); params.set('mode', $('mode').value);
-      history.replaceState(null, '', '?' + params.toString() + location.hash);
+      history.replaceState(null, '', (profile.id === 'classic' ? '/classic' : '/') + '?' + params.toString() + location.hash);
     }
     async function showRegions() {
       if (!selection || !map.isStyleLoaded()) return;
