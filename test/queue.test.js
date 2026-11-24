@@ -2,6 +2,26 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { WorkQueue, PRIORITY } = require('../lib/queue');
 const { createRequestFocus } = require('../lib/request-focus');
+const { readiness } = require('../lib/readiness');
+
+test('old prefetch does not degrade readiness and promotion starts a fresh requested wait', async t => {
+  let now = 1000;
+  t.mock.method(Date, 'now', () => now);
+  const queue = new WorkQueue(1, 4, 1, () => false);
+  const completion = assert.rejects(queue.run(() => assert.fail('admission remains blocked'),
+    { key: 'old-neighbour', priority: PRIORITY.NEIGHBOUR }), { status: 503 });
+  try {
+    now += 130000;
+    assert.equal(queue.stats.oldestQueuedMs, 130000);
+    assert.equal(readiness({ renderer: queue.stats }).ready, true);
+    queue.promote('old-neighbour');
+    now += 500;
+    assert.equal(queue.stats.oldestRequestedQueuedMs, 500);
+    assert.equal(readiness({ renderer: queue.stats }).ready, true);
+    now += 120000;
+    assert.equal(readiness({ renderer: queue.stats }).reasons[0].code, 'render-queue-stalled');
+  } finally { queue.close(); await completion; }
+});
 
 test('latest zoom moves all matching requested tiles ahead without cancelling older work', async () => {
   const queue = new WorkQueue(1, 16), focus = createRequestFocus(), seen = [];

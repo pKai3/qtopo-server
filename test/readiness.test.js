@@ -4,7 +4,7 @@ const { readiness } = require('../lib/readiness');
 
 test('idle and briefly busy services are ready without requiring live upstream probes', () => {
   assert.equal(readiness().ready, true);
-  assert.equal(readiness({ renderer: { consecutiveFailures: 2, queued: 5, oldestQueuedMs: 500 } }).ready, true);
+  assert.equal(readiness({ renderer: { consecutiveFailures: 2, queued: 5, oldestRequestedQueuedMs: 500 } }).ready, true);
 });
 test('repeated rendering and provider failures are distinguished and clear after success', () => {
   const data = { renderer: { consecutiveFailures: 3 }, cache: { providers: { nsw: { consecutiveFailures: 3 }, qld: { consecutiveFailures: 0 } } } };
@@ -13,7 +13,7 @@ test('repeated rendering and provider failures are distinguished and clear after
   assert.equal(readiness(data).ready, true);
 });
 test('storage, memory, prolonged queue stalls and maintenance report actionable degradation', () => {
-  const result = readiness({ storage: { pressure: true }, renderer: { memory: { readFailed: true }, queued: 1, oldestQueuedMs: 120000 }, maintenance: true });
+  const result = readiness({ storage: { pressure: true }, renderer: { memory: { readFailed: true }, queued: 1, oldestRequestedQueuedMs: 120000 }, maintenance: true });
   assert.equal(result.ready, false);
   assert.deepEqual(result.reasons.map(reason => reason.code), ['maintenance', 'storage-pressure', 'memory-check-failed', 'render-queue-stalled']);
   assert.equal(readiness({ storage: { readFailed: true } }).reasons[0].code, 'storage-check-failed');
