@@ -78,3 +78,14 @@ The icon and name share a symbol to prevent self-collision. Two combined rules
 (one below z17, one above) and one capped source keep those landmarks visible while
 all other layers, including 1 m contours, retain their existing source resolution.
 Verified with native previews at West End z18, UQ St Lucia z19 and Guyatt Park z17.
+
+NSW colors in Readable, Mobile 2x, Mobile 3x and their Light derivatives now use
+the corresponding QLD palette. Open land is tan, water blue, protected land
+muted green, contours brown, and road colors follow the same hierarchy. These
+edits preserve NSW geometry, feature classes, layer order, zoom thresholds,
+line widths and label placement. Classic remains unchanged.
+
+Run `node scripts/match-nsw-colors.js` to repeat the semantic color matching after
+editing a detailed QLD palette; it also regenerates both Light styles. It only
+writes the five named style files. See [NSW palette mapping](NSW-palette.md) for
+the layer mapping and the cases that intentionally retain their NSW treatment.
