@@ -2,6 +2,10 @@
 
 One XYZ tile source for Gaia GPS and other mapping apps, covering Queensland and NSW automatically. Queensland uses your editable vector style; NSW uses the official NSW vector basemap. Both are rendered into PNG tiles for the GPS client. The browser supports interactive vectors and a preview of the GPS raster tile source.
 
+## Performance benchmarks
+
+The reusable [benchmark toolkit](scripts/benchmark/README.md) includes sequential server comparisons, saved pan patterns, live tile-request visualization, box plots and offline replay. It captures and restores the selected container’s current settings. See the guide for the read-only preflight and one-command remote launcher.
+
 ## Release channels
 
 - `docker.io/pkai3/qtopo-server:latest` — tested QLD + NSW release.
