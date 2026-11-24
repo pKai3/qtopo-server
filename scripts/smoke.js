@@ -35,7 +35,16 @@ async function main() {
     const t = tile(lng, lat, z), url = `${origin}/raster/${provider === 'auto' ? '' : provider + '/'}${t.z}/${t.x}/${t.y}.png`;
     console.log('Rendering', url);
     const started = performance.now();
-    const r = await fetch(url, { signal: AbortSignal.timeout(120000) });
+    let r;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      r = await fetch(url, { signal: AbortSignal.timeout(120000) });
+      // A transient official raster-service failure must not skip validation;
+      // retry it twice, then still fail if a real map cannot be rendered.
+      if (attempt === 2 || r.status !== 502 || !/Upstream HTTP (502|503|504)/.test(await r.clone().text())) break;
+      await r.body?.cancel();
+      console.log('Retrying transient upstream failure', url);
+      await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 2000));
+    }
     assert.equal(r.status, 200, await (r.ok ? Promise.resolve('') : r.text()));
     assert.match(r.headers.get('content-type'), /image\/png/);
     const data = Buffer.from(await r.arrayBuffer());
