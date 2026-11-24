@@ -117,6 +117,6 @@ import { createStateSelector, selectPreview } from './preview.mjs';
       catch { window.prompt('Copy this QLD + NSW URL into Gaia or your GPS app:', profile.raster); }
     });
     await switchStyle();
-    if (innerWidth < 600) document.querySelector('details').open = false;
+    if (innerWidth < 600) $('map-controls').open = false;
   } catch (err) { $('status').textContent = err.message; $('status').className = 'error'; }
 })();

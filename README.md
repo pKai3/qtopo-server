@@ -40,6 +40,8 @@ Keep using `http://<unraid-host>:<host-port>/raster/{z}/{x}/{y}.png` in Gaia or 
 
 ### Status and private logs
 
+The map includes a compact, independently collapsible **Server activity** panel with Rendering and Waiting queues, using the same requested/nearby/zoom colours as the full activity page. It remembers whether you leave it open and polls only while expanded and the page is visible.
+
 Open `/status` on the normal server URL for public, read-only activity charts. `/readyz` returns aggregate counters, settings and readiness; it omits individual tile locations, test coordinates and local maintenance details. It returns HTTP 503 with an explanation when storage checks fail, disk limits cannot be met, memory admission cannot read its limit, requested work stalls, or three consecutive renders or provider downloads fail. The dashboard continues showing live figures and the reason while degraded. Actual successful renders/downloads clear their corresponding failure state. An idle server starts ready; no extra map downloads or renders are scheduled just to check health. `/healthz` remains the lightweight process liveness check used by Docker, so an upstream outage does not itself cause restart loops. Readiness transitions are also logged. Enabling ZeroTier is not required to view status. The former `/api/actions/*` web endpoints return 404 for every client, including localhost and trusted proxies.
 
 Raw logs contain requested tile locations and remain restricted. The log panel is shown only to allowed clients:
