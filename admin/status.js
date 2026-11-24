@@ -105,13 +105,19 @@ async function refresh() {
   loading = true;
   try {
     const response = await fetch('/readyz' + (splitClients ? '?clients=1' : ''), { cache: 'no-store', signal: AbortSignal.timeout(10000) });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok && response.status !== 503) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     const r = data.renderer, c = data.cache, p = data.prefetch, q = data.requests, s = data.settings;
     const busy = q.active || r.active || c.activeDownloads;
-    $('activity').textContent = r.memory?.limited ? 'Memory limited' : busy ? 'Working' : r.queued || p.queued ? 'Waiting' : 'Idle';
+    $('activity').textContent = data.health?.ready === false ? 'Needs attention' : r.memory?.limited ? 'Memory limited' : busy ? 'Working' : r.queued || p.queued ? 'Waiting' : 'Idle';
     text($('updated'), `Updated ${new Date().toLocaleTimeString()}`);
-    $('error').hidden = true;
+    $('error').hidden = data.health?.ready !== false;
+    if (data.health?.ready === false) text($('error'), data.health.reasons.map(reason => reason.message).join(' '));
+    const storage = data.storage || {};
+    text($('storage-status'), storage.readFailed ? 'Disk checks failed.' : storage.running ? 'Removing expired or old cached files where needed.' : storage.blocked ? 'Limits exceeded. Active files and non-cache data are protected.' : 'Old cached files are removed when either storage limit is reached.');
+    rows($('storage'), [['Estimated cache size', bytes(storage.cacheBytes || 0)], ['Maximum cache', storage.maxBytes ? bytes(storage.maxBytes) : 'Disabled'],
+      ['Least free space across cache disks', storage.freeBytes == null ? 'Checking' : bytes(storage.freeBytes)], ['Minimum free space', storage.minFreeBytes ? bytes(storage.minFreeBytes) : 'Disabled'],
+      ['Space reclaimed this session', bytes(storage.reclaimedBytes || 0)], ['Last cache scan', storage.lastScanAt ? new Date(storage.lastScanAt).toLocaleString() : 'Pending']], true);
     $('workers').textContent = `${r.active} / ${r.concurrency}`;
     $('workers-detail').textContent = r.active ? `${r.workers} processes · ${r.idleWorkers ?? 0} idle · peak ${r.peakActive} busy` : `${r.idleWorkers ?? r.workers} workers kept ready · peak ${r.peakActive} busy`;
     $('memory-detail').textContent = r.memory?.enabled
@@ -156,6 +162,7 @@ async function refresh() {
       ['Pan/zoom reprioritization', s.requestReprioritize ? 'Enabled' : 'Disabled'],
       ['Pan threshold', `${number(s.requestPanThreshold)} tiles`],
       ['Interrupt prefetch for requests', s.prefetchPreempt ? 'Enabled' : 'Disabled'],
+      ['Tile request deadline', `${number(s.requestTimeoutSeconds)} seconds`],
       ['Prefetch concurrency', number(s.prefetchConcurrency)], ['Render queue limit', number(s.renderQueueLimit)], ['Download concurrency', number(s.upstreamConcurrency)], ['Zoom prefetch', s.prefetchZoom && s.prefetchRadius ? 'Enabled · lowest priority' : 'Disabled'], ['Started', new Date(data.startedAt).toLocaleString()]], true);
     $('release').textContent = `QTopo ${data.version} · ${data.revision.slice(0, 12)}`;
     $('logs-panel').hidden = !data.logsAvailable;

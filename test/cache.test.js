@@ -6,6 +6,19 @@ const path = require('node:path');
 const { gzipSync } = require('node:zlib');
 const { createCache } = require('../lib/cache');
 const { PRIORITY } = require('../lib/queue');
+
+test('provider readiness records actual fetch failures and clears only after a successful fetch', async t => {
+  const dir = await setup(t); let fail = true;
+  const cache = createCache({ fetchImpl: async () => fail ? new Response('offline', { status: 503 }) : pbf() });
+  t.after(() => cache.close());
+  const opts = { file: path.join(dir, 'tile.pbf'), provider: 'nsw', url: 'https://example.test/tile' };
+  for (let i = 0; i < 3; i++) await assert.rejects(cache.get(opts));
+  assert.equal(cache.stats.providers.nsw.consecutiveFailures, 3);
+  assert.equal(cache.stats.providers.nsw.lastSuccessAt, null);
+  fail = false; await cache.get(opts);
+  assert.equal(cache.stats.providers.nsw.consecutiveFailures, 0);
+  assert.ok(cache.stats.providers.nsw.lastSuccessAt);
+});
 async function setup(t) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-test-'));
   t.after(() => fs.rm(dir, { recursive: true, force: true }));

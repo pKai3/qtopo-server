@@ -132,4 +132,4 @@ Relative traces store `baseZoom`, an `anchor` tile at that zoom, and signed tile
 npm run test:benchmark
 ```
 
-The trace tests run without a server. The host-runner tests use a fake Docker daemon and verify cold-cache scope, preservation of nonstandard limits/styles, successful restoration, failed workload/create recovery, manual recovery, read-only checks and unsafe-path rejection. They do not render tiles or touch real containers. The JavaScript tests also run in the repository's normal test suite.
+The trace tests run without a server. The host-runner tests use a fake Docker daemon and verify cold-cache scope, preservation of nonstandard limits/styles, successful restoration, failed workload/create recovery, manual recovery, read-only checks and unsafe-path rejection. They do not render tiles or touch real containers. Both benchmark test suites run only through this manual command. The normal application tests and image release workflow do not run them.

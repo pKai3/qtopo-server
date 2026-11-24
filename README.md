@@ -40,7 +40,7 @@ Keep using `http://<unraid-host>:<host-port>/raster/{z}/{x}/{y}.png` in Gaia or 
 
 ### Status and private logs
 
-Open `/status` on the normal server URL for public, read-only activity charts. `/readyz` returns aggregate counters and settings; it omits individual tile locations, test coordinates and local maintenance details. Enabling ZeroTier is not required to view status. The former `/api/actions/*` web endpoints return 404 for every client, including localhost and trusted proxies.
+Open `/status` on the normal server URL for public, read-only activity charts. `/readyz` returns aggregate counters, settings and readiness; it omits individual tile locations, test coordinates and local maintenance details. It returns HTTP 503 with an explanation when storage checks fail, disk limits cannot be met, memory admission cannot read its limit, queued work stalls, or three consecutive renders or provider downloads fail. The dashboard continues showing live figures and the reason while degraded. Actual successful renders/downloads clear their corresponding failure state. An idle server starts ready; no extra map downloads or renders are scheduled just to check health. `/healthz` remains the lightweight process liveness check used by Docker, so an upstream outage does not itself cause restart loops. Readiness transitions are also logged. Enabling ZeroTier is not required to view status. The former `/api/actions/*` web endpoints return 404 for every client, including localhost and trusted proxies.
 
 Raw logs contain requested tile locations and remain restricted. The log panel is shown only to allowed clients:
 
@@ -178,7 +178,11 @@ Additional endpoints:
 | PREFETCH_CONCURRENCY | RENDER_CONCURRENCY − 1 | Maximum simultaneous prefetch groups, at least 1; QLD vector siblings share a grid group, while other tile types count individually. The render queue also caps background jobs to leave a slot for requests when possible. |
 | PREFETCH_QUEUE_LIMIT | 64 | Maximum pending neighbouring tiles; older queued tiles are dropped when full |
 | RENDER_TIMEOUT_SECONDS | 60 | Worker deadline, maximum 300 |
+| REQUEST_TIMEOUT_SECONDS | 120 | Total tile-request deadline, including discovery, queue/memory waiting and delivery; 1–900 seconds. A timeout returns an uncached, retryable 504 if delivery has not started. |
 | UPSTREAM_TIMEOUT_SECONDS | 20 | Download deadline, maximum 120 |
+| CACHE_MAX_GIB | 20 | Maximum combined managed cache size across vector/v2, raster/v2 and resources/v2. Oldest unused files are removed when exceeded. 0 disables this limit. |
+| CACHE_MIN_FREE_GIB | 5 | Minimum free space on each filesystem containing a managed cache. Cleanup can run even below the maximum cache size. 0 disables this limit. |
+| CACHE_CHECK_INTERVAL_SECONDS | 30 | Free-space check interval; 1–3600 seconds. Completed writes also trigger a cache-size check when needed. |
 | UPSTREAM_CONCURRENCY | 16 | Maximum concurrent upstream downloads, 1–64; prefetch may use up to half, leaving capacity for requested resources when possible |
 | RASTER_TTL_HOURS | 72 | Raster cache lifetime; 0 keeps successful tiles indefinitely |
 | VECTOR_TTL_HOURS | 168 | Vector cache lifetime; 0 keeps successful tiles indefinitely |
@@ -192,6 +196,12 @@ Additional endpoints:
 | MESA_SHADER_CACHE_DIR | /data/resources/mesa | Compiled graphics cache shared by rendering workers; must be writable by the runtime user |
 
 Invalid configuration fails at startup. Cache expiry is checked on access, not just by the cleanup job. Style changes and render-setting changes automatically use a new raster cache revision. HTTP responses advertise up to one hour of freshness; Gaia's saved/offline maps can retain old tiles until explicitly refreshed or downloaded again.
+
+Storage cleanup removes expired files first, then the oldest unused managed cache files when either limit is exceeded. It aims for 90% of the cache-size limit and 110% of the minimum free-space threshold, stopping only when both constraints are satisfied or no eligible files remain. Each cache filesystem is checked separately. The dashboard shows estimated cache size, free space, reclaimed bytes and the last full scan. Writes update the estimate; full scans reconcile it. These are cleanup thresholds, so concurrent writes can temporarily exceed them.
+
+Cached files being read, sent or written are protected, including sibling outputs and source images of active renders. A request arriving during eviction waits for deletion to finish and then follows the ordinary cache-miss path. PNGs and their empty markers are managed together. Cleanup stays within the three managed `v2` cache trees; it preserves styles, profile history, legacy rollback caches, shader data, unrelated files and symlink targets. If other data or active files prevent enough space being reclaimed, readiness reports the unresolved pressure. The normal expiry interval remains independent; setting it to zero does not disable disk limits.
+
+Each live HTTP tile request owns a separate subscription to shared render work. One disconnect or deadline does not cancel another request for the same tile or a sibling in its metatile, even when they share an IP address. Only a queued job with no remaining subscribers and no prefetch commitment is removed; already running renders finish under their existing worker deadline. An immediate retry starts or joins valid work rather than a cancelled job. Panning changes priority, not whether an open request is still wanted. If a request deadline expires after streaming has begun, the connection closes rather than presenting a partial PNG as a complete tile.
 
 Parsed styles and their cache revisions are reused in memory. File metadata is checked on every access so local style edits still take effect immediately. NSW zoom variants are cached separately without altering the base style. The metatile renderer uses a new vector raster revision so old clipped images are regenerated; vector downloads and other resource caches are reused. Successful cached delivery avoids a second PNG/empty-marker lookup. Expired tiles still refresh before delivery; stale tiles are not served while refreshing in the background. Changing PNG compression does not invalidate existing tiles because their pixels are unchanged.
 
@@ -224,6 +234,8 @@ The `/status` page updates every 250ms while visible, waiting for each response 
 The viewer serves its JavaScript locally. Map data and uncached NSW glyphs/sprites still require internet access. Upstream resources are fetched from fixed provider URLs; this is not a general-purpose proxy.
 
 ## Development and verification
+
+This work is based on published Stable revision `30852c21d80c8327fde06db851f5bfd1b7668112`, retaining its separate prefetch scheduler. The unified requested/prefetch queue experiment at `5c91fc4` was unsuccessful for the intended speed improvement and is preserved on branch `codex/archive-unsuccessful-unified-queue` and annotated tag `unsuccessful-unified-queue-2026-11-25`. The historical Git branch named `stable` is older than the published Stable image. The benchmark toolkit is retained for optional manual tests; `npm run test:benchmark` is not part of the normal application or image-release tests.
 
 Run these commands in the **Unraid terminal** (replace the container name for stable):
 

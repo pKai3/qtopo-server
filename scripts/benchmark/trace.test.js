@@ -3,8 +3,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { prepareTrace } = require('../scripts/benchmark/run');
-const directory = path.join(__dirname, '../scripts/benchmark/traces');
+const { prepareTrace } = require('./run');
+const directory = path.join(__dirname, 'traces');
 
 test('bundled traces work in a clean checkout without capture files', () => {
   prepareTrace(JSON.parse(fs.readFileSync(path.join(directory,'synthetic.json'))), 'synthetic');
