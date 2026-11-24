@@ -22,6 +22,7 @@ import { createStateSelector, selectPreview } from './preview.mjs';
     for (const p of catalog.providers) $('provider').add(new Option(p.name, p.id));
     $('provider').value = provider.id;
     $('mode').value = params.get('mode') === 'raster' ? 'raster' : 'vector';
+    $('mode-label').textContent = $('mode').value === 'raster' ? 'Raster' : 'Vector';
     function previewStyle({ provider: selected, mode }) {
       if (mode === 'vector') return `/styles/${profile.id}/${selected.id}.json`;
       const rasterURL = selected.id === 'auto' ? profile.raster : `${location.origin}/raster/${profile.id}/${selected.id}/{z}/{x}/{y}.png`;
@@ -54,6 +55,7 @@ import { createStateSelector, selectPreview } from './preview.mjs';
     function syncUI() {
       const raster = selection.mode === 'raster', selected = selection.provider;
       $('mode').value = selection.mode;
+      $('mode-label').textContent = raster ? 'Raster' : 'Vector';
       $('mode').disabled = provider.type === 'raster';
       $('profile').disabled = provider.type === 'raster';
       $('layers').disabled = raster;

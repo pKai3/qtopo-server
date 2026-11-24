@@ -1,6 +1,21 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { createRequestFocus, rememberInterest } = require('../lib/request-focus');
+const { WorkQueue, PRIORITY } = require('../lib/queue');
+
+test('disabling pan/zoom reprioritization keeps requested arrival order across jumps on a shared IP', async () => {
+  const focus = createRequestFocus({ reprioritize: false }), queue = new WorkQueue(1, 8, 1, () => false);
+  const first = { z: 12, x: 100, y: 100 }, pan = { z: 12, x: 150, y: 150 }, zoom = { z: 14, x: 600, y: 600 };
+  const order = [];
+  const enqueue = (name, tile, priority = PRIORITY.REQUEST) => {
+    const interest = focus.observe('shared-ip', tile).forTile(tile);
+    return queue.run(() => order.push(name), { priority, score: interest.score });
+  };
+  const tasks = [enqueue('prefetch', first, PRIORITY.ZOOM), enqueue('first', first), enqueue('pan', pan), enqueue('zoom', zoom)];
+  queue.canStart = () => true; queue.drain(); await Promise.all(tasks);
+  assert.deepEqual(order, ['first', 'pan', 'zoom', 'prefetch']);
+  queue.close();
+});
 
 test('small pans keep the area anchor; large and gradual pans move it in tile units', () => {
   const focus = createRequestFocus({ distance: 8 });

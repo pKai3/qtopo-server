@@ -476,6 +476,27 @@ test('configuration and ArcGIS tile order are explicit', () => {
   assert.equal(parseTile({ z: '3', x: '8', y: '0' }), null);
   assert.notEqual(styleRevision({}, config, p.qld), styleRevision({}, { ...config, tilePx: 512 }, p.qld));
 });
+
+test('startup tuning is validated and reported as the effective running configuration', async t => {
+  const values = { RENDER_MEMORY_GUARD: '0', RENDER_MEMORY_HEADROOM_MB: '256', RENDER_MEMORY_HEADROOM_PERCENT: '10',
+    RENDER_MEMORY_INITIAL_WORKER_MB: '300', RENDER_WORKER_MAX_RSS_MB: '512', REQUEST_REPRIORITIZE: '0', REQUEST_PAN_THRESHOLD: '4', PREFETCH_PREEMPT: '0' };
+  const s = await server(t, {}, values);
+  const { settings } = await (await fetch(s.url + '/readyz')).json();
+  assert.equal(settings.renderMemoryGuard, false);
+  assert.equal(settings.renderMemoryHeadroomMb, 256);
+  assert.equal(settings.renderMemoryHeadroomPercent, 10);
+  assert.equal(settings.renderMemoryInitialWorkerMb, 300);
+  assert.equal(settings.renderWorkerMaxRssMb, 512);
+  assert.equal(settings.requestReprioritize, false);
+  assert.equal(settings.requestPanThreshold, 4);
+  assert.equal(settings.prefetchPreempt, false);
+  for (const name of ['RENDER_MEMORY_GUARD', 'REQUEST_REPRIORITIZE', 'PREFETCH_PREEMPT']) {
+    assert.throws(() => loadConfig({ [name]: '2' }), new RegExp(name));
+  }
+  for (const [name, value] of [['RENDER_MEMORY_HEADROOM_MB', '-1'], ['RENDER_MEMORY_HEADROOM_PERCENT', '51'], ['RENDER_MEMORY_INITIAL_WORKER_MB', '127']]) {
+    assert.throws(() => loadConfig({ [name]: value }), new RegExp(name));
+  }
+});
 test('the existing Gaia URL selects QLD and NSW vector rendering and combines border tiles', async t => {
   const calls = [], jobs = [];
   const s = await server(t, {
