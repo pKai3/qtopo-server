@@ -39,6 +39,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   const cache = dependencies.cache || createCache({ timeoutMs: config.upstreamTimeoutMs, emptyTTL: config.emptyTTL, concurrency: config.upstreamConcurrency, logger: L });
   const flyby = dependencies.flyby || createRenderFlyby();
   const renderer = dependencies.renderer || createRenderer(config, undefined, flyby);
+  renderer.enableResourceOwnership?.();
   const requestFocus = createRequestFocus({ distance: config.requestPanThreshold, reprioritize: config.requestReprioritize });
   const nativeZoom = dependencies.nativeZoom || createTileIndex(config, cache);
   const stopCleaner = startCleaner(config, L);

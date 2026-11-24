@@ -16,7 +16,7 @@ process.on('message', async job => {
   if (job.fetchUrls) {
     try {
       await Promise.all(job.fetchUrls.map(async url => {
-        const response = await fetch(url, { headers: { 'X-QTopo-Render': job.resourceOwner, 'X-QTopo-Priority': String(job.priority) } });
+        const response = await fetch(url, { headers: { ...(job.resourceOwner ? { 'X-QTopo-Render': job.resourceOwner } : {}), 'X-QTopo-Priority': String(job.priority) } });
         if (!response.ok) throw new Error('Resource failed: ' + response.status);
         await response.arrayBuffer();
       }));

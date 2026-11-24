@@ -719,3 +719,17 @@ test('terminating an obsolete worker aborts its actual HTTP download dependencie
   assert.equal(cache.stats.activeDownloads, 0); assert.equal(cache.stats.downloads.queued, 0);
   assert.equal(cache.stats.cancelled, 2); assert.equal(cache.stats.errors, 0);
 });
+
+test('standalone render tools can reuse another server without sending an unregistered owner', async t => {
+  const { createRenderer } = require('../lib/render');
+  const s = await server(t, { cache: { stats: {}, async get(options) {
+    assert.equal(options.owner, undefined);
+    await atomicWrite(options.file, Buffer.from([26, 0])); return { path: options.file };
+  } } });
+  const standalone = createRenderer({ renderConcurrency: 1, renderQueueLimit: 4, renderTimeoutMs: 5000,
+    rasterTTL: 10000, emptyTTL: 1000 }, path.join(__dirname, 'fixtures/render-worker.js'));
+  t.after(() => standalone.close());
+  const outPath = path.join(s.config.dataDir, 'standalone.png');
+  await standalone.render({ outPath, fetchUrls: [s.url + '/vector/qld/13/7578/4746.pbf'] });
+  assert.equal(await fs.readFile(outPath, 'utf8'), 'rendered-test-output');
+});
