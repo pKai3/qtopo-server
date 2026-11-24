@@ -44,12 +44,13 @@ Raw logs contain requested tile locations and remain restricted. The log panel i
 - `ADMIN_ALLOWED_HOSTS`: exact names/IPs used for private logs, without schemes or ports.
 - `TRUSTED_PROXIES`: only the proxy's actual source address as seen by QTopo. This also allows correctly forwarded HTTPS URLs. Never trust an entire Docker/LAN network as a proxy.
 
-A public DNS name still uses its public route when ZeroTier is enabled. That affects private logs and tile previews; status and map tiles are public. Read full container logs from Unraid or `docker logs` when needed. Forwarded private addresses from untrusted peers cannot enable log access.
+A public DNS name still uses its public route when ZeroTier is enabled. That affects private logs; status, tile previews and map tiles are public. Read full container logs from Unraid or `docker logs` when needed. Forwarded private addresses from untrusted peers cannot enable log access.
 
-The management page's **Tile flyby** switch shows a sample of freshly rendered
+The public status page's **Tile flyby** switch shows a sample of freshly rendered
 tiles drifting up the right edge. It is off by default and remembers the browser's
-choice. Previews share the application log's management access restrictions;
-public status contains no previews. Hidden pages stop watching, and reduced-motion
+choice. The preview feed is public and contains map images, zoom, style and render
+priority, without client identifiers or tile coordinates. Raw logs remain private.
+Hidden pages stop watching, and reduced-motion
 settings use still cards. The existing renderer creates a 160px JPEG after saving
 the requested PNG, sampling at most four jobs per second across all viewers. There are
 no extra map renders or tile downloads. Sampling stops within three seconds of the

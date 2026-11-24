@@ -147,7 +147,7 @@ function updateFlyby() {
   $('flyby-toggle').checked = enabled;
   $('flyby-lane').hidden = !enabled;
   document.body.classList.toggle('flyby-enabled', enabled);
-  text($('flyby-status'), !flybyAllowed ? 'Tile flyby is available on your management connection.' : enabled ? 'Waiting for fresh renders… Cached tiles do not appear here.' : 'Show newly rendered tiles drifting up the right edge.');
+  text($('flyby-status'), !flybyAllowed ? 'Tile flyby is temporarily unavailable.' : enabled ? 'Waiting for fresh renders… Cached tiles do not appear here.' : 'Show newly rendered tiles drifting up the right edge.');
   if (enabled && !document.hidden) refreshFlyby();
 }
 function showTile(entry) {
