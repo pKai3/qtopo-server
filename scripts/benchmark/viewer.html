@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QTopo · Benchmark replay</title>
+<style>
+:root{font:15px/1.5 system-ui,sans-serif;color:#213a32;background:#f1f4ef;--muted:#60746b;--line:#d9e2d9}*{box-sizing:border-box}body{margin:0}main{max-width:1400px;margin:32px auto;padding:0 24px}header{display:flex;justify-content:space-between;align-items:center;gap:20px}h1{margin:4px 0;font-size:32px;letter-spacing:-1px}h2{font-size:17px;margin:0 0 12px}.eyebrow{color:#537362;font-weight:700;font-size:12px;letter-spacing:1.5px}p{color:var(--muted);margin:8px 0}#connection{padding:7px 12px;border-radius:30px;background:#dceade;font-size:13px;white-space:nowrap}.panel{background:#fff;border:1px solid var(--line);border-radius:15px;padding:20px;margin-top:20px}.controls{display:flex;gap:16px;flex-wrap:wrap;align-items:end}label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:650}select,button{font:inherit;color:inherit;background:white;border:1px solid #bacac0;border-radius:7px;padding:8px 11px}select{max-width:380px}button{cursor:pointer}.toggle{flex-direction:row;align-items:center;padding:9px;font-size:14px}input[type=checkbox]{accent-color:#2c7453}#timeline{width:100%;accent-color:#2c7453}#liveProgress{width:100%;height:12px;accent-color:#2c7453}[hidden]{display:none!important}.timeline{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;margin-top:18px}.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-top:18px}.stat{background:#edf3ee;border-radius:9px;padding:12px}.stat strong{display:block;font-size:24px;line-height:1.25}.stat span{color:var(--muted);font-size:12px}.stage{display:flex;justify-content:space-between;gap:12px;margin-bottom:12px}.stage p{margin:0;font-size:13px}.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:#50685b;margin-top:12px}.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:middle;margin-right:5px}#tiles{width:100%;height:400px;background:#f7faf6;border:1px solid #e2e9e1;border-radius:10px;display:block}.split{display:grid;grid-template-columns:1.5fr 1fr;gap:20px}.split .panel{min-width:0}#log{height:190px;overflow:auto;font:12px/1.7 ui-monospace,monospace;white-space:pre-wrap;color:#506458}table{width:100%;border-collapse:collapse;font-size:12px}td,th{text-align:right;padding:8px;border-bottom:1px solid #edf0eb}td:first-child,th:first-child{text-align:left}summary{cursor:pointer;font-weight:650}details p{max-width:1050px;font-size:13px}.note{font-size:12px}#phaseNote{font-size:13px}a{color:#326b4e}@media(max-width:800px){main{padding:0 12px}.split{grid-template-columns:1fr}.stats{grid-template-columns:repeat(3,1fr)}header{align-items:start}h1{font-size:25px}#tiles{height:320px}.panel{padding:14px}}
+
+#boxplot{width:100%;display:block;min-height:140px}.charthead{display:flex;gap:18px;justify-content:space-between;align-items:start}.charthead h2{margin-bottom:4px}.reference{width:100%;height:auto;margin-top:18px}.plotwrap{overflow-x:auto}#boxplot{min-width:460px}
+</style>
+<main>
+<header><div><div class="eyebrow">QTOPO / PERFORMANCE LAB</div><h1>Watch the tile requests</h1><p>Actual request events, live or replayed. Live progress counts resolved requests; replay uses a time scrubber.</p></div><span id="connection">Connecting…</span></header>
+<section class="panel">
+<div class="controls"><label>Run<select id="run"><option>Waiting for events</option></select></label><label>Phase<select id="phase"><option>All phases</option></select></label><label class="toggle"><input id="live" type="checkbox" checked>Follow live</label><button id="play">▶ Replay</button><span id="phaseNote">Preparing the comparison. No test traffic yet.</span></div>
+<div class="timeline"><span id="time">0.0s</span><progress id="liveProgress" aria-label="Requests resolved"></progress><input hidden id="timeline" type="range" min="0" max="1" step="50" value="0" aria-label="Replay time"><span id="end">0.0s</span></div><p class="note">Resolved requests include received tiles, cancellations and failures. Choose Replay to inspect the timing.</p>
+<div class="stats"><div class="stat"><strong id="sent">0</strong><span>requests sent</span></div><div class="stat"><strong id="received">0</strong><span>responses complete</span></div><div class="stat"><strong id="pending">0</strong><span>in flight</span></div><div class="stat"><strong id="workers">—</strong><span>active render workers</span></div><div class="stat"><strong id="memory">—</strong><span>working memory</span></div></div>
+</section>
+<section class="panel"><div class="stage"><div><h2 id="gridTitle">Tile grid</h2><p id="gridNote">Each square is an actual tile coordinate. Gaps were not requested.</p></div><p id="burst"></p></div><canvas id="tiles" aria-label="Tile request grid"></canvas><div class="legend" id="legend"></div><p class="note">Benchmark: sent → response started → complete PNG received. Recordings include HTTP 304 cache validations. This measures delivery from QTopo inside the server, not when Gaia displays the tile. No map imagery is fetched by this viewer.</p></section>
+<section class="panel"><div class="charthead"><div><h2>Response times by configuration</h2><p class="note">Lower is faster. Each row is a completed phase from the same workload.</p></div><label>Compare workload<select id="boxPhase"><option value="fresh-batches">Fresh batches</option><option value="steady-pan">Steady pan</option><option value="rapid-jumps">Rapid jumps</option><option value="human-phone-clock">Phone · fixed timing</option><option value="human-phone-paced">Phone · wait for all tiles</option><option selected value="human-phone-partial">Phone · move before all tiles arrive</option><option value="human-phone-full-clock">Phone · full route with pauses</option><option value="human-computer-clock">Computer · fixed timing</option><option value="human-computer-paced">Computer · tile-driven</option></select></label></div><label style="margin-top:12px;max-width:320px">Measure<select id="boxMetric"><option value="tile">Individual tile response</option><option value="50">Time for 50% of a burst</option><option value="75">Time for 75% of a burst</option><option value="100">Time for every tile in a burst</option></select></label><label class="toggle" style="padding-left:0"><input type="checkbox" id="allPoints" checked>Show every tile</label><div class="plotwrap"><svg id="boxplot" role="img" aria-label="Box plot comparing completed response times"></svg></div><p class="note" id="boxNote">Box: middle 50% · line: median · whiskers: within 1.5× the box width. Faint scattered dots show individual tiles; darker dots beyond the whiskers are outliers. Successful responses only; counts of abandoned and failed requests appear beside each row. Replay modes are kept separate.</p></section>
+<details class="panel" id="referencePanel"><summary>Earlier comparison: Stable vs Latest</summary><p class="note">The previous matched-resource comparison, before this prefetch sweep.</p><img class="reference" src="/stable-latest-boxplot.png" alt="Earlier Stable versus Latest response-time box plots" loading="lazy"></details>
+<div class="split"><section class="panel"><h2>Completed phases</h2><table><thead><tr><th>Phase</th><th>Median</th><th>95th %</th><th>Foreground</th><th>Drain</th></tr></thead><tbody id="results"></tbody></table></section><section class="panel"><h2>Progress</h2><div id="log" role="log"></div></section></div>
+<details class="panel"><summary>How the comparison works</summary><p>One test at a time on the selected container. Its current memory cap, CPU allowance, worker count and upstream concurrency are captured and preserved for every run. Each workload begins with empty rendered-tile and vector caches and fresh workers. Fonts, sprites and shaders remain. Background work drains before the next run. Original server settings are restored afterwards.</p><p><b>Synthetic:</b> six batches of 24 fresh requests; eight 12-request jumps, 1.5 seconds apart, abandoning the previous view; repeat the last view from cache; then a 6×4 tile view moving two columns east after delivery, with a 350 ms pause.</p><p><b>Human / fixed timing:</b> request coordinates and intervals from the trimmed recording, including recorded client cancellations. Every configuration faces the same arrival schedule. Requests originally answered 304 are replayed as full requests, so every run begins comparably cold.</p><p><b>Human / tile-driven:</b> the same request bursts, waiting for each burst to finish before a 300 ms pause. This is a responsiveness model, not a reconstruction of your gestures. Bursts split at a 350 ms quiet gap or a profile/zoom change. Browser-cached tiles and exact viewport movements were not recorded.</p><p><b>Human / partial delivery:</b> preserves timing within each request burst. After dispatching that burst, it waits at least 100 ms, then moves when 75% has arrived or after 1.5 seconds. Unfinished requests can overlap the next burst; recorded abandonment timers are retained. This is an explicit sensitivity model, not exact camera movement. Route time ends when it moves on from the final burst; remaining responses are measured separately.</p><p><b>Fairness:</b> compare foreground completion and response distributions, not just how much background work was discarded. Results from different replay modes stay separate. The read-only viewer adds no tile requests.</p></details>
+</main>
+<script>
+const $=id=>document.getElementById(id),runs=new Map(),colors={planned:'#dfe6df',sent:'#3a7fba',headers:'#dcaa32',received:'#509273',abandoned:'#a58abf',error:'#cb5f50'},labels={planned:'Planned',sent:'Sent / waiting',headers:'Response started',received:'Received',abandoned:'Abandoned',error:'Error'};
+let cursor=0,playing=false,playAt=0,lastFrame=0;
+for(const [state,color]of Object.entries(colors)){const el=document.createElement('span');el.innerHTML=`<i style="background:${color}"></i>${labels[state]}`;$('legend').append(el)}
+function addEvent(e){if(!e.run){log(e.message||JSON.stringify(e));return}let r=runs.get(e.run);if(!r){r={id:e.run,events:[],end:0,phases:[]};runs.set(e.run,r);const o=new Option(e.run,e.run);if(runs.size===1)$('run').replaceChildren(o);else $('run').add(o);if($('live').checked){$('run').value=e.run;fillPhases(r)}}if(e.plannedRequests)r.plannedRequests=e.plannedRequests;r.events.push(e);r.end=Math.max(r.end,e.t||0);if(e.event==='phase'&&e.state==='running'&&!r.phases.includes(e.phase)){r.phases.push(e.phase);if($('run').value===r.id)fillPhases(r)}if(['start','complete','failed','safety-stop'].includes(e.event))log(`${e.run} · ${e.event}${e.error?' · '+e.error:''}`);if(e.event==='phase')log(`${e.run} · ${e.phase} · ${e.state}`)}
+function log(text){const el=$('log');el.textContent+=text+'\n';el.scrollTop=el.scrollHeight}
+function fillPhases(r){const previous=$('phase').value;$('phase').replaceChildren(new Option('All phases',''));for(const p of r.phases)$('phase').add(new Option(p,p));if(r.phases.includes(previous))$('phase').value=previous}
+const duration=v=>v==null?'—':(v/1000).toFixed(2)+' s';
+function draw(){const r=runs.get($('run').value);if(!r)return;let at=$('live').checked?r.end:Number($('timeline').value);$('timeline').max=r.end;$('timeline').value=at;$('time').textContent=(at/1000).toFixed(1)+'s';$('end').textContent=(r.end/1000).toFixed(1)+'s';const tiles=new Map();let sample,phaseEvent,lastTile,results=[];for(const e of r.events){if(e.t>at)continue;if(e.event==='plan')for(const t of e.tiles){tiles.set(t.id,{...t,state:'planned'});lastTile=tiles.get(t.id)}if(e.event==='tile'&&tiles.has(e.id)){Object.assign(tiles.get(e.id),{state:e.state,ms:e.ms})}if(e.event==='sample')sample=e;if(e.event==='complete'&&phaseEvent)phaseEvent={...phaseEvent,state:'complete'};if(e.event==='phase'){phaseEvent=e;if(e.result)results.push(e.result)}}let items=[...tiles.values()];const live=$('live').checked,done=r.events.some(e=>e.event==='complete'&&e.t<=at),settled=items.filter(t=>['received','abandoned','error'].includes(t.state)).length,total=r.plannedRequests||(done?items.length:0);$('liveProgress').hidden=!live;$('timeline').hidden=live;if(live){$('time').textContent=(at/1000).toFixed(1)+'s elapsed';if(total){$('liveProgress').max=total;$('liveProgress').value=settled;$('end').textContent=settled+' / '+total+' resolved'}else{$('liveProgress').removeAttribute('value');$('end').textContent='Live activity'}}const filter=$('phase').value;if(filter)items=items.filter(t=>t.phase===filter);if(!items.some(t=>t===lastTile))lastTile=items.at(-1);$('sent').textContent=items.filter(t=>t.state!=='planned').length;$('received').textContent=items.filter(t=>t.state==='received').length;$('pending').textContent=items.filter(t=>['sent','headers'].includes(t.state)).length;$('workers').textContent=done?0:(sample?.active??'—');$('memory').textContent=sample?.working?(sample.working/1024**3).toFixed(2)+' GiB':'—';$('phaseNote').textContent=phaseEvent?phaseEvent.phase+' · '+phaseEvent.state:'Waiting for requests';$('results').replaceChildren();for(const s of results){const tr=document.createElement('tr');for(const value of [s.name,duration(s.medianMs),duration(s.p95Ms),duration(s.foregroundMs),duration(s.drainMs)]){const td=document.createElement('td');td.textContent=value;tr.append(td)}$('results').append(tr)}drawGrid(items,lastTile)}
+function drawGrid(items,current){const c=$('tiles'),dpr=devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;if(c.width!==w*dpr||c.height!==h*dpr){c.width=w*dpr;c.height=h*dpr}const ctx=c.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);if(!current){ctx.fillStyle='#60746b';ctx.font='14px system-ui';ctx.fillText('Waiting for the first request…',24,36);return}const group=items.filter(t=>t.phase===current.phase&&t.group===current.group&&t.z===current.z);let x0=Math.min(...group.map(t=>t.x))-1,x1=Math.max(...group.map(t=>t.x))+1,y0=Math.min(...group.map(t=>t.y))-1,y1=Math.max(...group.map(t=>t.y))+1;if(x1-x0>35||y1-y0>25){x0=current.x-8;x1=current.x+8;y0=current.y-5;y1=current.y+5}const cols=x1-x0+1,rows=y1-y0+1,size=Math.min(72,(w-60)/cols,(h-46)/rows),ox=(w-cols*size)/2,oy=(h-rows*size)/2;const visible=new Map();for(const t of items)if(t.phase===current.phase&&t.z===current.z&&t.x>=x0&&t.x<=x1&&t.y>=y0&&t.y<=y1)visible.set(t.x+','+t.y,t);ctx.font='10px system-ui';ctx.textAlign='center';for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const t=visible.get(x+','+y),px=ox+(x-x0)*size,py=oy+(y-y0)*size;ctx.fillStyle=t?colors[t.state]:'#eef2ec';ctx.fillRect(px+2,py+2,size-4,size-4);if(t&&t.group===current.group){ctx.strokeStyle='#284f3e';ctx.lineWidth=1.5;ctx.strokeRect(px+2.5,py+2.5,size-5,size-5)}if(t&&size>36){ctx.fillStyle=t.state==='planned'?'#506458':'white';ctx.fillText(x,px+size/2,py+size/2-2);ctx.fillText(y,px+size/2,py+size/2+11)}}$('gridTitle').textContent=`${current.profile} · zoom ${current.z}`;$('burst').textContent=`${current.phase} · burst ${current.group+1}`}
+const svgNS='http://www.w3.org/2000/svg';
+function svgEl(tag,attrs,text){const el=document.createElementNS(svgNS,tag);for(const[k,v]of Object.entries(attrs))el.setAttribute(k,v);if(text!=null)el.textContent=text;return el}
+function percentile(v,p){const i=(v.length-1)*p,a=Math.floor(i),b=Math.ceil(i);return v[a]+(v[b]-v[a])*(i-a)}
+function boxplots() {
+  const phase = $('boxPhase').value, metric = $('boxMetric').value, rows = [];
+  for (const r of runs.values()) {
+    if (r.id.startsWith('recorded-')) continue;
+    const finished = r.events.find(e => e.event === 'phase' && e.phase === phase && e.state === 'complete');
+    if (!finished) continue;
+    const tiles = new Map();
+    for (const e of r.events) {
+      if (e.event === 'plan') for (const t of e.tiles) if (t.phase === phase) tiles.set(t.id, {...t, state:'planned'});
+      if (e.event === 'tile' && tiles.has(e.id)) {
+        const tile = tiles.get(e.id);
+        Object.assign(tile, e);
+        if (e.state === 'sent') tile.sentAt = e.t;
+        if (e.state === 'received') tile.receivedAt = e.t;
+      }
+    }
+    const entries = [...tiles.values()];
+    let values, unreached = 0;
+    if (metric === 'tile') {
+      values = entries.filter(t => t.state === 'received' && Number.isFinite(t.ms)).map(t => t.ms / 1000);
+    } else {
+      values = [];
+      for (const group of Map.groupBy(entries, t => t.group).values()) {
+        const began = Math.min(...group.map(t => t.sentAt));
+        const received = group.filter(t => Number.isFinite(t.receivedAt)).map(t => t.receivedAt).sort((a,b) => a-b);
+        const needed = Math.ceil(group.length * Number(metric) / 100);
+        if (received.length >= needed) values.push((received[needed - 1] - began) / 1000);
+        else unreached++;
+      }
+    }
+    const v = values.sort((a,b) => a-b);
+    if (!v.length) continue;
+    const q1 = percentile(v,.25), q3 = percentile(v,.75), median = percentile(v,.5), iqr = q3-q1;
+    rows.push({id:r.id, v, q1, q3, median, lo:v.find(x => x >= q1-1.5*iqr), hi:v.findLast(x => x <= q3+1.5*iqr),
+      abandoned:entries.filter(t => t.state === 'abandoned').length, errors:entries.filter(t => t.state === 'error').length,
+      unreached, route:finished.result.movementMs ?? finished.result.foregroundMs});
+  }
+  $('boxNote').textContent = 'Box: middle 50% · line: median · whiskers: within 1.5× the box width. Faint dots show individual measurements; darker dots are outliers. ' +
+    (metric === 'tile' ? 'Successful responses only; cancellations and failures are counted separately.' :
+    'Burst time starts at its first request. Bursts are inferred request groups, not known viewports. Groups that never reach the selected fraction are counted separately.') +
+    ' Route times are comparable only within the same replay mode.';
+  const svg = $('boxplot'); svg.replaceChildren();
+  const w = Math.max(460,svg.clientWidth), left = 135, right = 165, h = Math.max(150,rows.length*82+70), plotW = w-left-right;
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
+  if (!rows.length) {
+    svg.append(svgEl('text',{x:22,y:70,fill:'#60746b','font-size':17},'This workload has not completed yet.')); return;
+  }
+  const max = Math.max(.1,...rows.flatMap(r => r.v))*1.06, scale = x => left+x/max*plotW;
+  for (let i=0;i<=5;i++) {
+    const value=max*i/5, x=scale(value);
+    svg.append(svgEl('line',{x1:x,x2:x,y1:14,y2:h-40,stroke:'#e2e9e1'}),
+      svgEl('text',{x,y:h-18,fill:'#60746b','text-anchor':'middle','font-size':13},value.toFixed(1)+' s'));
+  }
+  const palette=['#5d8eaa','#5d9174','#b29a65','#827fa9','#629c9a','#b78177','#929c5e'];
+  for (const [i,r] of rows.entries()) {
+    const y=36+i*82, c=palette[i%palette.length];
+    svg.append(svgEl('text',{x:left-15,y:y+5,fill:'#2d4d3f','text-anchor':'end','font-size':12},r.id.replace(/-(synthetic|phone|computer)$/,'')),
+      svgEl('line',{x1:scale(r.lo),x2:scale(r.hi),y1:y,y2:y,stroke:c,'stroke-width':2}),
+      svgEl('line',{x1:scale(r.lo),x2:scale(r.lo),y1:y-9,y2:y+9,stroke:c,'stroke-width':2}),
+      svgEl('line',{x1:scale(r.hi),x2:scale(r.hi),y1:y-9,y2:y+9,stroke:c,'stroke-width':2}),
+      svgEl('rect',{x:scale(r.q1),y:y-14,width:Math.max(2,scale(r.q3)-scale(r.q1)),height:28,rx:3,fill:c,'fill-opacity':.28,stroke:c,'stroke-width':2}),
+      svgEl('line',{x1:scale(r.median),x2:scale(r.median),y1:y-14,y2:y+14,stroke:'#233e31','stroke-width':3}));
+    for (const [j,v] of r.v.entries()) {
+      const outlier=v<r.lo||v>r.hi;
+      if (!$('allPoints').checked&&!outlier) continue;
+      const jitter=$('allPoints').checked?(((j*37)%101)/100-.5)*28:0;
+      const dot=svgEl('circle',{cx:scale(v),cy:y+jitter,r:outlier?2.5:1.8,fill:c,'fill-opacity':outlier?.72:.24});
+      dot.append(svgEl('title',{},v.toFixed(3)+' s')); svg.append(dot);
+    }
+    svg.append(svgEl('text',{x:w-right+8,y:y-8,fill:'#294a3a','font-size':12},`median ${r.median.toFixed(2)}s · n=${r.v.length}`),
+      svgEl('text',{x:w-right+8,y:y+10,fill:'#60746b','font-size':11},metric==='tile'?`${r.abandoned} cancelled · ${r.errors} failed`:`Unreached: ${r.unreached} of ${r.unreached+r.v.length}`),
+      svgEl('text',{x:w-right+8,y:y+28,fill:'#60746b','font-size':11},`Route: ${(r.route/1000).toFixed(1)}s`));
+  }
+}
+$('boxPhase').onchange=boxplots;$('boxMetric').onchange=boxplots;$('allPoints').onchange=boxplots;
+async function poll(){try{const response=await fetch('/events?after='+cursor,{cache:'no-store'}),data=await response.json();cursor=data.next;for(const e of data.events)addEvent(e);if(data.events.some(e=>e.event==='complete'||e.event==='phase'&&e.state==='complete'))boxplots();$('connection').textContent='Event feed connected';draw();setTimeout(poll,data.events.length===2000?10:350)}catch(e){$('connection').textContent='Feed disconnected · retrying';setTimeout(poll,2000)}}
+$('run').onchange=()=>{ $('live').checked=false;const r=runs.get($('run').value);fillPhases(r);$('timeline').max=r.end;$('timeline').value=r.end;draw()};$('phase').onchange=draw;$('timeline').oninput=()=>{$('live').checked=false;playing=false;draw()};$('live').onchange=()=>{playing=false;if($('live').checked){$('run').value=[...runs.keys()].at(-1);fillPhases(runs.get($('run').value))}draw()};$('play').onclick=()=>{$('live').checked=false;playing=!playing;playAt=Number($('timeline').value);if(playAt>=runs.get($('run').value).end-50)playAt=0;lastFrame=performance.now();$('play').textContent=playing?'❚❚ Pause':'▶ Replay'};function animate(t){if(playing){playAt+=t-lastFrame;const r=runs.get($('run').value);$('timeline').value=Math.min(playAt,r.end);if(playAt>=r.end){playing=false;$('play').textContent='▶ Replay'}draw()}lastFrame=t;requestAnimationFrame(animate)}requestAnimationFrame(animate);window.onresize=draw;poll();
+</script></html>

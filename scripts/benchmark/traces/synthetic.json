@@ -1,0 +1,22 @@
+{
+  "name": "tower-original-stress-plus-steady-pan",
+  "description": "Original six cold 24-request batches and eight 12-request jumps, 1.5 seconds apart; cached final view; then a tile-driven 6x4 view moving east two columns per step with a 350ms pause.",
+  "sustained": [
+    ["readable", 14, 15110, 9494],
+    ["mobile", 15, 30280, 18988],
+    ["mobile", 16, 60580, 37976],
+    ["readable", 15, 30280, 19004],
+    ["mobile", 16, 60600, 37982],
+    ["readable", 14, 15130, 9496]
+  ],
+  "jumps": [
+    ["mobile", 15, 30300, 19020],
+    ["mobile", 16, 60600, 38040],
+    ["readable", 14, 15156, 9506],
+    ["mobile", 16, 60680, 38080],
+    ["readable", 15, 30340, 19040],
+    ["mobile", 16, 60720, 38090],
+    ["readable", 14, 15174, 9520],
+    ["mobile", 16, 60700, 38120]
+  ]
+}

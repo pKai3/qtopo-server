@@ -9,3 +9,5 @@ test-results
 server_raster
 server_vector
 data
+benchmark-results
+scripts/benchmark/__pycache__
