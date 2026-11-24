@@ -21,6 +21,7 @@ const { createStatusActions } = require('./lib/status-actions');
 const { createAdminAccess } = require('./lib/admin-access');
 const { listenControl, socketPath } = require('./lib/local-control');
 const { createRequestFocus } = require('./lib/request-focus');
+const { mergeClientQueues } = require('./lib/client-queues');
 const { createRenderFlyby } = require('./lib/render-flyby');
 const { normalizeVectorValues } = require('./lib/vector-values');
 
@@ -327,6 +328,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     // Aggregate activity is public; individual tile locations and test areas
     // must not be disclosed through the read-only dashboard.
     const { lastRender, ...renderStats } = data.renderer || {};
+    if (req.query.clients === '1') data.clientQueues = mergeClientQueues(renderer.clientQueues || [], prefetch.clientQueues || []);
     res.json({ ...data, renderer: renderStats, logsAvailable: admin.canReadLogs(req), flybyAvailable: true });
   });
   // Retired web controls fail for every client, including localhost and

@@ -18,7 +18,7 @@
       <article><h2>Upstream downloads</h2><strong id="downloads">—</strong><p id="download-detail">Government map resources</p></article>
     </section>
     <section class="panel queue-panel" aria-labelledby="queue-heading">
-      <div class="queue-heading"><h2 id="queue-heading">Render queue</h2><label class="flyby-control"><input id="flyby-toggle" type="checkbox" disabled> Tile flyby</label></div>
+      <div class="queue-heading"><h2 id="queue-heading">Render queue</h2><div class="queue-controls"><label class="flyby-control"><input id="clients-toggle" type="checkbox"> Split by client</label><label class="flyby-control"><input id="flyby-toggle" type="checkbox" disabled> Tile flyby</label></div></div>
       <p id="flyby-status" class="hint">A sample of fresh renders drifting up the right edge. Cached tiles do not appear here.</p>
       <p id="memory-detail" class="hint">Checking available memory.</p>
       <div class="queue-charts">
@@ -47,6 +47,11 @@
           <p id="waiting-space" class="hint">Grey shows unused queue space.</p>
         </div>
       </div>
+      <section id="client-queues" hidden aria-labelledby="clients-heading">
+        <h3 id="clients-heading">Queues by client</h3>
+        <p class="hint">Anonymous client labels. Shared work is counted once in its own row. Devices sharing a network address may appear together; labels reset after inactivity or a server restart.</p>
+        <div id="client-queue-list" tabindex="0" aria-label="Queues grouped by anonymous client"><p id="clients-empty" class="hint">No queued or rendering work.</p></div>
+      </section>
       <p class="hint queue-explanation">Requested tiles have first priority, followed by nearby prefetch, then zoom prefetch. Rendering counts jobs; each vector job can prepare up to four tiles. Waiting counts render jobs and pending prefetch checks. Cached tiles bypass rendering; requesting an unfinished prefetch tile moves its render to Requested.</p>
     </section>
     <div class="columns">

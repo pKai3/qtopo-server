@@ -600,3 +600,13 @@ test('profile files create and update public URLs without restart while Classic 
   assert.ok(catalog.profiles.some(p => p.id === 'live-test' && p.raster === s.url + '/live-test/{z}/{x}/{y}.png'));
   assert.equal((await fetch(s.url + '/api/profiles/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(document) })).status, 404);
 });
+
+test('anonymous client queue summaries are opt-in and read-only', async t => {
+  let reads=0;
+  const renderer={stats:{},close(){},get clientQueues(){reads++;return [{id:'client-1',rendering:{requested:1,neighbours:0,zoom:0},waiting:{requested:0,neighbours:0,zoom:0}}];}};
+  const s=await server(t,{renderer});
+  const plain=await (await fetch(s.url+'/readyz')).json();
+  assert.equal(plain.clientQueues,undefined);assert.equal(reads,0);
+  const split=await (await fetch(s.url+'/readyz?clients=1')).json();
+  assert.equal(reads,1);assert.deepEqual(split.clientQueues,[{id:'client-1',rendering:{requested:1,neighbours:0,zoom:0},waiting:{requested:0,neighbours:0,zoom:0}}]);
+});
