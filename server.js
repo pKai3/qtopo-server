@@ -317,7 +317,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     // Aggregate activity is public; individual tile locations and test areas
     // must not be disclosed through the read-only dashboard.
     const { lastRender, ...renderStats } = data.renderer || {};
-    res.json({ ...data, renderer: renderStats, logsAvailable: admin.canReadLogs(req), flybyAvailable: admin.canReadLogs(req) });
+    res.json({ ...data, renderer: renderStats, logsAvailable: admin.canReadLogs(req), flybyAvailable: true });
   });
   // Retired web controls fail for every client, including localhost and
   // trusted proxies. Maintenance is exposed only on the private Unix socket.
@@ -330,7 +330,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     if (typeof after !== 'string' || !/^\d+$/.test(after) || !Number.isSafeInteger(Number(after)) || (session != null && (typeof session !== 'string' || session.length > 64))) throw httpError('Invalid log cursor', 400);
     res.set('Cache-Control', 'no-store').json(L.read(Number(after), session));
   });
-  app.get('/api/render-flyby', admin.authorize, (req, res) => {
+  app.get('/api/render-flyby', (req, res) => {
     const after = req.query.after ?? '0', session = req.query.session;
     if (typeof after !== 'string' || !/^\d+$/.test(after) || !Number.isSafeInteger(Number(after)) || (session != null && (typeof session !== 'string' || session.length > 64))) throw httpError('Invalid preview cursor', 400);
     res.set('Cache-Control', 'no-store').json(flyby.read(Number(after), session));
