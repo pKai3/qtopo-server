@@ -2,7 +2,6 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { createRequestFocus, rememberInterest } = require('../lib/request-focus');
 const { interestClients, summarizeClientQueues, mergeClientQueues } = require('../lib/client-queues');
-const { createPrefetch } = require('../lib/prefetch');
 
 test('client summaries anonymize addresses, deduplicate a client and count shared work once', () => {
   const focus = createRequestFocus(), tile = {z:17,x:121026,y:76203};
@@ -32,18 +31,4 @@ test('client identity expires and nested prefetch attribution follows live inter
   assert.deepEqual(interestClients(nested),[]);
   rememberInterest(interests,focus.observe('address',tile).forTile(tile));
   assert.deepEqual(interestClients(nested),[2]);
-});
-
-test('per-client pending prefetch totals match the aggregate queue without duplicating shared checks', t => {
-  const focus=createRequestFocus(),tile={z:10,x:10,y:10};
-  const prefetch=createPrefetch({radius:1,zoom:true,delayMs:60000,render:async()=>{}});
-  t.after(()=>prefetch.close());
-  prefetch.begin('qld',tile,focus.observe('a',tile))(true);
-  prefetch.begin('qld',tile,focus.observe('b',tile))(true);
-  assert.equal(prefetch.clientQueues.length,1);
-  const shared=prefetch.clientQueues[0];
-  assert.equal(shared.id,'shared');
-  assert.equal(shared.waiting.neighbours,prefetch.stats.queuedNeighbours);
-  assert.equal(shared.waiting.zoom,prefetch.stats.queuedZoom);
-  assert.equal(shared.waiting.requested,0);
 });

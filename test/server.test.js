@@ -315,7 +315,7 @@ test('NSW source imagery passes through the conversion queue and never the vecto
   const s = await server(t, {
     nativeZoom: async (_provider, tile) => tile.z,
     cache: { stats: {}, async get(opts) { calls.push(opts); return { path: '/example/source.jpeg', empty: false }; } },
-    renderer: { close() {}, async render(job) { jobs.push(job); await atomicWrite(job.outPath, PNG); } },
+    renderer: { close() {}, async render(job) { Object.assign(job, await job.prepare(require('../lib/work-owner').createWorkOwner())); jobs.push(job); await atomicWrite(job.outPath, PNG); } },
   });
   assert.equal((await fetch(s.url + '/raster/nsw-topo/10/938/610.png')).status, 200);
   assert.equal(calls[0].kind, 'image'); assert.match(calls[0].url, /tile\/10\/610\/938/);
@@ -608,12 +608,12 @@ test('prefetch keeps the requested profile for neighbouring tiles', async t => {
   const jobs = [];
   const s = await server(t, { renderer: { stats: {}, close() {}, async render(job) {
     jobs.push(job); for (const output of job.outputs || [job]) await atomicWrite(output.outPath, PNG);
-  } } }, { PREFETCH_RADIUS: '1', PREFETCH_ZOOM: '0', PREFETCH_QUEUE_LIMIT: '8' });
+  } } }, { PREFETCH_RADIUS: '1', PREFETCH_ZOOM: '0', RENDER_QUEUE_LIMIT: '8' });
   for (const profile of ['classic', 'mobile-2x']) {
     assert.equal((await fetch(s.url + '/' + profile + '/13/7578/4746.png')).status, 200);
     for (let i = 0; i < 100; i++) {
       const state = await (await fetch(s.url + '/readyz')).json();
-      if (!state.prefetch.queued && !state.prefetch.active) break;
+      if (!state.prefetch.tracked) break;
       await sleep(20);
     }
   }
@@ -665,4 +665,71 @@ test('anonymous client queue summaries are opt-in and read-only', async t => {
   assert.equal(plain.clientQueues,undefined);assert.equal(reads,0);
   const split=await (await fetch(s.url+'/readyz?clients=1')).json();
   assert.equal(reads,1);assert.deepEqual(split.clientQueues,[{id:'client-1',rendering:{requested:1,neighbours:0,zoom:0},waiting:{requested:0,neighbours:0,zoom:0}}]);
+});
+
+test('cancelled render ownership reaches queued HTTP resource downloads and retains shared requested data', async t => {
+  const { createCache } = require('../lib/cache');
+  const { createWorkOwner } = require('../lib/work-owner');
+  const owner = createWorkOwner(2), started = [], releases = new Map(), signals = new Map();
+  const cache = createCache({ concurrency: 1, fetchImpl: (url, { signal }) => {
+    started.push(url); signals.set(url, signal);
+    return new Promise((resolve, reject) => {
+      releases.set(url, () => resolve(new Response(Buffer.from([26, 0]))));
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    });
+  } });
+  const s = await server(t, { cache, renderer: { stats: {}, close() {}, resourceOwner: id => id === owner.id ? owner : undefined } });
+  const headers = { 'X-QTopo-Render': owner.id, 'X-QTopo-Priority': '2' };
+  const sharedUrl = '/vector/qld/13/7578/4746.pbf';
+  const prefetched = fetch(s.url + sharedUrl, { headers });
+  for (let i = 0; i < 100 && started.length !== 1; i++) await sleep(5);
+  assert.equal(started.length, 1);
+  const queued = fetch(s.url + '/vector/qld/13/7579/4746.pbf', { headers });
+  const required = fetch(s.url + sharedUrl);
+  for (let i = 0; i < 100 && (cache.stats.downloads.queued !== 1 || cache.stats.downloads.activeByPriority.requested !== 1); i++) await sleep(5);
+  assert.equal(cache.stats.downloads.activeByPriority.requested, 1);
+  assert.equal(cache.stats.downloads.queued, 1);
+  owner.cancel(Object.assign(new Error('Obsolete view'), { status: 503 }));
+  assert.equal((await prefetched).status, 503); assert.equal((await queued).status, 503);
+  assert.equal(cache.stats.downloads.queued, 0);
+  assert.equal(signals.get(started[0]).aborted, false);
+  releases.get(started[0])(); assert.equal((await required).status, 200);
+  assert.equal(started.length, 1, 'obsolete queued resource never starts');
+  assert.equal(cache.stats.errors, 0);
+  assert.equal((await fetch(s.url + sharedUrl, { headers: { 'X-QTopo-Render': 'expired-worker' } })).status, 503);
+});
+
+test('terminating an obsolete worker aborts its actual HTTP download dependencies', async t => {
+  const { createCache } = require('../lib/cache');
+  const { createRenderer } = require('../lib/render');
+  const cache = createCache({ concurrency: 1, fetchImpl: (_url, { signal }) => new Promise((resolve, reject) => {
+    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+  }) });
+  const renderer = createRenderer({ renderConcurrency: 2, renderQueueLimit: 8, renderTimeoutMs: 5000,
+    rasterTTL: 10000, emptyTTL: 1000 }, path.join(__dirname, 'fixtures/render-worker.js'));
+  const s = await server(t, { cache, renderer });
+  let wanted = true;
+  const pending = assert.rejects(renderer.render({ priority: 2, outPath: path.join(s.config.dataDir, 'unused.png'),
+    fetchUrls: [s.url + '/vector/qld/13/7578/4746.pbf', s.url + '/vector/qld/13/7579/4746.pbf'],
+  }, { key: 'old view', score: () => 1, wanted: () => wanted }), { status: 503 });
+  for (let i = 0; i < 100 && cache.stats.downloads.queued !== 1; i++) await sleep(5);
+  assert.equal(cache.stats.activeDownloads, 1); assert.equal(cache.stats.downloads.queued, 1);
+  wanted = false; renderer.cancelObsolete(); await pending;
+  for (let i = 0; i < 100 && cache.stats.activeDownloads; i++) await sleep(5);
+  assert.equal(cache.stats.activeDownloads, 0); assert.equal(cache.stats.downloads.queued, 0);
+  assert.equal(cache.stats.cancelled, 2); assert.equal(cache.stats.errors, 0);
+});
+
+test('standalone render tools can reuse another server without sending an unregistered owner', async t => {
+  const { createRenderer } = require('../lib/render');
+  const s = await server(t, { cache: { stats: {}, async get(options) {
+    assert.equal(options.owner, undefined);
+    await atomicWrite(options.file, Buffer.from([26, 0])); return { path: options.file };
+  } } });
+  const standalone = createRenderer({ renderConcurrency: 1, renderQueueLimit: 4, renderTimeoutMs: 5000,
+    rasterTTL: 10000, emptyTTL: 1000 }, path.join(__dirname, 'fixtures/render-worker.js'));
+  t.after(() => standalone.close());
+  const outPath = path.join(s.config.dataDir, 'standalone.png');
+  await standalone.render({ outPath, fetchUrls: [s.url + '/vector/qld/13/7578/4746.pbf'] });
+  assert.equal(await fs.readFile(outPath, 'utf8'), 'rendered-test-output');
 });

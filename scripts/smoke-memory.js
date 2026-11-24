@@ -68,10 +68,10 @@ async function main() {
     let after;
     for (let i = 0; i < 180; i++) {
       after = await status();
-      if (!after.renderer.active && !after.renderer.queued && !after.prefetch.active && !after.prefetch.queued) break;
+      if (!after.renderer.active && !after.renderer.queued && !after.prefetch.tracked) break;
       await sleep(500);
     }
-    assert.equal(after.renderer.active + after.renderer.queued + after.prefetch.active + after.prefetch.queued, 0, 'background work must finish');
+    assert.equal(after.renderer.active + after.renderer.queued + after.prefetch.tracked, 0, 'background work must finish');
     assert.equal(after.startedAt, before.startedAt);
     assert.ok(after.renderer.peakActive > 1 && after.renderer.peakActive <= 24, 'admission adapts below the configured ceiling');
     assert.ok(after.renderer.memory.pauses > 0, 'must exercise memory-aware backpressure');

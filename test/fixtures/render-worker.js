@@ -13,6 +13,15 @@ process.on('message', async job => {
       return process.send({ error: 'replacement started before previous worker exited' });
     } catch (err) { if (err.code !== 'ESRCH') throw err; }
   }
+  if (job.fetchUrls) {
+    try {
+      await Promise.all(job.fetchUrls.map(async url => {
+        const response = await fetch(url, { headers: { ...(job.resourceOwner ? { 'X-QTopo-Render': job.resourceOwner } : {}), 'X-QTopo-Priority': String(job.priority) } });
+        if (!response.ok) throw new Error('Resource failed: ' + response.status);
+        await response.arrayBuffer();
+      }));
+    } catch (error) { return process.send({ error: error.message }); }
+  }
   while (job.gate && !fs.existsSync(job.gate)) await new Promise(resolve => setTimeout(resolve, 5));
   for (const tile of job.outputs || [job]) {
     fs.mkdirSync(require('node:path').dirname(tile.outPath), { recursive: true });

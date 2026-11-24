@@ -228,18 +228,18 @@ test('prefetch fills distinct metatile workers instead of spending its budget on
   for (let i = 0; i < 200 && renderer.stats.workers < 7; i++) await new Promise(resolve => setTimeout(resolve, 5));
   assert.equal(renderer.stats.workers, 7);
   assert.equal(renderer.stats.active, 7);
-  assert.equal(prefetch.stats.activeGroups, 7);
-  assert.ok(prefetch.stats.active > 7, 'siblings retain their individual promises without taking extra grid slots');
-  assert.ok(prefetch.stats.queued > 0, 'additional grids remain bounded by the prefetch limit');
+  assert.ok(prefetch.stats.tracked > 7, 'siblings retain their individual promises without taking extra grid slots');
+  assert.ok(renderer.stats.queued > 0, 'additional grids wait in the shared render queue');
+  assert.equal(prefetch.stats.queued, undefined, 'there is no second queue');
   const foreground = renderer.render({ outPath: path.join(root, 'foreground.png'), gate });
   for (let i = 0; i < 100 && renderer.stats.workers < 8; i++) await new Promise(resolve => setTimeout(resolve, 5));
   assert.equal(renderer.stats.active, 8, 'a requested render can still use the reserved eighth slot');
   assert.deepEqual(renderer.stats.activeByPriority, { requested: 1, neighbours: 7, zoom: 0 });
   await fs.writeFile(gate, 'go');
   await foreground;
-  for (let i = 0; i < 200 && (prefetch.stats.active || prefetch.stats.queued); i++) await new Promise(resolve => setTimeout(resolve, 5));
+  for (let i = 0; i < 200 && prefetch.stats.tracked; i++) await new Promise(resolve => setTimeout(resolve, 5));
   assert.equal(prefetch.stats.completed, 24);
-  assert.equal(prefetch.stats.activeGroups, 0);
+  assert.equal(prefetch.stats.tracked, 0);
   assert.equal(renderer.stats.peakActive, 8, 'group admission must not change the real renderer concurrency cap');
 });
 
@@ -378,4 +378,42 @@ test('client queue attribution follows shared and promoted renders without expos
   assert.equal(rows.reduce((n,row)=>n+Object.values(row.waiting).reduce((a,b)=>a+b,0),0),renderer.stats.queued);
   assert.doesNotMatch(JSON.stringify(rows),/192\.0\.2|60500|38000/);
   await fs.writeFile(gate,'go'); await Promise.all([active,waiting]);
+});
+
+test('obsolete queued and running prefetch is cancelled while a promoted shared grid survives', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-obsolete-'));
+  const renderer = createRenderer({ renderConcurrency: 2, prefetchConcurrency: 1, renderQueueLimit: 3,
+    rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 5000 }, path.join(__dirname, 'fixtures/render-worker.js'));
+  t.after(async () => { renderer.close(); await fs.rm(root, { recursive: true, force: true }); });
+  let wanted = true;
+  const interest = { key: 'old', score: () => 1, wanted: () => wanted };
+  const gate = path.join(root, 'go');
+  const first = renderer.render({ outPath: path.join(root, 'active.png'), gate, recordPid: path.join(root, 'pid'), priority: 2 }, interest);
+  const activeCancelled = assert.rejects(first, { status: 503 });
+  const second = renderer.render({ outPath: path.join(root, 'queued.png'), gate, priority: 2 }, interest);
+  const queuedCancelled = assert.rejects(second, { status: 503 });
+  const sharedJob = { outPath: path.join(root, 'shared.png'), gate, priority: 2 };
+  const shared = renderer.render(sharedJob, interest);
+  assert.equal(renderer.render({ ...sharedJob, priority: 0 }), shared);
+  wanted = false; renderer.cancelObsolete();
+  await Promise.all([activeCancelled, queuedCancelled]);
+  assert.equal(renderer.stats.cancelledObsolete, 2);
+  await fs.writeFile(gate, 'go'); await shared;
+  assert.equal(await fs.readFile(sharedJob.outPath, 'utf8'), 'rendered-test-output');
+});
+
+test('requested and speculative renders share one pending limit and foreground displaces speculation', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-single-queue-'));
+  const renderer = createRenderer({ renderConcurrency: 1, renderQueueLimit: 2, prefetchPreempt: false,
+    rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 5000 }, path.join(__dirname, 'fixtures/render-worker.js'));
+  t.after(async () => { renderer.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const gate = path.join(root, 'go');
+  const blocker = renderer.render({ outPath: path.join(root, 'active.png'), gate });
+  const zoom = assert.rejects(renderer.render({ outPath: path.join(root, 'zoom.png'), priority: 2 }), { status: 503 });
+  const nearby = renderer.render({ outPath: path.join(root, 'nearby.png'), priority: 1 });
+  assert.equal(renderer.stats.queued, 2);
+  const requested = renderer.render({ outPath: path.join(root, 'requested.png') });
+  assert.equal(renderer.stats.queued, 2);
+  assert.deepEqual(renderer.stats.queuedByPriority, { requested: 1, neighbours: 1, zoom: 0 });
+  await fs.writeFile(gate, 'go'); await Promise.all([blocker, zoom, nearby, requested]);
 });
