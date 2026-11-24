@@ -14,10 +14,11 @@ const { validateStyleMin } = require('@maplibre/maplibre-gl-style-spec');
 const logger = require('../lib/logger');
 const { setTimeout: sleep } = require('node:timers/promises');
 const { createRenderFlyby } = require('../lib/render-flyby');
+const { createRenderer } = require('../lib/render');
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/YYbL4QAAAAASUVORK5CYII=', 'base64');
 async function server(t, dependencies = {}, env = {}) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-app-test-'));
-  const config = loadConfig({ DATA_DIR: dir, PORT: '0', CLEANUP_INTERVAL_MINUTES: '0', PREFETCH_RADIUS: '0', ADMIN_ALLOWED_NETWORKS: '127.0.0.1/32', DEFAULT_PROFILE: 'classic', ...env });
+  const config = loadConfig({ DATA_DIR: dir, PORT: '0', CLEANUP_INTERVAL_MINUTES: '0', CACHE_MAX_GIB: '0', CACHE_MIN_FREE_GIB: '0', PREFETCH_RADIUS: '0', ADMIN_ALLOWED_NETWORKS: '127.0.0.1/32', DEFAULT_PROFILE: 'classic', ...env });
   const instance = await createApp(config, dependencies);
   const listener = await new Promise(resolve => { const s = instance.app.listen(0, '127.0.0.1', () => resolve(s)); });
   const url = 'http://127.0.0.1:' + listener.address().port;
@@ -29,6 +30,75 @@ async function server(t, dependencies = {}, env = {}) {
   return { ...instance, config, url, socket };
 }
 const actionHeaders = { 'Content-Type': 'application/json', 'X-QTopo-Action': 'status-page' };
+
+test('readiness reports rendering and disk faults while liveness stays available', async t => {
+  const renderStats = { consecutiveFailures: 3 }, diskStats = { pressure: false, readFailed: false };
+  const s = await server(t, { renderer: { stats: renderStats, close() {} }, storage: { stats: diskStats, close() {} } });
+  let response = await fetch(s.url + '/readyz');
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).health.reasons[0].code, 'render-failures');
+  assert.equal((await fetch(s.url + '/healthz')).status, 200);
+  renderStats.consecutiveFailures = 0;
+  assert.equal((await fetch(s.url + '/readyz')).status, 200);
+  diskStats.pressure = true;
+  response = await fetch(s.url + '/readyz');
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).health.reasons[0].code, 'storage-pressure');
+  diskStats.pressure = false;
+  assert.equal((await fetch(s.url + '/readyz')).status, 200);
+});
+
+test('HTTP deadline releases one waiter without dropping a later request for the same tile', async t => {
+  let blocked = true;
+  const renderer = createRenderer({ renderConcurrency: 1, renderQueueLimit: 4, rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 2000 },
+    path.join(__dirname, 'fixtures/render-worker.js'), undefined, {
+      read: () => ({ limitBytes: 2048 * 1024 ** 2, currentBytes: (blocked ? 1800 : 64) * 1024 ** 2, workingBytes: (blocked ? 1800 : 64) * 1024 ** 2 }),
+    });
+  const s = await server(t, { renderer }, { REQUEST_TIMEOUT_SECONDS: '1' });
+  const url = s.url + '/raster/qld/13/7578/4746.png';
+  const first = fetch(url);
+  await sleep(500);
+  const second = fetch(url);
+  const timedOut = await first;
+  assert.equal(timedOut.status, 504); assert.equal(timedOut.headers.get('retry-after'), '3');
+  assert.equal(timedOut.headers.get('cache-control'), 'no-store');
+  assert.equal(renderer.stats.queued, 1); assert.equal(renderer.stats.cancelledQueued, 0);
+  blocked = false;
+  assert.equal((await second).status, 200);
+  assert.equal(renderer.stats.spawned, 1);
+});
+
+test('a sole disconnected HTTP request removes its queued render without starting a worker', async t => {
+  const renderer = createRenderer({ renderConcurrency: 1, renderQueueLimit: 4, rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 2000 },
+    path.join(__dirname, 'fixtures/render-worker.js'), undefined, {
+      read: () => ({ limitBytes: 1024 * 1024 ** 2, currentBytes: 900 * 1024 ** 2, workingBytes: 900 * 1024 ** 2 }),
+    });
+  const s = await server(t, { renderer });
+  const request = http.get(s.url + '/raster/qld/13/7578/4746.png'); request.on('error', () => {});
+  for (let i = 0; i < 100 && !renderer.stats.queued; i++) await sleep(5);
+  assert.equal(renderer.stats.queued, 1);
+  request.destroy();
+  for (let i = 0; i < 100 && renderer.stats.queued; i++) await sleep(5);
+  assert.equal(renderer.stats.queued, 0); assert.equal(renderer.stats.spawned, 0); assert.equal(renderer.stats.cancelledQueued, 1);
+});
+test('a failed border source releases the other source queued for the same HTTP request', async t => {
+  const renderer = createRenderer({ renderConcurrency: 1, renderQueueLimit: 4, rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 2000 },
+    path.join(__dirname, 'fixtures/render-worker.js'), undefined, {
+      read: () => ({ limitBytes: 1024 * 1024 ** 2, currentBytes: 900 * 1024 ** 2, workingBytes: 900 * 1024 ** 2 }),
+    });
+  let queued;
+  const sourceQueued = new Promise(resolve => { queued = resolve; });
+  const s = await server(t, {
+    nativeZoom: async (_provider, tile) => tile.z,
+    renderer: { get stats() { return renderer.stats; }, close: () => renderer.close(), async render(job, interest) {
+      if (job.outPath.includes('/qld/')) { await sourceQueued; throw new Error('Source render failed'); }
+      const pending = renderer.render(job, interest); queued(); return pending;
+    } },
+  });
+  assert.equal((await fetch(s.url + '/raster/14/15179/9528.png')).status, 502);
+  for (let i = 0; i < 100 && renderer.stats.queued; i++) await sleep(5);
+  assert.equal(renderer.stats.queued, 0); assert.equal(renderer.stats.spawned, 0); assert.equal(renderer.stats.cancelledQueued, 1);
+});
 const webAction = (s, route, body = {}, headers = actionHeaders) => fetch(s.url + '/api/actions/' + route, { method: 'POST', headers, body: JSON.stringify(body) });
 const action = async (s, route, body = {}) => {
   try {

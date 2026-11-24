@@ -12,6 +12,7 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test test/*.test.js",
+    "test:benchmark": "node --test scripts/benchmark/trace.test.js && python3 scripts/benchmark/test_runner.py",
     "build:sprites": "node scripts/build_sprites.js",
     "test:smoke": "node scripts/smoke.js"
   },

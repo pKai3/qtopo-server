@@ -1,0 +1,2 @@
+# Only needed for PNG/SVG chart exports. Runner, viewer and HTML export use stdlib.
+matplotlib==3.11.2
