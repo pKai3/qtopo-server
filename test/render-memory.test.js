@@ -29,7 +29,7 @@ test('a cold burst reserves memory before asynchronous workers start', () => {
   const memory = createRenderMemory({ read: () => snapshot(250) });
   let admitted = 0;
   while (admitted < 16 && memory.canStart(admitted, [])) admitted++;
-  assert.equal(admitted, 5, '512 MiB reservations and 20% headroom apply to pending slots too');
+  assert.equal(admitted, 6, '512 MiB reservations and headroom apply to pending slots too');
   assert.equal(memory.stats().limited, true);
   assert.equal(memory.stats().pauses, 1);
 });
@@ -48,7 +48,7 @@ test('retained memory, active growth and other server memory all reduce admissio
   assert.equal(memory.stats().peakWorkingBytes, 3200 * MIB);
   for (let i = 0; i < 4; i++) memory.observePeak(600 * MIB);
   assert.equal(memory.stats().workerEstimateBytes, 750 * MIB, 'learn peak, not just idle RSS');
-  used = 2600;
+  used = 2900;
   assert.equal(memory.canStart(0, []), false);
   assert.equal(memory.canStart(0, [{ rssBytes: 500 * MIB }], 500 * MIB), true, 'reuse credit is already charged by the container');
 });
@@ -87,4 +87,29 @@ test('memory-paused queues resume requested work ahead of background work', asyn
   available = true; queue.drain(); await Promise.all(tasks);
   assert.deepEqual(order, ['requested', 'nearby', 'zoom']);
   queue.close();
+});
+
+
+test('shared library RSS does not impose a four-worker ceiling on a light workload', () => {
+  // Captured phone workload: 140 MiB of file mappings per worker, 240 MiB
+  // private peak. The cgroup already includes the shared libraries once.
+  const memory = createRenderMemory({ read: () => snapshot(1700) });
+  for (let i = 0; i < 8; i++) memory.observePeak(240 * MIB);
+  const workers = Array.from({ length: 4 }, () => ({ task: {}, rssBytes: 380 * MIB,
+    footprintBytes: 240 * MIB, peakFootprintBytes: 240 * MIB }));
+  let admitted = 4;
+  while (admitted < 16 && memory.canStart(admitted, workers)) admitted++;
+  assert.equal(admitted, 9, 'more work starts promptly while all future growth remains reserved');
+  assert.equal(memory.stats(workers).workerEstimateBytes, 300 * MIB);
+  assert.equal(memory.stats().headroomBytes, 512 * MIB);
+});
+
+test('a large active private allocation immediately raises the reservation and blocks further growth', () => {
+  const memory = createRenderMemory({ read: () => snapshot(2500) });
+  for (let i = 0; i < 8; i++) memory.observePeak(240 * MIB);
+  const workers = Array.from({ length: 6 }, () => ({ task: {}, rssBytes: 400 * MIB,
+    footprintBytes: 260 * MIB, peakFootprintBytes: 260 * MIB }));
+  workers[0].footprintBytes = workers[0].peakFootprintBytes = 600 * MIB;
+  assert.equal(memory.canStart(6, workers), false);
+  assert.equal(memory.stats(workers).workerEstimateBytes, 750 * MIB);
 });
