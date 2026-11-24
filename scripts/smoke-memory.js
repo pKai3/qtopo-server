@@ -20,7 +20,7 @@ async function main() {
     try { before = await status(); break; } catch (err) { if (i === 59) throw err; }
     await sleep(500);
   }
-  assert.equal(before.settings.renderConcurrency, 16);
+  assert.equal(before.settings.renderConcurrency, 24);
   assert.equal(before.renderer.memory.enabled, true);
   const initialEvents = counters(await fs.readFile('/sys/fs/cgroup/memory.events', 'utf8'));
   const report = { limit, samples: 0, peakCurrent: 0, peakAnonymous: 0, pans: [], history: [] };
@@ -46,10 +46,10 @@ async function main() {
       ][pan % 4];
       const x = baseX + Math.floor(pan / 4) * 8;
       const started = Date.now();
-      // Sixteen distinct grids demand the full configured pool. Repeated zoom
+      // Twenty-four distinct grids demand the full configured pool. Repeated zoom
       // and style changes exercise both retained maps and fresh allocations.
       // Prefetch remains enabled and overlaps subsequent pans.
-      await Promise.all(Array.from({ length: 16 }, async (_, i) => {
+      await Promise.all(Array.from({ length: 24 }, async (_, i) => {
         const res = await fetch(`${origin}/${profile}/${z}/${x + (i % 4) * 2}/${baseY + Math.floor(i / 4) * 2}.png`, {
           signal: AbortSignal.timeout(120000),
         });
@@ -73,7 +73,7 @@ async function main() {
     }
     assert.equal(after.renderer.active + after.renderer.queued + after.prefetch.active + after.prefetch.queued, 0, 'background work must finish');
     assert.equal(after.startedAt, before.startedAt);
-    assert.ok(after.renderer.peakActive > 1 && after.renderer.peakActive <= 16, 'admission adapts below the configured ceiling');
+    assert.ok(after.renderer.peakActive > 1 && after.renderer.peakActive <= 24, 'admission adapts below the configured ceiling');
     assert.ok(after.renderer.memory.pauses > 0, 'must exercise memory-aware backpressure');
     assert.equal(after.renderer.memory.limited, false, 'idle status must clear after draining');
     assert.equal(after.requests.errors, 0);
@@ -90,6 +90,6 @@ async function main() {
     try { await monitor; }
     finally { await fs.writeFile('/tmp/smoke/memory.json', JSON.stringify(report, null, 2)); }
   }
-  console.log('Sixteen-worker memory admission check:', JSON.stringify({ peakCurrent: report.peakCurrent, peakAnonymous: report.peakAnonymous, events: report.events }));
+  console.log('Twenty-four-worker memory admission check:', JSON.stringify({ peakCurrent: report.peakCurrent, peakAnonymous: report.peakAnonymous, events: report.events }));
 }
 main().catch(error => { console.error(error); process.exit(1); });

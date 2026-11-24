@@ -47,10 +47,10 @@ jobs:
         with:
           ref: 4e90dc8fb0bc142764998cee4f6da4e23ccea01e
           path: memory-styles
-      - name: Exercise sustained panning with sixteen workers under a four GiB cap
+      - name: Exercise sustained panning with twenty-four workers under a four GiB cap
         run: |
           mkdir -p test-results
-          docker run -d --name qtopo-memory --cpus=4 --memory=4g --memory-swap=4g --pids-limit=1024 -e RENDER_CONCURRENCY=16 -e RENDER_TIMEOUT_SECONDS=90 -e PREFETCH_RADIUS=2 qtopo:test
+          docker run -d --name qtopo-memory --cpus=4 --memory=4g --memory-swap=4g --pids-limit=1024 -e RENDER_CONCURRENCY=24 -e RENDER_TIMEOUT_SECONDS=90 -e PREFETCH_RADIUS=2 qtopo:test
           for profile in readable mobile-3x mobile-light; do
             docker cp "memory-styles/styles/$profile.json" "qtopo-memory:/tmp/$profile.json"
             docker exec qtopo-memory node scripts/profiles.js sync "/tmp/$profile.json"

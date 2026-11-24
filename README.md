@@ -156,7 +156,7 @@ Additional endpoints:
 | PNG_COMPRESSION_LEVEL | 3 | Lossless PNG compression, 0–9. Try 6 for slightly smaller files at the cost of more encoding CPU; resolution and colours are unchanged. Applies to newly rendered tiles only. |
 | LABEL_SCALE | 1 | Legacy extra raster text/icon multiplier, 0.5–3, applied on top of every profile; keep 1 when comparing named profiles. |
 | VECTOR_UPSTREAM | QLD service | Optional QLD template containing {z}, {x}, {y} |
-| RENDER_CONCURRENCY | 2 | Maximum simultaneous reusable native workers, 1–16. With a Docker memory cap, actual concurrency adapts to available memory. |
+| RENDER_CONCURRENCY | 8 | Maximum simultaneous reusable native workers, 1–24. With a Docker memory cap, actual concurrency adapts to available memory. |
 | RENDER_MEMORY_GUARD | 1 | Adapt concurrency and release speculative work when approaching the Docker RAM cap. Set 0 for unguarded admission; Docker still enforces its hard memory limit and worker recycling remains enabled. |
 | RENDER_MEMORY_HEADROOM_MB | 512 | Minimum memory headroom in MiB (0–65536). The guard reserves the larger of this value and the percentage below. |
 | RENDER_MEMORY_HEADROOM_PERCENT | 12.5 | Proportional memory headroom, 0–50 percent of the Docker RAM cap. Applies while the guard is enabled. |

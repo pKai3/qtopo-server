@@ -466,6 +466,13 @@ test('configuration and ArcGIS tile order are explicit', () => {
     assert.throws(() => loadConfig({ PREFETCH_RADIUS: radius }), /PREFETCH_RADIUS must be an integer between 0 and 10/);
   }
   assert.equal(loadConfig({ RENDER_CONCURRENCY: '8' }).prefetchConcurrency, 7);
+  assert.equal(loadConfig({}).renderConcurrency, 8);
+  assert.equal(loadConfig({}).prefetchConcurrency, 7);
+  assert.equal(loadConfig({ RENDER_CONCURRENCY: '20' }).renderConcurrency, 20);
+  assert.equal(loadConfig({ RENDER_CONCURRENCY: '24' }).prefetchConcurrency, 23);
+  assert.equal(loadConfig({ RENDER_CONCURRENCY: '24', PREFETCH_CONCURRENCY: '24' }).prefetchConcurrency, 23);
+  assert.throws(() => loadConfig({ RENDER_CONCURRENCY: '25' }), /RENDER_CONCURRENCY/);
+  assert.throws(() => loadConfig({ PREFETCH_CONCURRENCY: '25' }), /PREFETCH_CONCURRENCY/);
   assert.equal(loadConfig({ RENDER_CONCURRENCY: '8', PREFETCH_CONCURRENCY: '3' }).prefetchConcurrency, 3);
   assert.equal(loadConfig({ RENDER_CONCURRENCY: '2', PREFETCH_CONCURRENCY: '8' }).prefetchConcurrency, 1);
   assert.equal(loadConfig({ PREFETCH_ZOOM: '0' }).prefetchZoom, false);
