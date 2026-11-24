@@ -50,3 +50,25 @@ test('truncated tile data fails rather than returning a corrupted tile', async (
   assert.throws(() => normalizeVectorValues(buffer.subarray(0, -1)), /Truncated/);
   assert.throws(() => normalizeVectorValues(Buffer.from([26, 128])), /Truncated/);
 });
+test('unknown-type QLD point features retain mountain markers without changing their coordinates', async () => {
+  const { PbfWriter, PbfReader } = await import('pbf');
+  const { VectorTile } = await import('@mapbox/vector-tile');
+  const writer = new PbfWriter();
+  writer.writeMessage(3, (_, layer) => {
+    layer.writeStringField(1, 'Mountain'); layer.writeVarintField(15, 2); layer.writeVarintField(5, 2048);
+    for (const [id, geometry, type] of [[1, [9, 1322, 1152], 0], [2, [9, 20, 40], undefined], [3, [9, 20, 40, 10, 4, 6], 0]]) {
+      layer.writeMessage(2, (_, f) => {
+        f.writeVarintField(1, id);
+        if (type !== undefined) f.writeVarintField(3, type);
+        f.writePackedVarint(4, geometry);
+      });
+    }
+  });
+  const raw = Buffer.from(writer.finish()), repaired = normalizeVectorValues(raw);
+  const layer = new VectorTile(new PbfReader(repaired)).layers.Mountain;
+  assert.equal(layer.feature(0).type, 1);
+  assert.equal(layer.feature(1).type, 1);
+  assert.equal(layer.feature(2).type, 0, 'do not guess the type of non-point geometry');
+  assert.deepEqual(layer.feature(0).loadGeometry().map(line => line.map(p => [p.x, p.y])), [[[661, 576]]]);
+  assert.strictEqual(normalizeVectorValues(repaired), repaired);
+});
