@@ -5,7 +5,7 @@ One XYZ tile source for Gaia GPS and other mapping apps, covering Queensland and
 ## Release channels
 
 - `docker.io/pkai3/qtopo-server:latest` — tested QLD + NSW release.
-- `docker.io/pkai3/qtopo-server:stable` — confirmed QLD + NSW release through PR #14 (`15a5c79`), including padded metatiles, short tile URLs and private management controls.
+- `docker.io/pkai3/qtopo-server:stable` — the last published release before adaptive memory admission (`5d5f2ae`, PR #27), promoted for comparison with Latest. The Stable server runs eight workers with a 4 GiB Docker cap; this image does not throttle admission against that cap.
 - `docker.io/pkai3/qtopo-server:fallback` — original pre-chat, pre-NSW image, preserved by digest without rebuilding it.
 - `:stable-before-15a5c79` — previous stable release through PR #12, retained for rollback.
 - `:pre-nsw` — another permanent reference to that same pre-NSW image.
