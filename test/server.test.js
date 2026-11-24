@@ -48,6 +48,22 @@ async function waitForActions(s, predicate) {
   }
   assert.fail('Status action did not reach the expected state');
 }
+test('browser vector tiles repair empty values while native rendering retains raw cached data', async t => {
+  // A named, versioned empty layer with an invalid empty Value dictionary entry.
+  const raw = Buffer.from([26, 7, 10, 1, 97, 120, 2, 34, 0]);
+  let cachedPath;
+  const s = await server(t, { cache: { stats: {}, async get({ file }) {
+    cachedPath = file; await atomicWrite(file, raw); return { path: file };
+  } } });
+  const url = s.url + '/vector/qld/17/121026/76203.pbf';
+  assert.deepEqual(Buffer.from(await (await fetch(url)).arrayBuffer()), raw);
+  const response = await fetch(url + '?values=2');
+  assert.equal(response.status, 200);
+  assert.deepEqual(Buffer.from(await response.arrayBuffer()), Buffer.from([26, 9, 10, 1, 97, 120, 2, 34, 2, 32, 0]));
+  assert.deepEqual(await fs.readFile(cachedPath), raw, 'the existing upstream cache is preserved');
+  const browserStyle = await (await fetch(s.url + '/styles/qld.json')).json();
+  assert.ok(Object.values(browserStyle.sources).every(src => src.tiles.every(url => url.endsWith('?values=2'))));
+});
 test('public status is read-only: web controls are absent even with spoofed proxy headers', async t => {
   let renders = 0;
   const s = await server(t, { renderer: { stats: { active: 0, lastRender: { z:16, x:60500, y:37950 } }, close() {}, async render(job) { renders++; await atomicWrite(job.outPath, PNG); } } }, { ADMIN_ALLOWED_NETWORKS: '' });

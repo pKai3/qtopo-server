@@ -22,6 +22,7 @@ const { createAdminAccess } = require('./lib/admin-access');
 const { listenControl, socketPath } = require('./lib/local-control');
 const { createRequestFocus } = require('./lib/request-focus');
 const { createRenderFlyby } = require('./lib/render-flyby');
+const { normalizeVectorValues } = require('./lib/vector-values');
 
 async function createApp(config = loadConfig(), dependencies = {}) {
   const admin = createAdminAccess(config);
@@ -144,6 +145,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     });
     headers(res, result.empty ? Math.floor(config.emptyTTL / 1000) : 3600);
     if (result.empty) return res.status(204).end();
+    if (p.id === 'qld' && req.query.values === '2') return res.type('application/x-protobuf').send(normalizeVectorValues(await fs.readFile(result.path)));
     await sendFile(res, result.path, 'application/x-protobuf');
   }
   async function styleForRaster(p, tile, profile) {
@@ -260,7 +262,12 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   });
   async function style(req, res) {
     const p = providerFor(req);
-    res.set('Cache-Control', 'no-cache').json(absoluteStyle((await styles.get(p, await profileFor(req))).style, origin(req)));
+    const browserStyle = absoluteStyle((await styles.get(p, await profileFor(req))).style, origin(req));
+    // Bypass previously cached raw Esri tiles without invalidating PNG caches.
+    if (p.id === 'qld') for (const source of Object.values(browserStyle.sources || {})) {
+      if (source.type === 'vector') source.tiles = source.tiles.map(url => `${url}?values=2`);
+    }
+    res.set('Cache-Control', 'no-cache').json(browserStyle);
   }
   app.get('/style.json', style);
   app.get('/styles/:provider.json', style);
