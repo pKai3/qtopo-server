@@ -81,6 +81,24 @@ test('a sole disconnected HTTP request removes its queued render without startin
   for (let i = 0; i < 100 && renderer.stats.queued; i++) await sleep(5);
   assert.equal(renderer.stats.queued, 0); assert.equal(renderer.stats.spawned, 0); assert.equal(renderer.stats.cancelledQueued, 1);
 });
+test('a failed border source releases the other source queued for the same HTTP request', async t => {
+  const renderer = createRenderer({ renderConcurrency: 1, renderQueueLimit: 4, rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 2000 },
+    path.join(__dirname, 'fixtures/render-worker.js'), undefined, {
+      read: () => ({ limitBytes: 1024 * 1024 ** 2, currentBytes: 900 * 1024 ** 2, workingBytes: 900 * 1024 ** 2 }),
+    });
+  let queued;
+  const sourceQueued = new Promise(resolve => { queued = resolve; });
+  const s = await server(t, {
+    nativeZoom: async (_provider, tile) => tile.z,
+    renderer: { get stats() { return renderer.stats; }, close: () => renderer.close(), async render(job, interest) {
+      if (job.outPath.includes('/qld/')) { await sourceQueued; throw new Error('Source render failed'); }
+      const pending = renderer.render(job, interest); queued(); return pending;
+    } },
+  });
+  assert.equal((await fetch(s.url + '/raster/14/15179/9528.png')).status, 502);
+  for (let i = 0; i < 100 && renderer.stats.queued; i++) await sleep(5);
+  assert.equal(renderer.stats.queued, 0); assert.equal(renderer.stats.spawned, 0); assert.equal(renderer.stats.cancelledQueued, 1);
+});
 const webAction = (s, route, body = {}, headers = actionHeaders) => fetch(s.url + '/api/actions/' + route, { method: 'POST', headers, body: JSON.stringify(body) });
 const action = async (s, route, body = {}) => {
   try {
