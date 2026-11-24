@@ -158,7 +158,7 @@ test('native worker crash output reaches the application log and subsequent work
   assert.equal(renderer.stats.spawned, 2);
 });
 
-test('memory pressure releases a retained idle worker and queued rendering resumes', async t => {
+for (const priority of [PRIORITY.REQUEST, PRIORITY.ZOOM]) test(`memory pressure releases a retained idle worker and queued priority ${priority} resumes`, async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-admission-test-'));
   const MIB = 1024 ** 2;
   let pressure = false, oldPid;
@@ -177,7 +177,7 @@ test('memory pressure releases a retained idle worker and queued rendering resum
   oldPid = Number(await fs.readFile(pidFile, 'utf8'));
   for (let i = 0; i < 100 && renderer.stats.active; i++) await new Promise(resolve => setTimeout(resolve, 5));
   pressure = true;
-  const next = renderer.render({ outPath: path.join(root, 'next.png'), assertExitedPidFile: pidFile });
+  const next = renderer.render({ outPath: path.join(root, 'next.png'), assertExitedPidFile: pidFile, priority });
   assert.equal(renderer.stats.memory.limited, true);
   await next;
   assert.equal(renderer.stats.spawned, 2);
