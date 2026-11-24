@@ -61,7 +61,8 @@ async function main() {
       const current = await status();
       assert.equal(current.startedAt, before.startedAt, 'the server must not restart during panning');
       report.pans.push({ profile, z, x, ms: Date.now() - started, completedRenders: current.renderer.completed,
-        active: current.renderer.active, queue: current.renderer.timings.queueMs, memory: current.renderer.memory });
+        active: current.renderer.active, queue: current.renderer.timings.queueMs, requestedQueue: current.renderer.requestedTimings.queueMs,
+        yieldedPrefetch: current.renderer.yieldedPrefetch, preemptedForMemory: current.renderer.preemptedForMemory, memory: current.renderer.memory });
       console.log('Memory pan:', JSON.stringify(report.pans.at(-1)));
     }
     let after;

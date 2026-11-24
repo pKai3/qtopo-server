@@ -263,4 +263,72 @@ test('a client joining an active prefetch shares the worker and reclassifies cou
   } finally { await fs.writeFile(job.gate, 'go'); await background; }
   assert.equal(renderer.stats.lastRender.priority, 'requested');
   assert.equal(renderer.stats.completed, 1);
+  assert.equal(renderer.stats.requestedTimings.samples, 1);
+  assert.equal(renderer.stats.requestedTimings.queueMs.p95, 0, 'a request joining an active prefetch does not inherit its earlier queue wait');
+});
+
+
+test('requested tiles interrupt memory-blocking zoom work and wait for its process to exit', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-yield-'));
+  const MIB=1024**2; let pressure=false, zoomPid;
+  const renderer=createRenderer({renderConcurrency:16,renderQueueLimit:16,prefetchConcurrency:15,
+    rasterTTL:10000,emptyTTL:1000,renderTimeoutMs:5000},path.join(__dirname,'fixtures/render-worker.js'),undefined,{
+    read:()=>{let alive=false;if(zoomPid){try{process.kill(zoomPid,0);alive=true;}catch{}}
+      const used=(pressure&&alive?1800:100)*MIB;return {limitBytes:2048*MIB,currentBytes:used,workingBytes:used};},
+  });
+  t.after(async()=>{renderer.close();await fs.rm(root,{recursive:true,force:true});});
+  const pidFile=path.join(root,'zoom.pid'), zoomFile=path.join(root,'zoom.png');
+  const zoom=renderer.render({outPath:zoomFile,priority:PRIORITY.ZOOM,recordPid:pidFile,gate:path.join(root,'never-opened')});
+  const yielded=assert.rejects(zoom,{status:503});
+  for(let i=0;i<200;i++){try{zoomPid=Number(await fs.readFile(pidFile,'utf8'));break;}catch{}await new Promise(r=>setTimeout(r,5));}
+  assert.ok(zoomPid);pressure=true;
+  const foreground=renderer.render({outPath:path.join(root,'requested.png'),assertExitedPidFile:pidFile,priority:PRIORITY.REQUEST});
+  // A sibling requested during cancellation must not attach to the dying job.
+  const replacement=renderer.render({outPath:zoomFile,assertExitedPidFile:pidFile,priority:PRIORITY.REQUEST});
+  assert.equal(renderer.render({outPath:zoomFile,priority:PRIORITY.REQUEST}),replacement);
+  await Promise.all([foreground,replacement,yielded]);
+  assert.equal(renderer.stats.yieldedPrefetch,1);
+  assert.equal(await fs.readFile(zoomFile,'utf8'),'rendered-test-output');
+  assert.equal(renderer.stats.completed,2);
+});
+
+test('a speculative render promoted by a real tile request is never interrupted', async t => {
+  const root=await fs.mkdtemp(path.join(os.tmpdir(),'qtopo-promoted-'));const MIB=1024**2;let pressure=false;
+  const renderer=createRenderer({renderConcurrency:16,renderQueueLimit:16,prefetchConcurrency:15,
+    rasterTTL:10000,emptyTTL:1000,renderTimeoutMs:5000},path.join(__dirname,'fixtures/render-worker.js'),undefined,{
+    read:()=>({limitBytes:2048*MIB,currentBytes:(pressure?1800:100)*MIB,workingBytes:(pressure?1800:100)*MIB}),
+  });
+  t.after(async()=>{renderer.close();await fs.rm(root,{recursive:true,force:true});});
+  const job={outPath:path.join(root,'shared.png'),recordPid:path.join(root,'pid'),gate:path.join(root,'go'),priority:PRIORITY.ZOOM};
+  const first=renderer.render(job);
+  for(let i=0;i<200;i++){try{await fs.access(job.recordPid);break;}catch{}await new Promise(r=>setTimeout(r,5));}
+  assert.equal(renderer.render({...job,priority:PRIORITY.REQUEST}),first);pressure=true;
+  const next=renderer.render({outPath:path.join(root,'requested.png'),priority:PRIORITY.REQUEST});
+  await new Promise(r=>setTimeout(r,120));
+  assert.equal(renderer.stats.yieldedPrefetch,0);
+  pressure=false;await fs.writeFile(job.gate,'go');await Promise.all([first,next]);
+});
+
+test('speculative work yields under memory pressure even without a waiting client', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-pressure-yield-'));
+  const MIB = 1024 ** 2;
+  let pressure = false;
+  const renderer = createRenderer({ renderConcurrency: 16, renderQueueLimit: 16, prefetchConcurrency: 15,
+    rasterTTL: 10000, emptyTTL: 1000, renderTimeoutMs: 5000 }, path.join(__dirname, 'fixtures/render-worker.js'), undefined, {
+    read: () => ({ limitBytes: 2048 * MIB, currentBytes: (pressure ? 1800 : 100) * MIB, workingBytes: (pressure ? 1800 : 100) * MIB }),
+  });
+  t.after(async () => { renderer.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const pidFile = path.join(root, 'zoom.pid');
+  const yielded = assert.rejects(renderer.render({ outPath: path.join(root, 'zoom.png'), priority: PRIORITY.ZOOM,
+    recordPid: pidFile, gate: path.join(root, 'never-opened') }), { status: 503 });
+  for (let i = 0; i < 200; i++) {
+    if (await fs.access(pidFile).then(() => true, () => false)) break;
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+  const pid = Number(await fs.readFile(pidFile, 'utf8'));
+  pressure = true;
+  await yielded;
+  assert.equal(renderer.stats.preemptedForMemory, 1);
+  assert.equal(renderer.stats.yieldedPrefetch, 0);
+  assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' });
 });
