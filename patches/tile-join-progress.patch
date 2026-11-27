@@ -1,0 +1,78 @@
+--- a/tile-join.cpp
++++ b/tile-join.cpp
+@@ -38,6 +38,7 @@
+ #include <sstream>
+ #include <algorithm>
+ #include <functional>
++#include <chrono>
+ #include "jsonpull/jsonpull.h"
+ #include "milo/dtoa_milo.h"
+ #include "errors.hpp"
+@@ -65,6 +66,25 @@
+ 
+ bool want_overzoom = false;
+ int buffer = 5;
++
++// Opt-in diagnostics for QTopo's long-running retained-data importer.
++// Counters describe consumed input tiles; overlapping sheet tiles remain separate.
++static unsigned long long qtopo_checked_files = 0;
++static unsigned long long qtopo_input_tiles = 0;
++static unsigned long long qtopo_output_tiles = 0;
++
++static void qtopo_report_progress(const char *stage, bool force = false) {
++	static bool enabled = getenv("QTOPO_TILE_JOIN_PROGRESS") != NULL;
++	if (!enabled) return;
++	using clock = std::chrono::steady_clock;
++	static clock::time_point last;
++	auto now = clock::now();
++	if (!force && last != clock::time_point() && now - last < std::chrono::seconds(5)) return;
++	last = now;
++	fprintf(stderr, "\nQTOPO_ASSEMBLY {\"stage\":\"%s\",\"checkedFiles\":%llu,\"inputTiles\":%llu,\"outputTiles\":%llu}\n",
++	        stage, qtopo_checked_files, qtopo_input_tiles, qtopo_output_tiles);
++	fflush(stderr);
++}
+ 
+ bool progress_time() {
+ 	return false;
+@@ -688,6 +708,8 @@
+ 
+ 			stmt = query;
+ 			next = NULL;
++			qtopo_checked_files++;
++			qtopo_report_progress("checking-inputs");
+ 		}
+ 	}
+ 
+@@ -1108,11 +1130,13 @@
+ 		for (auto ai = args[i].outputs.begin(); ai != args[i].outputs.end(); ++ai) {
+ 			if (outdb != NULL) {
+ 				mbtiles_write_tile(outdb, ai->first.z, ai->first.x, ai->first.y, ai->second.data(), ai->second.size());
++				qtopo_output_tiles++;
+ 			} else if (outdir != NULL) {
+ 				dir_write_tile(outdir, ai->first.z, ai->first.x, ai->first.y, ai->second);
+ 			}
+ 		}
+ 	}
++	qtopo_report_progress("merging");
+ }
+ 
+ void handle_strategies(const unsigned char *s, std::vector<strategy> *st) {
+@@ -1220,8 +1244,10 @@
+ 	double minlon2 = INT_MAX;
+ 	double maxlon2 = INT_MIN;
+ 
++	qtopo_report_progress("merging", true);
+ 	while (readers != NULL && !readers->all_done()) {
+ 		std::pair<zxy, std::string> current = readers->current();
++		qtopo_input_tiles++;
+ 
+ 		if (current.first.z >= minzoom && current.first.z <= maxzoom) {
+ 			zxy tile = current.first;
+@@ -1269,6 +1295,7 @@
+ 	}
+ 
+ 	dispatch_tasks(tasks, layermaps, outdb, outdir, header, mapping, db, exclude, include, ifmatched, keep_layers, remove_layers, filter, readers, &minlat, &minlon, &maxlat, &maxlon, &minlon2, &maxlon2);
++	qtopo_report_progress("merged", true);
+ 	layermap = merge_layermaps(layermaps);
+ 
+ 	st->minlon = std::min(minlon, st->minlon);

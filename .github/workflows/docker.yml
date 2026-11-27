@@ -43,7 +43,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Verify retained contour downloads and preparation without external data
-        run: docker run --rm --entrypoint python3 qtopo:test test/nsw-contours-import.test.py
+        run: docker run --rm -e QTOPO_REQUIRE_ASSEMBLY_PROGRESS=1 --entrypoint python3 qtopo:test test/nsw-contours-import.test.py
       - name: Exercise contour preparation at boot, native output and restart reuse
         run: |
           docker run -d --name qtopo-contours --entrypoint /bin/bash -e NSW_CONTOURS_ENABLED=1 -e CACHE_MIN_FREE_GIB=0 -e PREFETCH_RADIUS=0 -e RENDER_TIMEOUT_SECONDS=90 qtopo:test -c 'python3 test/fixtures/prepare-contours.py --data-dir /data/contours/nsw --catalog assets/nsw-contours-catalog.json && exec /usr/bin/tini -g -- ./start.sh'

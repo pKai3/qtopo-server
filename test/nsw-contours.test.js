@@ -284,3 +284,40 @@ test('publication validation rejects unsafe paths, mismatched revisions and inva
   }
   assert.throws(() => validatePublication(good, 'b'.repeat(64)), /Invalid contour publication/);
 });
+
+test('assembly logs and public status expose measured counters and stage-only estimates without raw tool output', async t => {
+  const f = await fixture(t, true, () => {
+    const child = new EventEmitter();
+    child.kill = () => { child.emit('exit', 0); return true; };
+    return child;
+  });
+  await fs.mkdir(f.root, { recursive: true });
+  await fs.writeFile(f.config.nswContoursCatalog, JSON.stringify({ sheets: [{ bytes: 1e9 }] }));
+  const state = { phase: 'assembling', completedSheets: 343, totalSheets: 343, assembly: {
+    stage: 'merging', countersAvailable: true, checkedFiles: 343, totalFiles: 343,
+    inputTiles: 450, totalInputTiles: 1000, outputTiles: 250, outputBytes: 10.4e9,
+    elapsedSeconds: 120, tilesPerSecond: 10, etaSeconds: 55, rawLog: '/private/secret', filename: 'private.db' } };
+  const save = async () => {
+    await fs.writeFile(path.join(f.root, 'status.json'), JSON.stringify(state));
+    await f.store.refresh(true);
+  };
+  await save();
+  await f.store.start();
+  assert.equal(f.store.status().assembly.inputTiles, 450);
+  assert.equal(f.store.status().assembly.etaSeconds, 55);
+  let line = f.logs.find(([, message]) => message.includes('input tiles processed'))[1];
+  assert.match(line, /450\/1000 input tiles processed \(45\.0%\).*10 input tiles\/s.*10\.40 GB written/);
+  assert.match(line, /~1m for this stage; later checks not included/);
+  assert.doesNotMatch(JSON.stringify(f.store.status()) + line, /secret|private|rawLog|filename/);
+  state.assembly.tilesPerSecond = 0;
+  await save();
+  assert.equal(f.store.status().assembly.etaSeconds, undefined, 'stale estimates must disappear when progress stalls');
+  Object.assign(state.assembly, { stage: 'validating', inputTiles: 1000 });
+  await save();
+  assert.match(f.logs.at(-1)[1], /validating merged map/);
+  assert.doesNotMatch(f.logs.at(-1)[1], /~\d+m|343\/343 sheets prepared/);
+  assert.equal(f.store.status().assembly.etaSeconds, undefined);
+  state.phase = 'preparing';
+  await save();
+  assert.equal(f.store.status().assembly, undefined, 'old assembly progress must not follow another preparation stage');
+});

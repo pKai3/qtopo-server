@@ -102,12 +102,15 @@ def fingerprint(path):
     return {'bytes': info.st_size, 'mtimeNs': info.st_mtime_ns}
 
 
-def sha256(path, guard=lambda: None):
+def sha256(path, guard=lambda: None, progress=lambda count: None):
     result = hashlib.sha256()
+    count = 0
     with Path(path).open('rb') as stream:
         while chunk := stream.read(MIB):
             guard()
             result.update(chunk)
+            count += len(chunk)
+            progress(count)
     return result.hexdigest()
 
 
@@ -367,6 +370,75 @@ def mbtiles_info(path):
         raise ImportFailure(f'Could not validate prepared MBTiles: {error}') from error
 
 
+class AssemblyProgress:
+    """Bounded reads of opt-in native counters; ETA covers the current stage only."""
+    def __init__(self, output, log, files, tiles, clock=time.monotonic):
+        self.output, self.log, self.files, self.tiles = Path(output), Path(log), files, tiles
+        self.clock, self.started = clock, clock()
+        self.last_sample = None
+        self.native, self.samples = {}, []
+        self.override, self.previous_stage, self.hashed = None, None, 0
+        self.size = 0
+
+    def sample(self, force=False, stage=None, hashed_bytes=None):
+        now = self.clock()
+        if stage is not None:
+            self.override = stage
+        if hashed_bytes is not None:
+            self.hashed = hashed_bytes
+        if not force and self.last_sample is not None and now - self.last_sample < 5:
+            return None
+        self.last_sample = now
+        try:
+            with self.log.open('rb') as stream:
+                stream.seek(max(0, self.log.stat().st_size - 65536))
+                tail = stream.read(65536).decode(errors='replace')
+            for line in tail.splitlines():
+                if not line.startswith('QTOPO_ASSEMBLY '):
+                    continue
+                try:
+                    record = json.loads(line[len('QTOPO_ASSEMBLY '):])
+                    valid = record.get('stage') in ('checking-inputs', 'merging', 'merged')
+                    limits = {'checkedFiles': self.files, 'inputTiles': self.tiles, 'outputTiles': self.tiles}
+                    if valid and all(type(record.get(key)) is int and self.native.get(key, 0) <= record[key] <= limit
+                                     for key, limit in limits.items()):
+                        self.native = {key: record[key] for key in ('stage', *limits)}
+                except (ValueError, TypeError, AttributeError):
+                    continue
+        except FileNotFoundError:
+            pass
+        if self.output.exists():
+            self.size = self.output.stat().st_size
+        size = self.size
+        native_stage = self.native.get('stage', 'merging' if size else 'checking-inputs')
+        stage = self.override or ('validating' if native_stage == 'merged' else native_stage)
+        result = {'stage': stage, 'checkedFiles': self.native.get('checkedFiles', 0), 'totalFiles': self.files,
+                  'inputTiles': self.native.get('inputTiles', 0), 'totalInputTiles': self.tiles,
+                  'outputTiles': self.native.get('outputTiles', 0), 'outputBytes': size,
+                  'countersAvailable': bool(self.native), 'elapsedSeconds': max(0, int(now - self.started))}
+        metric = self.hashed if stage == 'hashing' else result['inputTiles']
+        total = size if stage == 'hashing' else self.tiles
+        if stage != self.previous_stage:
+            self.samples = []
+            self.previous_stage = stage
+        self.samples.append((now, metric, size))
+        while len(self.samples) > 2 and self.samples[1][0] <= now - 120:
+            self.samples.pop(0)
+        duration = now - self.samples[0][0]
+        if stage == 'hashing':
+            result['hashedBytes'] = self.hashed
+        if duration >= 30 and stage in ('merging', 'hashing'):
+            rate = max(0, (metric - self.samples[0][1]) / duration)
+            if stage == 'hashing':
+                result['hashBytesPerSecond'] = int(rate)
+            elif self.native:
+                result['tilesPerSecond'] = int(rate)
+            result['bytesPerSecond'] = int(max(0, (size - self.samples[0][2]) / duration))
+            if rate > 0 and metric < total and (stage == 'hashing' or self.native):
+                result['etaSeconds'] = math.ceil((total - metric) / rate)
+        return result
+
+
 class Importer:
     def __init__(self, data_dir, catalog_path, min_free_bytes, threads=8):
         if min_free_bytes < 0 or not 1 <= threads <= 64:
@@ -386,7 +458,8 @@ class Importer:
             if path.is_symlink():
                 raise ImportFailure('Importer storage directories must not be symlinks.')
             path.mkdir(exist_ok=True)
-        self.env = {**os.environ, 'TIPPECANOE_MAX_THREADS': str(threads), 'GDAL_NUM_THREADS': str(threads)}
+        self.env = {**os.environ, 'TIPPECANOE_MAX_THREADS': str(threads), 'GDAL_NUM_THREADS': str(threads),
+                    'QTOPO_TILE_JOIN_PROGRESS': '1'}
 
     def guard(self, needed=0):
         if self.failure:
@@ -460,14 +533,16 @@ class Importer:
             with self.children_lock:
                 self.children.discard(child)
 
-    def check_process(self, child, log):
+    def check_process(self, child, log, progress=lambda: None):
         while child.poll() is None:
             self.guard()
+            progress()
             try:
                 child.wait(timeout=0.5)
             except subprocess.TimeoutExpired:
                 pass
         self.guard()
+        progress()
         if child.returncode:
             with Path(log).open('rb') as stream:
                 stream.seek(max(0, Path(log).stat().st_size - 3000))
@@ -568,20 +643,30 @@ class Importer:
         with tempfile.TemporaryDirectory(prefix='assemble-', dir=self.root / 'work') as temporary:
             stage = Path(temporary)
             output, log = stage / 'complete.mbtiles', stage / 'tile-join.log'
+            progress = AssemblyProgress(output, log, len(prepared), sum(item['tiles'] for item in prepared))
+            def report(force=False, **changes):
+                snapshot = progress.sample(force=force, **changes)
+                if snapshot is not None:
+                    self.status(assembly=snapshot)
+            report(force=True)
             # A file list avoids command-line length limits for the statewide catalogue.
             inputs = stage / 'inputs.txt'
             inputs.write_text(''.join(str(self.prepared_paths(sheet)[0]) + '\n' for sheet in catalog['sheets']))
             with log.open('wb') as errors, self.process([self.tools['tile-join'], '-pk', '-o', str(output), '-r', str(inputs)],
                                                       stdout=subprocess.DEVNULL, stderr=errors) as child:
-                self.check_process(child, log)
+                self.check_process(child, log, report)
+            report(force=True, stage='validating')
             stats = mbtiles_info(output)
             sheets = catalog['sheets']
             bounds = [min(s['bounds'][0] for s in sheets), min(s['bounds'][1] for s in sheets),
                       max(s['bounds'][2] for s in sheets), max(s['bounds'][3] for s in sheets)]
+            report(force=True, stage='hashing')
+            digest = sha256(output, self.guard, lambda count: report(hashed_bytes=count))
+            report(force=True, stage='publishing')
             result = {'format': 1, 'revision': revision, 'file': f'published/{revision}.mbtiles', 'bounds': bounds,
                       'minzoom': 10, 'maxzoom': 16, 'sheets': len(sheets), 'sourceBytes': sum(s['bytes'] for s in sheets),
                       'attribution': ATTRIBUTION, 'extractedAt': utc_now(), 'recipe': RECIPE, **stats,
-                      'sha256': sha256(output, self.guard), 'sourceUrl': catalog.get('sourceUrl'), 'catalogCheckedAt': catalog.get('checkedAt'),
+                      'sha256': digest, 'sourceUrl': catalog.get('sourceUrl'), 'catalogCheckedAt': catalog.get('checkedAt'),
                       'sheetSources': [{'id': s['id'], **source_identity(s), 'archiveSha256': p['archiveSha256'], 'preparedSha256': p['sha256']}
                                        for s, p in zip(sheets, prepared)]}
             self.guard()
@@ -590,6 +675,7 @@ class Importer:
             atomic_json(record, result)
             # The only activation point: all inputs and the immutable publication already exist.
             atomic_json(self.root / 'current.json', result)
+            report(force=True, stage='complete')
             return result
 
     def run(self):

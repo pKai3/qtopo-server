@@ -23,7 +23,19 @@ export function formatContourStatus(data) {
     'waiting-space': 'waiting for free space',
   };
   const prefix = data.available && data.phase !== 'ready' ? 'NSW 2 m update' : 'NSW 2 m';
-  const detail = !['ready', 'error', 'waiting-space'].includes(data.phase) && sheets ? ` · ${sheets}` : '';
+  let detail = !['ready', 'error', 'waiting-space'].includes(data.phase) && sheets ? ` · ${sheets}` : '';
+  if (data.phase === 'assembling' && data.assembly) {
+    const a = data.assembly, totalTiles = count(a.totalInputTiles), processed = count(a.inputTiles);
+    const stages = { 'checking-inputs': 'checking assembly inputs', merging: 'merging map tiles', validating: 'validating merged map',
+      hashing: 'checking map checksum', publishing: 'publishing map' };
+    if (Object.hasOwn(stages, a.stage)) {
+      labels.assembling = stages[a.stage];
+      detail = '';
+      if (a.stage === 'checking-inputs' && count(a.totalFiles)) detail = ` · ${Math.min(count(a.checkedFiles), count(a.totalFiles))}/${count(a.totalFiles)}`;
+      else if (a.stage === 'merging' && a.countersAvailable === true && totalTiles && processed <= totalTiles) detail = ` · ${(100 * processed / totalTiles).toFixed(1)}%`;
+      else if (count(a.outputBytes)) detail = ` · ${(a.outputBytes / 1e9).toFixed(1)} GB`;
+    }
+  }
   return { text: `${prefix}: ${labels[data.phase]}${detail}`, hidden: false,
     state: ['error', 'waiting-space'].includes(data.phase) ? 'paused' : '' };
 }

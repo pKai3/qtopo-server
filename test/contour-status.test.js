@@ -55,6 +55,18 @@ test('disabled, paused and invalid status never expose private errors or filenam
   for (const invalid of [null, {}, status({ phase: '/private/path' }), status({ available: 'yes' })]) assert.throws(() => format(invalid));
 });
 
+test('assembly formatting reports merge progress separately from validation and completed sheets', async () => {
+  const { formatContourStatus: format } = await modulePromise;
+  const value = assembly => format(status({ phase: 'assembling', completedSheets: 343, assembly })).text;
+  assert.equal(value({ stage: 'checking-inputs', checkedFiles: 120, totalFiles: 343 }), 'NSW 2 m: checking assembly inputs · 120/343');
+  assert.equal(value({ stage: 'merging', countersAvailable: true, inputTiles: 450, totalInputTiles: 1000 }), 'NSW 2 m: merging map tiles · 45.0%');
+  assert.equal(value({ stage: 'merging', countersAvailable: false, outputBytes: 10.4e9 }), 'NSW 2 m: merging map tiles · 10.4 GB');
+  assert.equal(value({ stage: 'validating', outputBytes: 17e9 }), 'NSW 2 m: validating merged map · 17.0 GB');
+  assert.equal(value({ stage: 'hashing', outputBytes: 17e9 }), 'NSW 2 m: checking map checksum · 17.0 GB');
+  assert.equal(value({ stage: 'merging', countersAvailable: true, inputTiles: 1001, totalInputTiles: 1000 }), 'NSW 2 m: merging map tiles');
+  assert.equal(value({ stage: '__proto__', message: 'private file' }), 'NSW 2 m: assembling map · 343/343 prepared');
+});
+
 test('new appearance options preserve selection, do not fire change and are not duplicated', async () => {
   const { addAvailableProfiles } = await modulePromise, select = new Select();
   let changes = 0; select.addEventListener('change', () => changes++);
