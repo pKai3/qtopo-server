@@ -2,7 +2,10 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const { createCanvas, loadImage } = require('canvas');
-const { profiles } = require('../lib/profiles');
+const { profiles: builtInProfiles } = require('../lib/profiles');
+// The prepared dataset has its own boot/render/restart smoke check. Its QLD
+// appearance also intentionally shares Readable's pixels, unlike this suite.
+const profiles = builtInProfiles.filter(profile => profile.id !== 'nsw-2m');
 const origin = 'http://127.0.0.1:' + (process.env.PORT || 8080);
 const size = Number(process.env.TILE_PX || 1024);
 function coordinates(lng, lat, z) {
