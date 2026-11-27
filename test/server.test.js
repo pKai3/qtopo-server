@@ -298,7 +298,7 @@ test('local socket controls run one tile test, reject unsafe inputs and stop wit
   const s = await server(t, { renderer: { close() {}, async render(job) { renders++; await blocked; await atomicWrite(job.outPath, PNG); } } });
   assert.equal((await action(s, 'tile-test/start', { url: 'http://other-server/' })).status, 400);
   assert.equal((await action(s, 'tile-test/start', { width: 1000 })).status, 400);
-  assert.equal((await action(s, 'tile-test/start', { z: 22 })).status, 400);
+  assert.equal((await action(s, 'tile-test/start', { z: 19 })).status, 400);
   assert.equal((await action(s, 'tile-test/start', { width: 3, height: 2, concurrency: 2 })).status, 202);
   assert.equal((await action(s, 'tile-test/start')).status, 409);
   assert.equal((await action(s, 'cache/clear', { confirm: 'clear-rendered-tiles' })).status, 409);
@@ -457,6 +457,36 @@ test('styles resolve provider tiles, fonts, sprites and attribution consistently
   assert.equal((await fetch(s.url + '/api/providers')).status, 200);
   assert.equal((await fetch(s.url + '/healthz')).status, 200);
   assert.equal((await fetch(s.url + '/assets/images/error.png')).status, 200);
+});
+test('discovery and prefetch stop at 18 while explicit legacy raster requests retain compatibility', async t => {
+  const jobs = [];
+  const s = await server(t, {
+    nativeZoom: async () => 16,
+    renderer: { stats: {}, close() {}, async render(job) {
+      jobs.push(job); for (const output of job.outputs || [job]) await atomicWrite(output.outPath, PNG);
+    } },
+  }, { PREFETCH_RADIUS: '1', PREFETCH_ZOOM: '1' });
+  const catalog = await (await fetch(s.url + '/api/providers')).json();
+  assert.equal(catalog.automatic.maxzoom, 18);
+  assert.deepEqual(Object.fromEntries(catalog.providers.map(p => [p.id, p.maxzoom])), { qld: 18, nsw: 18, 'nsw-topo': 16 });
+  assert.equal(s.providers.qld.maxzoom, 19, 'upstream capabilities are independent of the advertised map range');
+  assert.equal(s.providers.nsw.maxzoom, 22);
+  for (const route of ['/raster/qld/19/484992/303744.png', '/raster/19/484992/303744.png',
+    '/raster/nsw/19/481048/314360.png', '/raster/qld/18/242496/151872.png']) {
+    assert.equal((await fetch(s.url + route)).status, 200, route);
+  }
+  let state;
+  for (let i = 0; i < 150; i++) {
+    state = await (await fetch(s.url + '/readyz')).json();
+    if (state.prefetch.completed > 0 && !state.prefetch.queued && !state.prefetch.active) break;
+    await sleep(20);
+  }
+  assert.equal(state.prefetch.queued + state.prefetch.active, 0);
+  const background = jobs.filter(job => job.priority > 0);
+  assert.ok(background.length > 0);
+  assert.ok(background.every(job => job.z <= 18), 'neighbours and zoom prefetch cannot exceed the advertised limit');
+  assert.ok(background.some(job => job.z === 17), 'zooming out remains prefetched at the upper limit');
+  assert.ok(jobs.some(job => job.priority === 0 && job.z === 19), 'legacy explicit requests remain accepted');
 });
 test('NSW source imagery passes through the conversion queue and never the vector downloader', async t => {
   const calls = [], jobs = [];

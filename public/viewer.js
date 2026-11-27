@@ -2,6 +2,7 @@ import * as maplibregl from '/vendor/maplibre/maplibre-gl.mjs';
 import { createStateSelector, selectPreview } from './preview.mjs';
 import { attachMapSearch } from './map-search.mjs';
 import { attachContourStatus, addAvailableProfiles } from './contour-status.mjs';
+import { attachMapCoordinates } from './map-coordinates.mjs';
 (async () => {
   const $ = id => document.getElementById(id);
   const params = new URLSearchParams(location.search);
@@ -37,7 +38,7 @@ import { attachContourStatus, addAvailableProfiles } from './contour-status.mjs'
     }
     // Resolve the actual camera after MapLibre restores the shared URL hash.
     // Start empty so automatic vector mode never briefly requests PNG tiles.
-    const map = new maplibregl.Map({ container: 'map', style: { version: 8, sources: {}, layers: [] }, center: provider.center, zoom: provider.zoom, hash: true, maxZoom: 22 });
+    const map = new maplibregl.Map({ container: 'map', style: { version: 8, sources: {}, layers: [] }, center: provider.center, zoom: provider.zoom, hash: true, maxZoom: catalog.automatic.maxzoom });
     map.addControl(new maplibregl.NavigationControl(), 'top-right');
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-right');
     map.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }), 'top-right');
@@ -105,7 +106,7 @@ import { attachContourStatus, addAvailableProfiles } from './contour-status.mjs'
     }
     map.on('style.load', () => { applyLayers(); showRegions(); });
     map.on('error', e => { console.error(e.error); $('status').textContent = 'Some map data could not load. Please try again shortly.'; $('status').className = 'error'; });
-    map.on('mousemove', e => { $('coordinates').textContent = `${e.lngLat.lat.toFixed(5)}, ${e.lngLat.lng.toFixed(5)} · zoom ${map.getZoom().toFixed(1)}`; });
+    attachMapCoordinates({ map, element: $('coordinates') });
     map.on('moveend', () => { if (provider.id === 'auto' && $('mode').value === 'vector') switchStyle(); });
     $('provider').addEventListener('change', () => {
       provider = catalog.providers.find(p => p.id === $('provider').value); switchStyle();

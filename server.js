@@ -6,7 +6,7 @@ const { AsyncLocalStorage } = require('node:async_hooks');
 const L = require('./lib/logger');
 const { loadConfig } = require('./lib/config');
 const { createProfileCatalog } = require('./lib/profile-files');
-const { createProviders, tileURL, parseTile, hash } = require('./lib/providers');
+const { createProviders, tileURL, parseTile, hash, MAX_MAP_ZOOM } = require('./lib/providers');
 const { createCache } = require('./lib/cache');
 const { cachedRaster, httpError } = require('./lib/utils');
 const { seedStyles, createStyleCache, absoluteStyle, renderStyle } = require('./lib/styles');
@@ -81,7 +81,8 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     limit: config.prefetchQueueLimit, logger: L,
     zoomRange: source => {
       const [, id] = source.split(':');
-      return id === 'auto' ? { minzoom: 0, maxzoom: providers.qld.maxzoom } : providers[id];
+      const p = id === 'auto' ? { minzoom: 0, maxzoom: providers.qld.maxzoom } : providers[id];
+      return { minzoom: p.minzoom, maxzoom: Math.min(MAX_MAP_ZOOM, p.maxzoom) };
     },
     groupKey: (source, tile) => {
       const [profile, id] = source.split(':');
@@ -103,7 +104,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     },
   });
   const actions = createStatusActions({
-    origin: () => app.locals.internalOrigin, rasterDir: path.join(config.rasterDir, 'v2'), maxzoom: providers.qld.maxzoom,
+    origin: () => app.locals.internalOrigin, rasterDir: path.join(config.rasterDir, 'v2'), maxzoom: MAX_MAP_ZOOM,
     busy: () => { const render = renderer.stats; return activeRasterRequests || render?.active || render?.queued || prefetch.stats.active; },
     pause: () => prefetch.pause(), resume: () => { prefetch.resume(); storage.check?.(); }, logger: L,
     readStatus: () => status(),
@@ -319,10 +320,10 @@ async function createApp(config = loadConfig(), dependencies = {}) {
         return { id, name: id === 'mobile' ? 'Mobile' : p.name, aliases: p.id === 'mobile-3x' ? ['mobile-3x'] : [],
           hidden: hidden.has(id), factor: p.factor, refined: p.refined, raster: `${origin(req)}/${id}/{z}/{x}/{y}.png` };
       }),
-      automatic: { raster: `${origin(req)}/raster/{z}/{x}/{y}.png`, tileSize: config.tilePx, maxzoom: providers.qld.maxzoom, bounds: [137.8, -37.6, 162.7, -9], attribution: `${providers.qld.attribution}; ${providers.nsw.attribution}` },
+      automatic: { raster: `${origin(req)}/raster/{z}/{x}/{y}.png`, tileSize: config.tilePx, maxzoom: Math.min(MAX_MAP_ZOOM, providers.qld.maxzoom), bounds: [137.8, -37.6, 162.7, -9], attribution: `${providers.qld.attribution}; ${providers.nsw.attribution}` },
       providers: Object.values(providers).map(p => ({
         id: p.id, name: p.name, type: p.type, bounds: p.bounds, center: p.center, zoom: p.zoom,
-        minzoom: p.minzoom, maxzoom: p.maxzoom, tileSize: p.type === 'raster' ? 256 : config.tilePx,
+        minzoom: p.minzoom, maxzoom: Math.min(MAX_MAP_ZOOM, p.maxzoom), tileSize: p.type === 'raster' ? 256 : config.tilePx,
         attribution: p.attribution, style: `/styles/${p.id}.json`,
         raster: `${origin(req)}/raster/${p.id}/{z}/{x}/{y}.png`,
       })),
