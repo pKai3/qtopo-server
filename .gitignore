@@ -4,5 +4,6 @@ server_vector/tiles_vector/
 *.log
 .DS_Store
 benchmark-results/
+dem-examples/
 scripts/benchmark/__pycache__/
 **/__pycache__/

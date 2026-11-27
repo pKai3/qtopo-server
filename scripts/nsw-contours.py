@@ -368,7 +368,7 @@ def mbtiles_info(path):
 
 
 class Importer:
-    def __init__(self, data_dir, catalog_path, min_free_bytes, threads=2):
+    def __init__(self, data_dir, catalog_path, min_free_bytes, threads=8):
         if min_free_bytes < 0 or not 1 <= threads <= 64:
             raise ImportFailure('Free-space threshold must be nonnegative and threads must be between 1 and 64.')
         self.root, self.catalog_path = Path(data_dir).absolute(), Path(catalog_path)
@@ -655,7 +655,7 @@ def main(argv=None):
     parser.add_argument('--data-dir', required=True, type=Path)
     parser.add_argument('--catalog', required=True, type=Path)
     parser.add_argument('--min-free-bytes', required=True, type=int)
-    parser.add_argument('--threads', type=int, default=2)
+    parser.add_argument('--threads', type=int, default=8)
     args = parser.parse_args(argv)
     try:
         importer = Importer(args.data_dir, args.catalog, args.min_free_bytes, args.threads)

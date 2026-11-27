@@ -19,7 +19,7 @@ test('NSW contour preparation starts at boot with retained storage outside dispo
   const defaults = loadConfig({ DATA_DIR: '/data' });
   assert.equal(defaults.nswContoursEnabled, true);
   assert.equal(defaults.nswContoursDir, '/data/contours/nsw');
-  assert.equal(defaults.nswContoursThreads, 2);
+  assert.equal(defaults.nswContoursThreads, 8);
   assert.equal(defaults.nswContoursRetryMs, 60000);
   const custom = loadConfig({ DATA_DIR: '/data', NSW_CONTOURS_ENABLED: '0', NSW_CONTOURS_DIR: '/retained/nsw', NSW_CONTOURS_THREADS: '4', NSW_CONTOURS_RETRY_SECONDS: '120' });
   assert.equal(custom.nswContoursEnabled, false);
