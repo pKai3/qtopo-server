@@ -173,6 +173,17 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   const vector = fileRequest(async (req, res, signal) => {
     const p = providerFor(req, 'vector');
     const { z, x, y } = coordinates(req, p);
+    if (p.tileMap && req.query.sparse === '1') {
+      const availableZoom = await nativeZoom(p, { z, x, y });
+      signal.throwIfAborted();
+      if (availableZoom === null || availableZoom < z) {
+        headers(res, Math.floor(config.emptyTTL / 1000));
+        // MapLibre 6.19's sparse source uses 404 to fetch and correctly slice an
+        // ancestor. A truly empty branch must stay empty, without that fallback.
+        // NSW returns 500 for missing descendants, so consult its index first.
+        return res.status(availableZoom === null ? 204 : 404).end();
+      }
+    }
     const file = path.join(config.vectorDir, 'v2', p.id, p.cacheId, String(z), String(x), `${y}.pbf`);
     await holdFile(file);
     const result = await cache.get({ file, provider: p.id,
@@ -327,6 +338,16 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     // Bypass previously cached raw Esri tiles without invalidating PNG caches.
     if (p.id === 'qld') for (const source of Object.values(browserStyle.sources || {})) {
       if (source.type === 'vector') source.tiles = source.tiles.map(url => `${url}?values=2`);
+    }
+    if (p.tileMap) for (const source of Object.values(browserStyle.sources || {})) {
+      // Only the provider's base tiles are sparse; prepared 2 m contours have
+      // their own complete pyramid. Keep this browser option out of native
+      // rendering styles and their existing cache revisions.
+      const tiles = `${origin(req)}/vector/${p.id}/{z}/{x}/{y}.pbf`;
+      if (source.type === 'vector' && source.tiles?.length === 1 && source.tiles[0] === tiles) {
+        source.sparse = true;
+        source.tiles = [`${tiles}?sparse=1`];
+      }
     }
     res.set('Cache-Control', 'no-cache').json(browserStyle);
   }
