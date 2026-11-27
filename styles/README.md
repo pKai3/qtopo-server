@@ -92,3 +92,26 @@ Run `node scripts/match-nsw-colors.js` to repeat the semantic color matching aft
 editing a detailed QLD palette; it also regenerates both Light styles. It only
 writes the five named style files. See [NSW palette mapping](NSW-palette.md) for
 the layer mapping and the cases that intentionally retain their NSW treatment.
+
+NSW paved roads now use the corresponding QLD width curves, independently of
+label sizing. Local roads remain narrower than connectors, secondary roads and
+highways. The same continuous curve spans NSW's zoom-specific layer switches,
+removing the sudden increase at z16. In Mobile at z16, local-road outer widths
+are about 4.4 style pixels and highway widths about 9.3, instead of 52 for both.
+Tunnel edges meet the running surface, and bridge outlines stay outside their
+separation strokes. Service lanes, vehicle tracks and access ways stay narrower
+than local roads; path strokes match QLD's path sizing. Existing track/path dash
+patterns, colors, labels, source detail and Classic are unchanged.
+
+Run `node scripts/match-nsw-road-widths.js` after changing the maintained QLD
+road widths. It updates Readable, Mobile 2x and Mobile 3x and regenerates both
+Light choices. Repeating it does not compound sizing. Sync the five named style
+files to apply the correction; no application image or server restart is needed.
+
+Town, village, suburb and general-locality names disappear at z15 in all five
+named styles, in both states. Their settlement dots disappear with them where
+those dots are separate layers. Street and landmark names, including historic
+sites that share NSW's PlacePoint source, retain their existing zoom ranges.
+`node scripts/limit-place-label-zoom.js` reapplies that limit and rebuilds the
+Light choices. Labels whose minimum zoom is already 15 have an empty display
+range deliberately; retaining their definitions makes the limit easy to revise.
