@@ -1,0 +1,4812 @@
+{
+  "format": 1,
+  "sourceUrl": "https://portal.spatial.nsw.gov.au/portal/home/item.html?id=437c0697e6524d8ebf10ad0d915bc219",
+  "indexUrl": "https://portal.spatial.nsw.gov.au/server/rest/services/Hosted/Elevation_Index_Public/FeatureServer/0",
+  "checkedAt": "2026-11-27",
+  "attribution": "\u00a9 State of New South Wales (Spatial Services); Department Finance, Services and Innovation. CC BY 3.0 Australia. Extracted 2026-11-27.",
+  "licence": "https://creativecommons.org/licenses/by/3.0/au/",
+  "sheets": [
+    {
+      "id": "Albury-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "ALBURY",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Albury-CONT-AHD_55_2m.zip",
+      "bytes": 14056304,
+      "etag": "\"480361d577d06696337ab43c55d0bd8d\"",
+      "bounds": [
+        146.5000058160001,
+        -36.499987027999964,
+        147.00000576000002,
+        -35.99998696999995
+      ]
+    },
+    {
+      "id": "Araluen-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "ARALUEN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Araluen-CONT-AHD_55_2m.zip",
+      "bytes": 361959591,
+      "etag": "\"3bed8f277406c7d20c2b25d2fabe24f9-6\"",
+      "bounds": [
+        149.50000507000004,
+        -35.999987173999955,
+        150.00000510000007,
+        -35.499987070999964
+      ]
+    },
+    {
+      "id": "Ardlethan-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "ARDLETHAN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Ardlethan-CONT-AHD_55_2m.zip",
+      "bytes": 24567691,
+      "etag": "\"2c9c80215ec4635f1826057f5fa5ed66\"",
+      "bounds": [
+        146.50000586700003,
+        -34.49998692299994,
+        147.00000602400007,
+        -33.99998690299998
+      ]
+    },
+    {
+      "id": "Armidale-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "ARMIDALE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Armidale-CONT-AHD_56_2m.zip",
+      "bytes": 254972717,
+      "etag": "\"54df6d382159662ef946579c4607a060-4\"",
+      "bounds": [
+        151.5000055920001,
+        -30.99998822499998,
+        152.00000567900008,
+        -30.499987545999943
+      ]
+    },
+    {
+      "id": "Arumpo-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "ARUMPO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Arumpo-CONT-AHD_54_2m.zip",
+      "bytes": 28201251,
+      "etag": "\"500a72034a0b49653c11cd2187a8a700\"",
+      "bounds": [
+        142.50000688000011,
+        -33.99998687699997,
+        143.00000675500007,
+        -33.499986683999964
+      ]
+    },
+    {
+      "id": "Ashford-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "ASHFORD",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Ashford-CONT-AHD_56_2m.zip",
+      "bytes": 138825810,
+      "etag": "\"d208d326f732d488a5658a2e565415fd-3\"",
+      "bounds": [
+        151.00000554200005,
+        -29.499987232999956,
+        151.50000618700005,
+        -28.999987217999944
+      ]
+    },
+    {
+      "id": "BaanBaa-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BAAN BAA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/BaanBaa-CONT-AHD_55_2m.zip",
+      "bytes": 23268581,
+      "etag": "\"e36240110d20d7799f424d570aa61c47\"",
+      "bounds": [
+        149.50000611400003,
+        -30.999987223999938,
+        150.00000644700003,
+        -30.499987406999935
+      ]
+    },
+    {
+      "id": "BadenPark-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BADEN PARK",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/BadenPark-CONT-AHD_55_2m.zip",
+      "bytes": 23015941,
+      "etag": "\"5b5e5e0f3e82a7d45f5466d0777ff3cf\"",
+      "bounds": [
+        144.0000068500001,
+        -32.49998683599995,
+        144.5000072030001,
+        -31.999986664999938
+      ]
+    },
+    {
+      "id": "Ballina-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "BALLINA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Ballina-CONT-AHD_56_2m.zip",
+      "bytes": 19983762,
+      "etag": "\"21470a979868da56c25ffff94fb5e0d5\"",
+      "bounds": [
+        153.50000396000007,
+        -28.999987601999976,
+        154.0000057000001,
+        -28.499987482999984
+      ]
+    },
+    {
+      "id": "Balranald-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "BALRANALD",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Balranald-CONT-AHD_54_2m.zip",
+      "bytes": 18027369,
+      "etag": "\"4a88065fa8d927fecd1badf25e41def3\"",
+      "bounds": [
+        143.50000641400004,
+        -34.999987086999965,
+        144.00000643200008,
+        -34.49998677499997
+      ]
+    },
+    {
+      "id": "Bancannia-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "BANCANNIA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Bancannia-CONT-AHD_54_2m.zip",
+      "bytes": 32029702,
+      "etag": "\"f03066ae7856824b17a95abca3000a73\"",
+      "bounds": [
+        141.50000713000009,
+        -30.999986708999984,
+        142.00000698600002,
+        -30.49998665399994
+      ]
+    },
+    {
+      "id": "Baradine-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BARADINE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Baradine-CONT-AHD_55_2m.zip",
+      "bytes": 17279467,
+      "etag": "\"ab5275c19cd4503ef643d959cd337acb\"",
+      "bounds": [
+        149.00000586300007,
+        -30.99998723899995,
+        149.50000655700012,
+        -30.499987406999935
+      ]
+    },
+    {
+      "id": "BarePoint-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "BARE POINT",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/BarePoint-CONT-AHD_56_2m.zip",
+      "bytes": 58674447,
+      "etag": "\"1226cceed0adfb102354f6ffe11518e6\"",
+      "bounds": [
+        153.00000477600008,
+        -29.999987591999968,
+        153.500005503,
+        -29.499987250999936
+      ]
+    },
+    {
+      "id": "Barmedman-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BARMEDMAN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Barmedman-CONT-AHD_55_2m.zip",
+      "bytes": 23357132,
+      "etag": "\"cabf9b0b6b4b8769691eb2929b8bf670\"",
+      "bounds": [
+        147.00000576200011,
+        -34.49998707199995,
+        147.5000060860001,
+        -33.99998690299998
+      ]
+    },
+    {
+      "id": "Barnato-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BARNATO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Barnato-CONT-AHD_55_2m.zip",
+      "bytes": 26949746,
+      "etag": "\"e697157902e83039c5ec2c9927638065\"",
+      "bounds": [
+        144.50000661100012,
+        -31.99998676599995,
+        145.00000681500012,
+        -31.49998685299994
+      ]
+    },
+    {
+      "id": "BatemansBay-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "BATEMANS BAY",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/BatemansBay-CONT-AHD_56_2m.zip",
+      "bytes": 137130149,
+      "etag": "\"d2b7d54247a67dcd25b21517ee5a0137-3\"",
+      "bounds": [
+        150.00000503100011,
+        -35.999987173999955,
+        150.50000510300003,
+        -35.49998736699996
+      ]
+    },
+    {
+      "id": "Bathurst-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BATHURST",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Bathurst-CONT-AHD_55_2m.zip",
+      "bytes": 259327675,
+      "etag": "\"48cc89f2c897d24d897b81027a51d434-4\"",
+      "bounds": [
+        149.50000566200004,
+        -33.49998735499997,
+        150.00000533800005,
+        -32.99998729599997
+      ]
+    },
+    {
+      "id": "Bega-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BEGA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Bega-CONT-AHD_55_2m.zip",
+      "bytes": 287711296,
+      "etag": "\"112dc3ddba41e84d051262f1fadb0e52-5\"",
+      "bounds": [
+        149.50000479900007,
+        -36.99998726699994,
+        150.0000049040001,
+        -36.499987043999965
+      ]
+    },
+    {
+      "id": "Bellata-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BELLATA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Bellata-CONT-AHD_55_2m.zip",
+      "bytes": 18170179,
+      "etag": "\"f1c5ca21c61f8cab6905aab5e258affa\"",
+      "bounds": [
+        149.50000596600012,
+        -29.999987406999935,
+        150.00000592600009,
+        -29.499987320999935
+      ]
+    },
+    {
+      "id": "Bendemeer-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "BENDEMEER",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Bendemeer-CONT-AHD_56_2m.zip",
+      "bytes": 136306893,
+      "etag": "\"9767fe410210b96c6436c053912447bd-3\"",
+      "bounds": [
+        151.00000572400006,
+        -30.999987630999954,
+        151.50000570300006,
+        -30.49998749699995
+      ]
+    },
+    {
+      "id": "Bendoc-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BENDOC",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Bendoc-CONT-AHD_55_2m.zip",
+      "bytes": 14804548,
+      "etag": "\"592e74a46e19bdd9230b5ac49cbb0e7e\"",
+      "bounds": [
+        148.50000522100004,
+        -37.49998717099993,
+        149.00000519000002,
+        -36.99998704099994
+      ]
+    },
+    {
+      "id": "BerawinniaDowns-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "BERAWINNIA DOWNS",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/BerawinniaDowns-CONT-AHD_54_2m.zip",
+      "bytes": 12655448,
+      "etag": "\"800b53d64e9ec65c50a01cdaab6167ad\"",
+      "bounds": [
+        143.50000665800007,
+        -29.499986600999932,
+        144.00000694800008,
+        -28.99998678299994
+      ]
+    },
+    {
+      "id": "Berridale-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BERRIDALE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Berridale-CONT-AHD_55_2m.zip",
+      "bytes": 165828974,
+      "etag": "\"4f1717bf2b1a2f11db656b927adff2de-3\"",
+      "bounds": [
+        148.5000051820001,
+        -36.49998726499996,
+        149.0000051180001,
+        -35.999986931999956
+      ]
+    },
+    {
+      "id": "Berrigan-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BERRIGAN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Berrigan-CONT-AHD_55_2m.zip",
+      "bytes": 19000540,
+      "etag": "\"80c80049f6820efa8bcf03caf0a03641\"",
+      "bounds": [
+        145.50000608400012,
+        -35.99998692899993,
+        146.00000632800004,
+        -35.49998667799997
+      ]
+    },
+    {
+      "id": "Bidura-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "BIDURA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Bidura-CONT-AHD_54_2m.zip",
+      "bytes": 18596785,
+      "etag": "\"2a02189b44a01782277e208b7518c24d\"",
+      "bounds": [
+        143.00000667900008,
+        -34.49998677499997,
+        143.50000661900003,
+        -33.999986871999965
+      ]
+    },
+    {
+      "id": "Bingara-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "BINGARA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Bingara-CONT-AHD_56_2m.zip",
+      "bytes": 168565036,
+      "etag": "\"1f5addca30132b2f13a4f9c041f3d9e9-3\"",
+      "bounds": [
+        150.5000058270001,
+        -29.999987509999983,
+        151.00000583100007,
+        -29.49998714399993
+      ]
+    },
+    {
+      "id": "Blackville-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "BLACKVILLE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Blackville-CONT-AHD_56_2m.zip",
+      "bytes": 150907378,
+      "etag": "\"64596b942af71aaf394c695ffded29cf-3\"",
+      "bounds": [
+        150.00000624200004,
+        -31.999987105999935,
+        150.5000062570001,
+        -31.499987078999936
+      ]
+    },
+    {
+      "id": "Blayney-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BLAYNEY",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Blayney-CONT-AHD_55_2m.zip",
+      "bytes": 178242203,
+      "etag": "\"b2b5a23d0b2f84951880bd9694bfbfec-3\"",
+      "bounds": [
+        149.0000063000001,
+        -33.99998737899995,
+        149.50000586500005,
+        -33.49998703999995
+      ]
+    },
+    {
+      "id": "Bobadah-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BOBADAH",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Bobadah-CONT-AHD_55_2m.zip",
+      "bytes": 22212629,
+      "etag": "\"1d03091d43824f9595d2d4946d6ebc43\"",
+      "bounds": [
+        146.500005836,
+        -32.499987860999966,
+        147.0000066350001,
+        -31.999987034999947
+      ]
+    },
+    {
+      "id": "BoganGate-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BOGAN GATE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/BoganGate-CONT-AHD_55_2m.zip",
+      "bytes": 20024283,
+      "etag": "\"99f3489bcc07f20e7b447fc868608cd9\"",
+      "bounds": [
+        147.500006223,
+        -33.499987104999946,
+        148.0000063760001,
+        -32.99998693999993
+      ]
+    },
+    {
+      "id": "Boggabri-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "BOGGABRI",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Boggabri-CONT-AHD_56_2m.zip",
+      "bytes": 80208546,
+      "etag": "\"5103a46271fbeba12ade8a8ad593c06d-2\"",
+      "bounds": [
+        150.00000631700004,
+        -30.999987290999968,
+        150.5000060650001,
+        -30.499987406999935
+      ]
+    },
+    {
+      "id": "Bombala-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BOMBALA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Bombala-CONT-AHD_55_2m.zip",
+      "bytes": 182134158,
+      "etag": "\"f7ecb140ed72b119ac503849a3b10103-3\"",
+      "bounds": [
+        149.0000050540001,
+        -36.99998724499994,
+        149.50000502900002,
+        -36.499987043999965
+      ]
+    },
+    {
+      "id": "Bonalbo-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "BONALBO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Bonalbo-CONT-AHD_56_2m.zip",
+      "bytes": 260641556,
+      "etag": "\"1fe2496dab98fcb36194c6e5bd6e68ed-4\"",
+      "bounds": [
+        152.50000539400003,
+        -28.999987172999965,
+        153.0000051300001,
+        -28.49998646499995
+      ]
+    },
+    {
+      "id": "Bono-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "BONO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Bono-CONT-AHD_54_2m.zip",
+      "bytes": 27465827,
+      "etag": "\"e5545c10ee1d40f65cba62d1da08e62c\"",
+      "bounds": [
+        142.5000068390001,
+        -32.99998669299998,
+        143.0000069680001,
+        -32.499986717999946
+      ]
+    },
+    {
+      "id": "Boolaboolka-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "BOOLABOOLKA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Boolaboolka-CONT-AHD_54_2m.zip",
+      "bytes": 18921632,
+      "etag": "\"b80e777eb24319baca96869b6cb245f1\"",
+      "bounds": [
+        143.00000687500005,
+        -32.999986698999976,
+        143.50000680800008,
+        -32.49998668199993
+      ]
+    },
+    {
+      "id": "Booligal-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BOOLIGAL",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Booligal-CONT-AHD_55_2m.zip",
+      "bytes": 10945468,
+      "etag": "\"abbaa2a0055c3f8ea7c4330bf9b06044\"",
+      "bounds": [
+        144.50000640000007,
+        -33.99998711499995,
+        145.00000688400007,
+        -33.49998705899998
+      ]
+    },
+    {
+      "id": "Boomi-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BOOMI",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Boomi-CONT-AHD_55_2m.zip",
+      "bytes": 13109931,
+      "etag": "\"1e2106dffa72a0cdc852ab42de797250\"",
+      "bounds": [
+        149.5000062800001,
+        -28.999987377999958,
+        150.00000621100003,
+        -28.499987096999973
+      ]
+    },
+    {
+      "id": "BoonaMount-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BOONA MOUNT",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/BoonaMount-CONT-AHD_55_2m.zip",
+      "bytes": 25881620,
+      "etag": "\"3ef2975ff902d2ea30fbefd289598138\"",
+      "bounds": [
+        147.0000061080001,
+        -32.999987019999935,
+        147.50000645500006,
+        -32.499987121999936
+      ]
+    },
+    {
+      "id": "Booroondarra-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BOOROONDARRA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Booroondarra-CONT-AHD_55_2m.zip",
+      "bytes": 43088617,
+      "etag": "\"1ceef3f0e9727313ea5d909d0b16412a\"",
+      "bounds": [
+        145.00000681500012,
+        -31.499986968999963,
+        145.50000678300012,
+        -30.99998685199995
+      ]
+    },
+    {
+      "id": "Boorowa-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BOOROWA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Boorowa-CONT-AHD_55_2m.zip",
+      "bytes": 138824518,
+      "etag": "\"c91d4a71eb596dfd7ecae085ca436fa1-3\"",
+      "bounds": [
+        148.50000673700004,
+        -34.49998754199993,
+        149.0000065590001,
+        -33.99998737899995
+      ]
+    },
+    {
+      "id": "Bourke-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BOURKE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Bourke-CONT-AHD_55_2m.zip",
+      "bytes": 11968100,
+      "etag": "\"3dacbd8c5c536260915f7071877e9d10\"",
+      "bounds": [
+        145.5000062590001,
+        -30.49998713699995,
+        146.0000072370001,
+        -29.999986817999968
+      ]
+    },
+    {
+      "id": "Braidwood-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BRAIDWOOD",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Braidwood-CONT-AHD_55_2m.zip",
+      "bytes": 156574604,
+      "etag": "\"22ac7a531e2abfb254e02c06d2e0418a-3\"",
+      "bounds": [
+        149.5000050430001,
+        -35.49998763399998,
+        150.00000556200007,
+        -34.99998761699993
+      ]
+    },
+    {
+      "id": "Brewarrina-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BREWARRINA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Brewarrina-CONT-AHD_55_2m.zip",
+      "bytes": 12035734,
+      "etag": "\"80fbd38361078a143d54df2873a73631\"",
+      "bounds": [
+        146.50000650700008,
+        -29.999986858999932,
+        147.00000640300004,
+        -29.499986865999972
+      ]
+    },
+    {
+      "id": "Brindabella-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BRINDABELLA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Brindabella-CONT-AHD_55_2m.zip",
+      "bytes": 301031488,
+      "etag": "\"872e8f5660313e03469623669d9d1c79-5\"",
+      "bounds": [
+        148.50000540200006,
+        -35.49998729699996,
+        149.00000568200005,
+        -34.999987562999934
+      ]
+    },
+    {
+      "id": "Brindingabba-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BRINDINGABBA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Brindingabba-CONT-AHD_55_2m.zip",
+      "bytes": 17706049,
+      "etag": "\"6b05cd10b89882a95d5264c914ab87b6\"",
+      "bounds": [
+        144.50000679100003,
+        -29.49998699699995,
+        145.00000602600005,
+        -28.99998673799996
+      ]
+    },
+    {
+      "id": "BrokenHill-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "BROKEN HILL",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/BrokenHill-CONT-AHD_54_2m.zip",
+      "bytes": 71537581,
+      "etag": "\"440a52e0b8188e0a0246f62a43c80cc9-2\"",
+      "bounds": [
+        141.00000700300006,
+        -31.999986656999965,
+        141.50000701600004,
+        -31.49998646199998
+      ]
+    },
+    {
+      "id": "Buckalow-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "BUCKALOW",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Buckalow-CONT-AHD_54_2m.zip",
+      "bytes": 15739506,
+      "etag": "\"fc7dc461a8c706f142654a49562c032b\"",
+      "bounds": [
+        141.0000070630001,
+        -32.999986502999946,
+        141.50000678800006,
+        -32.49998661099994
+      ]
+    },
+    {
+      "id": "Bulahdelah-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "BULAHDELAH",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Bulahdelah-CONT-AHD_56_2m.zip",
+      "bytes": 238411820,
+      "etag": "\"f383e3f926d22fba77d0aec2189e9f11-4\"",
+      "bounds": [
+        152.000004772,
+        -32.49998731399995,
+        152.50000403500007,
+        -31.99998708399994
+      ]
+    },
+    {
+      "id": "Bunarba-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BUNARBA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Bunarba-CONT-AHD_55_2m.zip",
+      "bytes": 12876144,
+      "etag": "\"0d1cb169093a207622125951094ae9d2\"",
+      "bounds": [
+        149.00000584800011,
+        -29.499987720999968,
+        149.5000062800001,
+        -28.99998715399994
+      ]
+    },
+    {
+      "id": "Bunda-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "BUNDA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Bunda-CONT-AHD_54_2m.zip",
+      "bytes": 27501569,
+      "etag": "\"9253a8f3ae558bb8b942bce702489095\"",
+      "bounds": [
+        142.5000066130001,
+        -31.999986828999965,
+        143.0000068610001,
+        -31.49998683499996
+      ]
+    },
+    {
+      "id": "Bundarra-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "BUNDARRA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Bundarra-CONT-AHD_56_2m.zip",
+      "bytes": 124323117,
+      "etag": "\"0f4f2a89393acdf1ecb8355ab90eefd5-2\"",
+      "bounds": [
+        151.00000572400006,
+        -30.499987545999943,
+        151.50000560400008,
+        -29.999987507999947
+      ]
+    },
+    {
+      "id": "Bundemar-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BUNDEMAR",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Bundemar-CONT-AHD_55_2m.zip",
+      "bytes": 15020994,
+      "etag": "\"494761731661e62623579888cd54b978\"",
+      "bounds": [
+        148.00000655700012,
+        -31.99998746899996,
+        148.500006406,
+        -31.49998730599998
+      ]
+    },
+    {
+      "id": "BunnaBunna-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BUNNA BUNNA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/BunnaBunna-CONT-AHD_55_2m.zip",
+      "bytes": 12479010,
+      "etag": "\"270e5b20de21734e0cfaab55ddad4c23\"",
+      "bounds": [
+        149.00000588900002,
+        -29.999987398999963,
+        149.50000611600012,
+        -29.499987320999935
+      ]
+    },
+    {
+      "id": "Bunnerungee-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "BUNNERUNGEE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Bunnerungee-CONT-AHD_54_2m.zip",
+      "bytes": 22273239,
+      "etag": "\"bb3e63ceef7b52faa7dc1a68999910cb\"",
+      "bounds": [
+        141.50000636700008,
+        -33.99998662199994,
+        142.00000688800003,
+        -33.499986530999934
+      ]
+    },
+    {
+      "id": "Buraja-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BURAJA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Buraja-CONT-AHD_55_2m.zip",
+      "bytes": 15181707,
+      "etag": "\"527db473c135afed94d2de0c15cc4eb6\"",
+      "bounds": [
+        146.0000062790001,
+        -35.99998696999995,
+        146.5000064940001,
+        -35.49998695199997
+      ]
+    },
+    {
+      "id": "Burragorang-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "BURRAGORANG",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Burragorang-CONT-AHD_56_2m.zip",
+      "bytes": 443030563,
+      "etag": "\"4e0050c4b6ff216dea87a7c70c33ee05-7\"",
+      "bounds": [
+        150.0000053330001,
+        -34.499987690999944,
+        150.50000578300012,
+        -33.99998624699998
+      ]
+    },
+    {
+      "id": "Burrenbar-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BURRENBAR",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Burrenbar-CONT-AHD_55_2m.zip",
+      "bytes": 17469843,
+      "etag": "\"0391b24726bbcd2b4bd99e54250d73c2\"",
+      "bounds": [
+        149.00000584800011,
+        -28.999987304999934,
+        149.5000063230001,
+        -28.499987053999973
+      ]
+    },
+    {
+      "id": "Byrock-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "BYROCK",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Byrock-CONT-AHD_55_2m.zip",
+      "bytes": 8189774,
+      "etag": "\"1b0a608e3765cb193fb1671c77c29ea5\"",
+      "bounds": [
+        146.00000652100005,
+        -30.99998715099997,
+        146.50000671500004,
+        -30.49998690299998
+      ]
+    },
+    {
+      "id": "Callindra-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "CALLINDRA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Callindra-CONT-AHD_54_2m.zip",
+      "bytes": 19828428,
+      "etag": "\"bc1bb4253919a523ce3db39bbb9baf8e\"",
+      "bounds": [
+        143.50000670600002,
+        -31.49998695399995,
+        144.00000647600007,
+        -30.99998679199996
+      ]
+    },
+    {
+      "id": "Camberwell-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "CAMBERWELL",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Camberwell-CONT-AHD_56_2m.zip",
+      "bytes": 417331370,
+      "etag": "\"8818956cc4f622af167f966c30a9157c-7\"",
+      "bounds": [
+        151.00000552200004,
+        -32.49998773999994,
+        151.5000053330001,
+        -31.999987678999958
+      ]
+    },
+    {
+      "id": "CamdenHaven-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "CAMDEN HAVEN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/CamdenHaven-CONT-AHD_56_2m.zip",
+      "bytes": 96054299,
+      "etag": "\"962dff2df8748e35ec83d62c6e50a816-2\"",
+      "bounds": [
+        152.50000403500007,
+        -31.999987475999944,
+        153.00000589700005,
+        -31.49998747199993
+      ]
+    },
+    {
+      "id": "Canbelego-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "CANBELEGO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Canbelego-CONT-AHD_55_2m.zip",
+      "bytes": 32140146,
+      "etag": "\"f5d67293be92e32f70ad5dcaae76f683\"",
+      "bounds": [
+        146.0000063760001,
+        -31.999987241999975,
+        146.50000664700008,
+        -31.49998689699993
+      ]
+    },
+    {
+      "id": "Canberra-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "CANBERRA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Canberra-CONT-AHD_55_2m.zip",
+      "bytes": 133292283,
+      "etag": "\"7d3e4fc5865e63d5557a4f3bc76af387-2\"",
+      "bounds": [
+        149.0000055710001,
+        -35.49998709799996,
+        149.500005116,
+        -34.999987562999934
+      ]
+    },
+    {
+      "id": "Canonba-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "CANONBA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Canonba-CONT-AHD_55_2m.zip",
+      "bytes": 11480006,
+      "etag": "\"cdf3d282b9d928f00262e7b4881bbb1c\"",
+      "bounds": [
+        147.00000684400004,
+        -31.49998728299994,
+        147.50000692300011,
+        -30.999987026999975
+      ]
+    },
+    {
+      "id": "Cargelligo-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "CARGELLIGO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Cargelligo-CONT-AHD_55_2m.zip",
+      "bytes": 22417344,
+      "etag": "\"070c530324702aae6f5944b853d355d5\"",
+      "bounds": [
+        146.0000055270001,
+        -33.49998685699995,
+        146.50000617900002,
+        -32.99998691999997
+      ]
+    },
+    {
+      "id": "Carinda-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "CARINDA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Carinda-CONT-AHD_55_2m.zip",
+      "bytes": 15924108,
+      "etag": "\"b772a2266c0d2246d189f2fe9a15128f\"",
+      "bounds": [
+        147.50000637300002,
+        -30.499987389999944,
+        148.00000653000006,
+        -29.999987088999944
+      ]
+    },
+    {
+      "id": "Carrai-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "CARRAI",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Carrai-CONT-AHD_56_2m.zip",
+      "bytes": 541614050,
+      "etag": "\"9bb2bde9e57839639fd5884d238010f2-9\"",
+      "bounds": [
+        152.0000050320001,
+        -30.99998822499998,
+        152.5000047860001,
+        -30.499987183999963
+      ]
+    },
+    {
+      "id": "Cessnock-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "CESSNOCK",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Cessnock-CONT-AHD_56_2m.zip",
+      "bytes": 216306692,
+      "etag": "\"82c3df849c0738fcdbf59ceeda251c79-4\"",
+      "bounds": [
+        151.0000051410001,
+        -32.999987587999954,
+        151.50000502000012,
+        -32.49998751499993
+      ]
+    },
+    {
+      "id": "CliftonBore-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "CLIFTON BORE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/CliftonBore-CONT-AHD_54_2m.zip",
+      "bytes": 35801376,
+      "etag": "\"cae529c7d533fc573a979696ea9641e9\"",
+      "bounds": [
+        142.50000682600012,
+        -29.999986457999967,
+        143.0000069470001,
+        -29.49998660999995
+      ]
+    },
+    {
+      "id": "Clive-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "CLIVE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Clive-CONT-AHD_56_2m.zip",
+      "bytes": 198922080,
+      "etag": "\"016abe688b72e23045290504c24f2292-3\"",
+      "bounds": [
+        151.50000562900004,
+        -29.499987335999947,
+        152.0000056870001,
+        -28.99998718699993
+      ]
+    },
+    {
+      "id": "Coaldale-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "COALDALE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Coaldale-CONT-AHD_56_2m.zip",
+      "bytes": 234303456,
+      "etag": "\"f5b0fe0aabeef07b8218ff9ba1afe7f3-4\"",
+      "bounds": [
+        152.50000539400003,
+        -29.499987476999934,
+        153.0000051300001,
+        -28.999986944999932
+      ]
+    },
+    {
+      "id": "Cobar-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "COBAR",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Cobar-CONT-AHD_55_2m.zip",
+      "bytes": 16258860,
+      "etag": "\"e08bd5786e43b28760b6c8dff09b53a4\"",
+      "bounds": [
+        145.50000645600005,
+        -31.499987032999968,
+        146.00000652100005,
+        -30.999987080999972
+      ]
+    },
+    {
+      "id": "Cobargo-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "COBARGO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Cobargo-CONT-AHD_55_2m.zip",
+      "bytes": 419025104,
+      "etag": "\"1ab9f3df226ef9f1571428740047b3b7-7\"",
+      "bounds": [
+        149.50000502900002,
+        -36.49998728299994,
+        150.00000510000007,
+        -35.99998687899995
+      ]
+    },
+    {
+      "id": "Cobbadah-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "COBBADAH",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Cobbadah-CONT-AHD_56_2m.zip",
+      "bytes": 204181930,
+      "etag": "\"424c660d1d2a3ce0e720060022b54f9d-4\"",
+      "bounds": [
+        150.5000058270001,
+        -30.49998749699995,
+        151.00000583100007,
+        -29.999987396999984
+      ]
+    },
+    {
+      "id": "Cobbora-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "COBBORA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Cobbora-CONT-AHD_55_2m.zip",
+      "bytes": 87546217,
+      "etag": "\"e6319e774ac8cacdf36b7c07b624ba61-2\"",
+      "bounds": [
+        149.000006008,
+        -32.49998720899998,
+        149.50000649800006,
+        -31.99998727199994
+      ]
+    },
+    {
+      "id": "CobhamLake-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "COBHAM LAKE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/CobhamLake-CONT-AHD_54_2m.zip",
+      "bytes": 33384305,
+      "etag": "\"2e65ce874e08da0ff2c122471d845dca\"",
+      "bounds": [
+        142.00000695100005,
+        -30.49998673799996,
+        142.50000685500004,
+        -29.999986457999967
+      ]
+    },
+    {
+      "id": "CoffsHarbour-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "COFFS HARBOUR",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/CoffsHarbour-CONT-AHD_56_2m.zip",
+      "bytes": 73381461,
+      "etag": "\"81de6d0e92215833a523f10fb3d32523-2\"",
+      "bounds": [
+        153.00000428200008,
+        -30.499987552999983,
+        153.50000572200008,
+        -29.999987378999947
+      ]
+    },
+    {
+      "id": "Cohuna-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "COHUNA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Cohuna-CONT-AHD_55_2m.zip",
+      "bytes": 19962387,
+      "etag": "\"8e921e197040f57be45f240510749704\"",
+      "bounds": [
+        144.00000649300011,
+        -35.99998692299994,
+        144.50000624900008,
+        -35.49998683499996
+      ]
+    },
+    {
+      "id": "Coleambally-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "COLEAMBALLY",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Coleambally-CONT-AHD_55_2m.zip",
+      "bytes": 13000968,
+      "etag": "\"54a08559440bbb7c99e0f89d7a19c65d\"",
+      "bounds": [
+        145.50000565000005,
+        -34.99998703299997,
+        146.00000612100007,
+        -34.499986933999935
+      ]
+    },
+    {
+      "id": "Collarenebri-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "COLLARENEBRI",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Collarenebri-CONT-AHD_55_2m.zip",
+      "bytes": 12685562,
+      "etag": "\"def3b4e390dd2f70a5488b8a90a826be\"",
+      "bounds": [
+        148.5000061280001,
+        -29.999987247999968,
+        149.00000645400007,
+        -29.499987012999952
+      ]
+    },
+    {
+      "id": "Conargo-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "CONARGO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Conargo-CONT-AHD_55_2m.zip",
+      "bytes": 13833488,
+      "etag": "\"26155a440278318d44d81dcab4915ed1\"",
+      "bounds": [
+        145.00000610200004,
+        -35.499986784999976,
+        145.500006094,
+        -34.99998681899996
+      ]
+    },
+    {
+      "id": "Condobolin-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "CONDOBOLIN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Condobolin-CONT-AHD_55_2m.zip",
+      "bytes": 20642006,
+      "etag": "\"7636af514bd35bfc621adb6ebf0d546d\"",
+      "bounds": [
+        147.0000061080001,
+        -33.49998704899997,
+        147.50000640200005,
+        -32.99998693999993
+      ]
+    },
+    {
+      "id": "Conoble-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "CONOBLE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Conoble-CONT-AHD_55_2m.zip",
+      "bytes": 10068084,
+      "etag": "\"6dc0973fe72ebfc1f21c30eaf30da26d\"",
+      "bounds": [
+        144.5000068920001,
+        -32.99998688599993,
+        145.0000071290001,
+        -32.49998681599993
+      ]
+    },
+    {
+      "id": "Coolabah-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "COOLABAH",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Coolabah-CONT-AHD_55_2m.zip",
+      "bytes": 17789402,
+      "etag": "\"4ff52aa5b5335b3144419961d9d0a3d1\"",
+      "bounds": [
+        146.50000664700008,
+        -31.499987116999932,
+        147.000006847,
+        -30.999986889999946
+      ]
+    },
+    {
+      "id": "Coolah-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "COOLAH",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Coolah-CONT-AHD_55_2m.zip",
+      "bytes": 104962237,
+      "etag": "\"44b8d8f970116346021cd760882fbc5b-2\"",
+      "bounds": [
+        149.50000574600006,
+        -31.99998727199994,
+        150.0000062590001,
+        -31.499987078999936
+      ]
+    },
+    {
+      "id": "Coolamon-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "COOLAMON",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Coolamon-CONT-AHD_55_2m.zip",
+      "bytes": 29146672,
+      "etag": "\"317c553f8f2f3b205a61e0bc0f6e69ba\"",
+      "bounds": [
+        147.00000576200011,
+        -34.999987518999944,
+        147.50000598300005,
+        -34.49998649699995
+      ]
+    },
+    {
+      "id": "Cooma-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "COOMA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Cooma-CONT-AHD_55_2m.zip",
+      "bytes": 184658136,
+      "etag": "\"09650b21ef76dd91311c621518b8c6fb-3\"",
+      "bounds": [
+        149.0000050540001,
+        -36.49998709799996,
+        149.50000507000004,
+        -35.99998687899995
+      ]
+    },
+    {
+      "id": "Coombie-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "COOMBIE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Coombie-CONT-AHD_55_2m.zip",
+      "bytes": 15325780,
+      "etag": "\"1b14d8d2ad94de7ba1f274e7a9900d61\"",
+      "bounds": [
+        145.00000688900002,
+        -32.99998678999998,
+        145.50000685100008,
+        -32.49998676299998
+      ]
+    },
+    {
+      "id": "Coonabarabran-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "COONABARABRAN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Coonabarabran-CONT-AHD_55_2m.zip",
+      "bytes": 108703532,
+      "etag": "\"80cb47af380d3f0ba3b002f99c3ca3b3-2\"",
+      "bounds": [
+        149.0000061510001,
+        -31.49998738299996,
+        149.50000655700012,
+        -30.99998721999998
+      ]
+    },
+    {
+      "id": "Coonamble-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "COONAMBLE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Coonamble-CONT-AHD_55_2m.zip",
+      "bytes": 11112611,
+      "etag": "\"4e6f147fbb7c282c2a475955bcc3bc78\"",
+      "bounds": [
+        148.00000645900002,
+        -30.99998747799998,
+        148.50000614300006,
+        -30.499987381999972
+      ]
+    },
+    {
+      "id": "Cootamundra-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "COOTAMUNDRA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Cootamundra-CONT-AHD_55_2m.zip",
+      "bytes": 128738627,
+      "etag": "\"5ce9ba833d044da8cefc844881aa423c-2\"",
+      "bounds": [
+        148.0000067740001,
+        -34.999987707999935,
+        148.500006804,
+        -34.49998711599994
+      ]
+    },
+    {
+      "id": "Corona-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "CORONA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Corona-CONT-AHD_54_2m.zip",
+      "bytes": 52993731,
+      "etag": "\"60f8cd7d0b8b9e5f9067556a71645d5d\"",
+      "bounds": [
+        141.00000700300006,
+        -31.499986732999957,
+        141.50000713000009,
+        -30.999986526999976
+      ]
+    },
+    {
+      "id": "Corryong-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "CORRYONG",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Corryong-CONT-AHD_55_2m.zip",
+      "bytes": 40185608,
+      "etag": "\"5e8f61109c687855180a9850120e0b3b\"",
+      "bounds": [
+        147.50000549100002,
+        -36.49998718899997,
+        148.00000530500006,
+        -35.99998711799998
+      ]
+    },
+    {
+      "id": "Cowarral-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "COWARRAL",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Cowarral-CONT-AHD_56_2m.zip",
+      "bytes": 488876033,
+      "etag": "\"f1532fb5335a76d0301672239651c150-8\"",
+      "bounds": [
+        152.00000561000002,
+        -31.499987664999935,
+        152.50000462100002,
+        -30.99998758299995
+      ]
+    },
+    {
+      "id": "Cowra-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "COWRA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Cowra-CONT-AHD_55_2m.zip",
+      "bytes": 102804287,
+      "etag": "\"9f325ff24053ea28b495dc52c446d1b6-2\"",
+      "bounds": [
+        148.50000673700004,
+        -33.99998741899998,
+        149.0000065590001,
+        -33.499987003999934
+      ]
+    },
+    {
+      "id": "Craigie-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "CRAIGIE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Craigie-CONT-AHD_55_2m.zip",
+      "bytes": 95786013,
+      "etag": "\"6e66a17a6e2fe4fbbe79adc17f2263e0-2\"",
+      "bounds": [
+        149.00000506800006,
+        -37.49998722699996,
+        149.50000521700008,
+        -36.99998711899997
+      ]
+    },
+    {
+      "id": "Crookwell-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "CROOKWELL",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Crookwell-CONT-AHD_55_2m.zip",
+      "bytes": 203870914,
+      "etag": "\"6e8e89aac28e1b570da2631a7ade5757-4\"",
+      "bounds": [
+        149.00000599400005,
+        -34.49998762499996,
+        149.50000586500005,
+        -33.999986235999984
+      ]
+    },
+    {
+      "id": "CroppaCreek-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "CROPPA CREEK",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/CroppaCreek-CONT-AHD_56_2m.zip",
+      "bytes": 29123987,
+      "etag": "\"90b259fefbe74e39ca6d7268d4eac67c\"",
+      "bounds": [
+        150.00000576200011,
+        -29.49998752399995,
+        150.5000060970001,
+        -28.999987371999964
+      ]
+    },
+    {
+      "id": "Culpataro-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "CULPATARO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Culpataro-CONT-AHD_55_2m.zip",
+      "bytes": 11318638,
+      "etag": "\"90ace2cb7f0cd389c1d124223eb9f9bf\"",
+      "bounds": [
+        144.00000644600004,
+        -33.99998711499995,
+        144.500006868,
+        -33.49998674999995
+      ]
+    },
+    {
+      "id": "Cumborah-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "CUMBORAH",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Cumborah-CONT-AHD_55_2m.zip",
+      "bytes": 14785563,
+      "etag": "\"f2f96ce55a7af371411819de00e3ccd5\"",
+      "bounds": [
+        147.5000061600001,
+        -29.99998723999994,
+        148.00000632500007,
+        -29.49998687799996
+      ]
+    },
+    {
+      "id": "Curlewis-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "CURLEWIS",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Curlewis-CONT-AHD_56_2m.zip",
+      "bytes": 36744826,
+      "etag": "\"cb70c693390b5e0c8df49e6583895ba2\"",
+      "bounds": [
+        150.00000631700004,
+        -31.49998717799997,
+        150.5000060650001,
+        -30.99998721999998
+      ]
+    },
+    {
+      "id": "Cuthero-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "CUTHERO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Cuthero-CONT-AHD_54_2m.zip",
+      "bytes": 22038156,
+      "etag": "\"5a3aaeae2f4d4bbf48d61e2c47ff0061\"",
+      "bounds": [
+        142.00000663100002,
+        -33.499986683999964,
+        142.50000693000004,
+        -32.999986485999955
+      ]
+    },
+    {
+      "id": "Dandaloo-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "DANDALOO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Dandaloo-CONT-AHD_55_2m.zip",
+      "bytes": 12268003,
+      "etag": "\"a7415f59d2338cab9648398c4b980ba1\"",
+      "bounds": [
+        147.50000645500006,
+        -32.49998728099996,
+        148.00000658500005,
+        -31.99998721099996
+      ]
+    },
+    {
+      "id": "Darnick-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "DARNICK",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Darnick-CONT-AHD_54_2m.zip",
+      "bytes": 14910750,
+      "etag": "\"1ce1e16f162ff1673a89fe26364729fb\"",
+      "bounds": [
+        143.5000065270001,
+        -32.999986880999984,
+        144.00000744500005,
+        -32.49998664499998
+      ]
+    },
+    {
+      "id": "Dookie-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "DOOKIE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Dookie-CONT-AHD_55_2m.zip",
+      "bytes": 261344,
+      "etag": "\"fea459b9e36f1c51507e903c2f98a1c8\"",
+      "bounds": [
+        145.5000059780001,
+        -36.49998693499998,
+        146.0000062790001,
+        -35.99998675299997
+      ]
+    },
+    {
+      "id": "Dorrigo-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "DORRIGO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Dorrigo-CONT-AHD_56_2m.zip",
+      "bytes": 401709054,
+      "etag": "\"6888a2661e93bbcac1bbf57eff0755d7-6\"",
+      "bounds": [
+        152.5000047540001,
+        -30.499987370999975,
+        153.00000474000012,
+        -29.999987175999934
+      ]
+    },
+    {
+      "id": "Drake-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "DRAKE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Drake-CONT-AHD_56_2m.zip",
+      "bytes": 303042435,
+      "etag": "\"aa481e97af259b7005196418995c081d-5\"",
+      "bounds": [
+        152.00000558800002,
+        -28.99998718699993,
+        152.50000556400005,
+        -28.49998682699993
+      ]
+    },
+    {
+      "id": "DryLake-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "DRY LAKE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/DryLake-CONT-AHD_55_2m.zip",
+      "bytes": 14193581,
+      "etag": "\"79b720a1953b58842a8aba55eb8cb354\"",
+      "bounds": [
+        144.000006374,
+        -34.999986917999934,
+        144.50000630600005,
+        -34.499986820999936
+      ]
+    },
+    {
+      "id": "Dubbo-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "DUBBO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Dubbo-CONT-AHD_55_2m.zip",
+      "bytes": 40511262,
+      "etag": "\"a564ad2fdf67b83659a0334527e7cb9f\"",
+      "bounds": [
+        148.50000624400002,
+        -32.49998727199994,
+        149.0000060960001,
+        -31.999987440999973
+      ]
+    },
+    {
+      "id": "Dungalear-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "DUNGALEAR",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Dungalear-CONT-AHD_55_2m.zip",
+      "bytes": 11708082,
+      "etag": "\"84c8e8b503e42cadd8d0feb0b5e74b3a\"",
+      "bounds": [
+        148.00000619700006,
+        -29.99998723999994,
+        148.50000633700006,
+        -29.499987012999952
+      ]
+    },
+    {
+      "id": "Dungog-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "DUNGOG",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Dungog-CONT-AHD_56_2m.zip",
+      "bytes": 357191709,
+      "etag": "\"8c84c50a22b0794cca10a5529cb8091a-6\"",
+      "bounds": [
+        151.50000504700006,
+        -32.49998773999994,
+        152.00000485500004,
+        -31.999987558999976
+      ]
+    },
+    {
+      "id": "Dunumbral-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "DUNUMBRAL",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Dunumbral-CONT-AHD_55_2m.zip",
+      "bytes": 12665801,
+      "etag": "\"c98339d6de65db822380e2e5008d48a1\"",
+      "bounds": [
+        148.00000619700006,
+        -29.499987051999938,
+        148.50000633700006,
+        -28.999986999999976
+      ]
+    },
+    {
+      "id": "Ebor-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "EBOR",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Ebor-CONT-AHD_56_2m.zip",
+      "bytes": 347926037,
+      "etag": "\"6f56795ae4cd6847c5717507fc6a857c-6\"",
+      "bounds": [
+        152.0000050320001,
+        -30.499987764999958,
+        152.5000047860001,
+        -29.999987175999934
+      ]
+    },
+    {
+      "id": "Echuca-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "ECHUCA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Echuca-CONT-AHD_55_2m.zip",
+      "bytes": 7206414,
+      "etag": "\"f633b47b7b6155d3f867cae78f308118\"",
+      "bounds": [
+        144.50000536200002,
+        -36.499986873999944,
+        145.00000635900005,
+        -35.999985970999944
+      ]
+    },
+    {
+      "id": "Eden-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "EDEN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Eden-CONT-AHD_55_2m.zip",
+      "bytes": 193877798,
+      "etag": "\"0789cf0f70828a5b4f405cbdd6099ae6-3\"",
+      "bounds": [
+        149.50000479900007,
+        -37.49998722699996,
+        150.000005535,
+        -36.99998711899997
+      ]
+    },
+    {
+      "id": "Ellerston-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "ELLERSTON",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Ellerston-CONT-AHD_56_2m.zip",
+      "bytes": 322556640,
+      "etag": "\"8aa5e1b3cbfa647c2eb4c09c4608cfde-5\"",
+      "bounds": [
+        151.00000558800002,
+        -31.999987817999966,
+        151.50000547800005,
+        -31.49998762599995
+      ]
+    },
+    {
+      "id": "Enngonia-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "ENNGONIA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Enngonia-CONT-AHD_55_2m.zip",
+      "bytes": 10154516,
+      "etag": "\"759450f4727f8833b8c145361c9ffb5c\"",
+      "bounds": [
+        145.50000647600007,
+        -29.499986822999972,
+        146.00000662600007,
+        -28.999986750999938
+      ]
+    },
+    {
+      "id": "Euchareena-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "EUCHAREENA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Euchareena-CONT-AHD_55_2m.zip",
+      "bytes": 242970791,
+      "etag": "\"cf6a358eac95a2cc825b63bfb6dc1ee7-4\"",
+      "bounds": [
+        149.000006008,
+        -32.99998729599997,
+        149.50000649800006,
+        -32.499987085999976
+      ]
+    },
+    {
+      "id": "FordsBridge-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "FORDS BRIDGE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/FordsBridge-CONT-AHD_55_2m.zip",
+      "bytes": 14933358,
+      "etag": "\"25de0cf28bff90af298f53859955931f\"",
+      "bounds": [
+        145.0000059020001,
+        -29.999986817999968,
+        145.50000713100007,
+        -29.49998637599998
+      ]
+    },
+    {
+      "id": "Forster-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "FORSTER",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Forster-CONT-AHD_56_2m.zip",
+      "bytes": 7362430,
+      "etag": "\"aa215d331de375195c7e2488a014e7f8\"",
+      "bounds": [
+        152.50000354700012,
+        -32.49998749799994,
+        153.0000058610001,
+        -31.99998708399994
+      ]
+    },
+    {
+      "id": "FortGrey-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "FORT GREY",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/FortGrey-CONT-AHD_54_2m.zip",
+      "bytes": 39236984,
+      "etag": "\"f24c486817197f787280b23bbe9d6cf1\"",
+      "bounds": [
+        141.00000715900012,
+        -29.499986577999948,
+        141.50000735600008,
+        -28.99998639399996
+      ]
+    },
+    {
+      "id": "FowlersGap-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "FOWLERS GAP",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/FowlersGap-CONT-AHD_54_2m.zip",
+      "bytes": 48892576,
+      "etag": "\"b577cbe83b2d6a4bf55349510d1c793f\"",
+      "bounds": [
+        141.50000670600002,
+        -31.499986757999977,
+        142.00000698600002,
+        -30.99998655199994
+      ]
+    },
+    {
+      "id": "Geera-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "GEERA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Geera-CONT-AHD_55_2m.zip",
+      "bytes": 12165028,
+      "etag": "\"c87124cc68bbe182af3534e20e93bbbd\"",
+      "bounds": [
+        147.0000063000001,
+        -30.49998721999998,
+        147.50000649800006,
+        -29.999986858999932
+      ]
+    },
+    {
+      "id": "Gerara-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "GERARA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Gerara-CONT-AHD_55_2m.zip",
+      "bytes": 10509164,
+      "etag": "\"0efd6ba2becf8efbfe2eaa820e7e6b8c\"",
+      "bounds": [
+        146.0000066130001,
+        -29.499986880999984,
+        146.500006675,
+        -28.99998679199996
+      ]
+    },
+    {
+      "id": "Gilgandra-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "GILGANDRA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Gilgandra-CONT-AHD_55_2m.zip",
+      "bytes": 28952381,
+      "etag": "\"0b221ebdc3b425f9e6922adafb989877\"",
+      "bounds": [
+        148.50000638200004,
+        -31.999987473999965,
+        149.00000627600002,
+        -31.49998738299996
+      ]
+    },
+    {
+      "id": "Gindoono-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "GINDOONO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Gindoono-CONT-AHD_55_2m.zip",
+      "bytes": 23171226,
+      "etag": "\"fc65590a0f1b1619463a5d43115cb3b9\"",
+      "bounds": [
+        146.50000594100004,
+        -32.999987019999935,
+        147.00000623800008,
+        -32.499987448999946
+      ]
+    },
+    {
+      "id": "GlenInnes-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "GLEN INNES",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/GlenInnes-CONT-AHD_56_2m.zip",
+      "bytes": 114396180,
+      "etag": "\"06b72c368d2dae3fe694c724c1f77a13-2\"",
+      "bounds": [
+        151.50000562900004,
+        -29.99998758399994,
+        152.0000056870001,
+        -29.499987232999956
+      ]
+    },
+    {
+      "id": "Glenariff-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "GLENARIFF",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Glenariff-CONT-AHD_55_2m.zip",
+      "bytes": 10139684,
+      "etag": "\"bdbe83b1d76326894701b32930e82ce2\"",
+      "bounds": [
+        146.50000636100003,
+        -30.999987026999975,
+        147.000006847,
+        -30.49998690299998
+      ]
+    },
+    {
+      "id": "GoalenPoint-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "GOALEN POINT",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/GoalenPoint-CONT-AHD_56_2m.zip",
+      "bytes": 7500613,
+      "etag": "\"8ea78ff895fb0976a148c2a867b2975c\"",
+      "bounds": [
+        150.00000465200003,
+        -36.99998729599997,
+        150.2490665680001,
+        -36.49998728299994
+      ]
+    },
+    {
+      "id": "Gongolgon-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "GONGOLGON",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Gongolgon-CONT-AHD_55_2m.zip",
+      "bytes": 9439817,
+      "etag": "\"cb782e7b65b608073e59652119122a4a\"",
+      "bounds": [
+        146.50000636100003,
+        -30.499987019999935,
+        147.00000648500009,
+        -29.999986615999944
+      ]
+    },
+    {
+      "id": "Goodooga-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "GOODOOGA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Goodooga-CONT-AHD_55_2m.zip",
+      "bytes": 10046942,
+      "etag": "\"804671431d42d07584dfaf3d23c915f1\"",
+      "bounds": [
+        147.00000640300004,
+        -29.49998687799996,
+        147.50000622900006,
+        -28.99998705099995
+      ]
+    },
+    {
+      "id": "Goondiwindi-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "GOONDIWINDI",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Goondiwindi-CONT-AHD_56_2m.zip",
+      "bytes": 22251900,
+      "etag": "\"ca68aed8bd807e363b41703123494882\"",
+      "bounds": [
+        150.0000062690001,
+        -28.999987372999954,
+        150.50000619000002,
+        -28.499987140999963
+      ]
+    },
+    {
+      "id": "Gosford-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "GOSFORD",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Gosford-CONT-AHD_56_2m.zip",
+      "bytes": 324840009,
+      "etag": "\"55b1c6604b65133eb5bfb3862f52bcd5-5\"",
+      "bounds": [
+        151.0000051410001,
+        -33.499987164999936,
+        151.5000047950001,
+        -32.99998709799996
+      ]
+    },
+    {
+      "id": "Goulburn-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "GOULBURN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Goulburn-CONT-AHD_55_2m.zip",
+      "bytes": 124446428,
+      "etag": "\"c54f933e081ad09c876b1dceb8fb599e-2\"",
+      "bounds": [
+        149.5000050430001,
+        -34.99998771399993,
+        150.00000564100003,
+        -34.499987429999976
+      ]
+    },
+    {
+      "id": "Grafton-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "GRAFTON",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Grafton-CONT-AHD_56_2m.zip",
+      "bytes": 251305638,
+      "etag": "\"7d5e5ba761d9df1717e64d561f708ae4-4\"",
+      "bounds": [
+        152.5000047540001,
+        -29.999987373999943,
+        153.00000483300005,
+        -29.49998736499998
+      ]
+    },
+    {
+      "id": "Grasmere-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "GRASMERE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Grasmere-CONT-AHD_54_2m.zip",
+      "bytes": 36517505,
+      "etag": "\"50bc82a8592a30b1d09c203df6bc51cc\"",
+      "bounds": [
+        142.5000066130001,
+        -31.499986946999968,
+        143.00000684600002,
+        -30.99998663899993
+      ]
+    },
+    {
+      "id": "Gravesend-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "GRAVESEND",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Gravesend-CONT-AHD_56_2m.zip",
+      "bytes": 84108136,
+      "etag": "\"3333d92469c3a3e569ebea11d3b4d0fe-2\"",
+      "bounds": [
+        150.00000576200011,
+        -29.999987402999977,
+        150.5000060420001,
+        -29.499987460999932
+      ]
+    },
+    {
+      "id": "GreenCape-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "GREEN CAPE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/GreenCape-CONT-AHD_56_2m.zip",
+      "bytes": 1754192,
+      "etag": "\"444e69e991534763a26750eea8d69508\"",
+      "bounds": [
+        150.00000465200003,
+        -37.49998647999996,
+        150.24906685400003,
+        -36.99998726699994
+      ]
+    },
+    {
+      "id": "Grenfell-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "GRENFELL",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Grenfell-CONT-AHD_55_2m.zip",
+      "bytes": 67825072,
+      "etag": "\"921dbe4841e919f9223d73b2ac21b123-2\"",
+      "bounds": [
+        148.0000063760001,
+        -33.99998741899998,
+        148.50000688400007,
+        -33.499987003999934
+      ]
+    },
+    {
+      "id": "Griffith-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "GRIFFITH",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Griffith-CONT-AHD_55_2m.zip",
+      "bytes": 27531610,
+      "etag": "\"257a2b8f2bf6b730ddc8e5b6bea56276\"",
+      "bounds": [
+        146.0000059680001,
+        -34.499986933999935,
+        146.50000602900002,
+        -33.99998703199998
+      ]
+    },
+    {
+      "id": "Gulargambone-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "GULARGAMBONE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Gulargambone-CONT-AHD_55_2m.zip",
+      "bytes": 10927597,
+      "etag": "\"ede0a486a0fd111b21c56703b7f294e2\"",
+      "bounds": [
+        148.00000645900002,
+        -31.499987586999964,
+        148.500006406,
+        -30.999987291999958
+      ]
+    },
+    {
+      "id": "Gulgong-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "GULGONG",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Gulgong-CONT-AHD_55_2m.zip",
+      "bytes": 140717003,
+      "etag": "\"6b87537f9d442b93ee9fdd9f9fec5fb7-3\"",
+      "bounds": [
+        149.50000574600006,
+        -32.49998741999997,
+        150.00000617900002,
+        -31.99998711099994
+      ]
+    },
+    {
+      "id": "Gunbar-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "GUNBAR",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Gunbar-CONT-AHD_55_2m.zip",
+      "bytes": 11749560,
+      "etag": "\"2786e5edf915281e0f201665db0ffc21\"",
+      "bounds": [
+        145.00000620700007,
+        -34.49998714399993,
+        145.50000625500002,
+        -33.999987103999956
+      ]
+    },
+    {
+      "id": "Gunderbooka-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "GUNDERBOOKA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Gunderbooka-CONT-AHD_55_2m.zip",
+      "bytes": 14199058,
+      "etag": "\"fa641d2060339b735114562f1ec13e09\"",
+      "bounds": [
+        145.50000678300012,
+        -30.99998715099997,
+        146.0000072370001,
+        -30.499987069999975
+      ]
+    },
+    {
+      "id": "Gunning-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "GUNNING",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Gunning-CONT-AHD_55_2m.zip",
+      "bytes": 129218883,
+      "etag": "\"d0ee79537962d81b63e20b19c2e4694d-2\"",
+      "bounds": [
+        149.00000568200005,
+        -34.99998771399993,
+        149.50000579400012,
+        -34.49998754199993
+      ]
+    },
+    {
+      "id": "Guyra-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "GUYRA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Guyra-CONT-AHD_56_2m.zip",
+      "bytes": 106951663,
+      "etag": "\"33a09bb268912b2df6add928c2e0890f-2\"",
+      "bounds": [
+        151.5000055920001,
+        -30.499987764999958,
+        152.00000529800002,
+        -29.99998751199996
+      ]
+    },
+    {
+      "id": "Gwabegar-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "GWABEGAR",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Gwabegar-CONT-AHD_55_2m.zip",
+      "bytes": 10188892,
+      "etag": "\"ea2460f6a98de20685d0c3ecf97292c7\"",
+      "bounds": [
+        148.5000061390001,
+        -30.999987481999938,
+        149.0000061510001,
+        -30.499987381999972
+      ]
+    },
+    {
+      "id": "Hatfield-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "HATFIELD",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Hatfield-CONT-AHD_54_2m.zip",
+      "bytes": 15905240,
+      "etag": "\"cfc81ed60947a2214c7542a63ec77fc1\"",
+      "bounds": [
+        143.50000651000005,
+        -33.999987026999975,
+        144.00000686400006,
+        -33.499986745999934
+      ]
+    },
+    {
+      "id": "HawkerGate-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "HAWKER GATE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/HawkerGate-CONT-AHD_54_2m.zip",
+      "bytes": 39256609,
+      "etag": "\"887fddb00d6a40414eee650fff690c56\"",
+      "bounds": [
+        141.00000730400006,
+        -29.999986621999938,
+        141.5000072460001,
+        -29.499986561999947
+      ]
+    },
+    {
+      "id": "Hay-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "HAY",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Hay-CONT-AHD_55_2m.zip",
+      "bytes": 11445318,
+      "etag": "\"2675c5816b1ec86051426829931622e1\"",
+      "bounds": [
+        144.500006148,
+        -34.999986917999934,
+        145.00000620700007,
+        -34.499986820999936
+      ]
+    },
+    {
+      "id": "Hermidale-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "HERMIDALE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Hermidale-CONT-AHD_55_2m.zip",
+      "bytes": 15641290,
+      "etag": "\"a80ec3111235f087f5e296bfc98b66d0\"",
+      "bounds": [
+        146.500005836,
+        -31.999987241999975,
+        147.00000684400004,
+        -31.49998689699993
+      ]
+    },
+    {
+      "id": "Hermidon-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "HERMIDON",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Hermidon-CONT-AHD_55_2m.zip",
+      "bytes": 10760304,
+      "etag": "\"af70f4f026bcda82c9e81de7bf904082\"",
+      "bounds": [
+        147.00000648500009,
+        -30.99998726399997,
+        147.50000654200005,
+        -30.499987019999935
+      ]
+    },
+    {
+      "id": "Hillston-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "HILLSTON",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Hillston-CONT-AHD_55_2m.zip",
+      "bytes": 11851620,
+      "etag": "\"0652b58a6698d6a0267a620a83df9b1b\"",
+      "bounds": [
+        145.5000064840001,
+        -33.49998702999994,
+        146.0000063870001,
+        -32.99998678999998
+      ]
+    },
+    {
+      "id": "Holbrook-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "HOLBROOK",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Holbrook-CONT-AHD_55_2m.zip",
+      "bytes": 105911906,
+      "etag": "\"50a7e006dc959aa8d23561e163e71df1-2\"",
+      "bounds": [
+        147.00000570500004,
+        -35.99998733499996,
+        147.50000612500003,
+        -35.499986828999965
+      ]
+    },
+    {
+      "id": "Horton-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "HORTON",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Horton-CONT-AHD_56_2m.zip",
+      "bytes": 229753835,
+      "etag": "\"72f1df95e549871ba2af0c5cb12247b9-4\"",
+      "bounds": [
+        150.0000059890001,
+        -30.49998740799998,
+        150.50000586800002,
+        -29.999987396999984
+      ]
+    },
+    {
+      "id": "HowesValley-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "HOWES VALLEY",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/HowesValley-CONT-AHD_56_2m.zip",
+      "bytes": 469173664,
+      "etag": "\"bb903642a11e8d79a6dea098d8ef8905-7\"",
+      "bounds": [
+        150.50000530700004,
+        -32.99998764199995,
+        151.00000552200004,
+        -32.499987328999964
+      ]
+    },
+    {
+      "id": "Innesowen-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "INNESOWEN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Innesowen-CONT-AHD_55_2m.zip",
+      "bytes": 23882320,
+      "etag": "\"ea08071900139a64da926f9db7e05f87\"",
+      "bounds": [
+        144.50000639600012,
+        -31.499986944999932,
+        145.00000686600004,
+        -30.99998685199995
+      ]
+    },
+    {
+      "id": "Inverell-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "INVERELL",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Inverell-CONT-AHD_56_2m.zip",
+      "bytes": 94633057,
+      "etag": "\"5aadd406be3a275a6510940ed6fcc5a5-2\"",
+      "bounds": [
+        151.00000554200005,
+        -29.999987509999983,
+        151.50000560400008,
+        -29.49998714399993
+      ]
+    },
+    {
+      "id": "Ivanhoe-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "IVANHOE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Ivanhoe-CONT-AHD_55_2m.zip",
+      "bytes": 10884424,
+      "etag": "\"2b4c68a32d80eafd1d2d3bc21060054b\"",
+      "bounds": [
+        144.00000720800006,
+        -32.99998688599993,
+        144.5000072030001,
+        -32.49998664499998
+      ]
+    },
+    {
+      "id": "JacobsRiver-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "JACOBS RIVER",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/JacobsRiver-CONT-AHD_55_2m.zip",
+      "bytes": 179550172,
+      "etag": "\"63e856a369b1e9ed62a9c9682339c607-3\"",
+      "bounds": [
+        148.00000476700006,
+        -36.99998704099994,
+        148.50000535000004,
+        -36.49998718899997
+      ]
+    },
+    {
+      "id": "Jerilderie-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "JERILDERIE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Jerilderie-CONT-AHD_55_2m.zip",
+      "bytes": 11489739,
+      "etag": "\"1fdb2ec80f960336ca29fe6ba1f66f6e\"",
+      "bounds": [
+        145.5000060740001,
+        -35.49998695199997,
+        146.00000632800004,
+        -34.99998701699997
+      ]
+    },
+    {
+      "id": "JervisBay-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "JERVIS BAY",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/JervisBay-CONT-AHD_56_2m.zip",
+      "bytes": 18734224,
+      "etag": "\"ace6178056e0c31b089633ff8ee371ca\"",
+      "bounds": [
+        150.50000510300003,
+        -35.49998736699996,
+        151.00000529300007,
+        -34.99998731299996
+      ]
+    },
+    {
+      "id": "Junee-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "JUNEE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Junee-CONT-AHD_55_2m.zip",
+      "bytes": 61351807,
+      "etag": "\"6309c46fa940a988a33eb72c741c8db7\"",
+      "bounds": [
+        147.500005686,
+        -34.99998720899998,
+        148.00000685400005,
+        -34.49998707199995
+      ]
+    },
+    {
+      "id": "Kango-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "KANGO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Kango-CONT-AHD_55_2m.zip",
+      "bytes": 22168385,
+      "etag": "\"fa0673d325cfc43694e668cdc0715d2f\"",
+      "bounds": [
+        144.0000062460001,
+        -30.49998666199997,
+        144.50000647500008,
+        -29.99998659499994
+      ]
+    },
+    {
+      "id": "Katoomba-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "KATOOMBA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Katoomba-CONT-AHD_56_2m.zip",
+      "bytes": 487112362,
+      "etag": "\"3a706caaef7211fac9f2822266abe267-8\"",
+      "bounds": [
+        150.0000053330001,
+        -33.999987130999955,
+        150.500005718,
+        -33.49998707299994
+      ]
+    },
+    {
+      "id": "Kayrunnera-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "KAYRUNNERA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Kayrunnera-CONT-AHD_54_2m.zip",
+      "bytes": 28108788,
+      "etag": "\"b5b48ca023743f20828539f43c2b5720\"",
+      "bounds": [
+        142.50000679900006,
+        -30.999986691999936,
+        143.00000684600002,
+        -30.49998655099995
+      ]
+    },
+    {
+      "id": "Keewong-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "KEEWONG",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Keewong-CONT-AHD_55_2m.zip",
+      "bytes": 11586393,
+      "etag": "\"6230fd8ff6e0dc3b8a41842bb678c2d7\"",
+      "bounds": [
+        145.00000676700006,
+        -32.49998681599993,
+        145.50000685100008,
+        -31.99998667999995
+      ]
+    },
+    {
+      "id": "Kempsey-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "KEMPSEY",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Kempsey-CONT-AHD_56_2m.zip",
+      "bytes": 194931859,
+      "etag": "\"a1db7d8c23b9939cdcd993184956098e-3\"",
+      "bounds": [
+        152.5000039350001,
+        -31.499987664999935,
+        153.00000309200004,
+        -30.99998758299995
+      ]
+    },
+    {
+      "id": "Kerang-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "KERANG",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Kerang-CONT-AHD_54_2m.zip",
+      "bytes": 3259776,
+      "etag": "\"cd4397c878ae192ee26b2c2844a71cbc\"",
+      "bounds": [
+        143.50000641500003,
+        -35.99998692299994,
+        144.00000667900008,
+        -35.49998669499996
+      ]
+    },
+    {
+      "id": "Kiama-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "KIAMA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Kiama-CONT-AHD_56_2m.zip",
+      "bytes": 138831680,
+      "etag": "\"91f699cc0dc78643fe6f1aec14b14cca-3\"",
+      "bounds": [
+        150.500005191,
+        -34.99998735499997,
+        151.0000053020001,
+        -34.49998736999993
+      ]
+    },
+    {
+      "id": "Kilfera-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "KILFERA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Kilfera-CONT-AHD_55_2m.zip",
+      "bytes": 11016901,
+      "etag": "\"c2c0632ba0a4359c369580d495b598d4\"",
+      "bounds": [
+        144.0000069450001,
+        -33.49998705899998,
+        144.5000068920001,
+        -32.999986880999984
+      ]
+    },
+    {
+      "id": "Kilparney-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "KILPARNEY",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Kilparney-CONT-AHD_55_2m.zip",
+      "bytes": 19928915,
+      "etag": "\"ebfc616734eb7427b9aed236ab62bd27\"",
+      "bounds": [
+        146.0000063870001,
+        -32.999986940999975,
+        146.50000617900002,
+        -32.49998667699998
+      ]
+    },
+    {
+      "id": "Kooroongal-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "KOOROONGAL",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Kooroongal-CONT-AHD_55_2m.zip",
+      "bytes": 14855183,
+      "etag": "\"68894ca8ee8767dee3939467ec513e8f\"",
+      "bounds": [
+        145.50000565000005,
+        -34.49998714399993,
+        146.00000612100007,
+        -33.999987156999964
+      ]
+    },
+    {
+      "id": "KorogoroPoint-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "KOROGORO POINT",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/KorogoroPoint-CONT-AHD_56_2m.zip",
+      "bytes": 1925856,
+      "etag": "\"bb5914d29cc7d9ac66349e6f2869b867\"",
+      "bounds": [
+        153.00000294500012,
+        -31.49998747199993,
+        153.25261847500008,
+        -30.99998765199996
+      ]
+    },
+    {
+      "id": "Kosciusko-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "KOSCIUSKO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Kosciusko-CONT-AHD_55_2m.zip",
+      "bytes": 330204446,
+      "etag": "\"275f90909f7d1fb7efc3975a1db368cf-5\"",
+      "bounds": [
+        148.00000476700006,
+        -36.49998726499996,
+        148.50000526300005,
+        -35.99998711799998
+      ]
+    },
+    {
+      "id": "LachlanDowns-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "LACHLAN DOWNS",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/LachlanDowns-CONT-AHD_55_2m.zip",
+      "bytes": 27784599,
+      "etag": "\"a90bb4e0c46e05f53101d2c573bd8dad\"",
+      "bounds": [
+        145.50000669400004,
+        -32.49998676299998,
+        146.000006524,
+        -31.99998667999995
+      ]
+    },
+    {
+      "id": "LakeMacquarie-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "LAKE MACQUARIE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/LakeMacquarie-CONT-AHD_56_2m.zip",
+      "bytes": 14361802,
+      "etag": "\"9bcd3c03e15eb18dc61ee6915e9bb595\"",
+      "bounds": [
+        151.50000461500008,
+        -33.49998733099994,
+        151.74901071500005,
+        -32.99998709799996
+      ]
+    },
+    {
+      "id": "LakeTandou-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "LAKE TANDOU",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/LakeTandou-CONT-AHD_54_2m.zip",
+      "bytes": 25899855,
+      "etag": "\"80aa4fcc05ff0c916dbcbda774d64868\"",
+      "bounds": [
+        142.00000663100002,
+        -32.99998667799997,
+        142.50000693000004,
+        -32.49998674999995
+      ]
+    },
+    {
+      "id": "LakeVictoria-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "LAKE VICTORIA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/LakeVictoria-CONT-AHD_54_2m.zip",
+      "bytes": 21946177,
+      "etag": "\"eb1707970c67d0b2f2d40277e2073218\"",
+      "bounds": [
+        141.0000069340001,
+        -33.999986596999975,
+        141.5000070310001,
+        -33.49998653999995
+      ]
+    },
+    {
+      "id": "LightningRidge-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "LIGHTNING RIDGE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/LightningRidge-CONT-AHD_55_2m.zip",
+      "bytes": 11387748,
+      "etag": "\"6e358f9c92623b93f897d6479cd247dd\"",
+      "bounds": [
+        147.5000061600001,
+        -29.499987051999938,
+        148.0000063330001,
+        -28.99998702499994
+      ]
+    },
+    {
+      "id": "Lindsay-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "LINDSAY",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Lindsay-CONT-AHD_54_2m.zip",
+      "bytes": 10635901,
+      "etag": "\"bba02031caad03dd418b8ebf8daf7f73\"",
+      "bounds": [
+        141.00000449700008,
+        -34.499986554999964,
+        141.5000070310001,
+        -33.99998654899997
+      ]
+    },
+    {
+      "id": "Lismore-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "LISMORE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Lismore-CONT-AHD_56_2m.zip",
+      "bytes": 232840674,
+      "etag": "\"96699b5b8d240c7cb4c3107ce587300c-4\"",
+      "bounds": [
+        153.0000049240001,
+        -28.99998717799997,
+        153.50000534100002,
+        -28.49998646499995
+      ]
+    },
+    {
+      "id": "Lockhart-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "LOCKHART",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Lockhart-CONT-AHD_55_2m.zip",
+      "bytes": 21448917,
+      "etag": "\"91d663d0093f04ba9269c2a0cf41e22e\"",
+      "bounds": [
+        146.50000616500006,
+        -35.49998718899997,
+        147.00000645500006,
+        -34.99998724499994
+      ]
+    },
+    {
+      "id": "Louth-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "LOUTH",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Louth-CONT-AHD_55_2m.zip",
+      "bytes": 18980143,
+      "etag": "\"46a13ac91e25b3e2fab638b17abf6c4c\"",
+      "bounds": [
+        145.0000063770001,
+        -30.999987080999972,
+        145.5000070740001,
+        -30.499986693999972
+      ]
+    },
+    {
+      "id": "LowerLila-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "LOWER LILA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/LowerLila-CONT-AHD_55_2m.zip",
+      "bytes": 14703938,
+      "etag": "\"af80101c920eccd7ce6158865c524a90\"",
+      "bounds": [
+        145.5000062590001,
+        -29.99998689499995,
+        146.00000662600007,
+        -29.49998637599998
+      ]
+    },
+    {
+      "id": "Macksville-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "MACKSVILLE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Macksville-CONT-AHD_56_2m.zip",
+      "bytes": 382404496,
+      "etag": "\"37ef00e6a3eea6e083afcb597ae2a751-6\"",
+      "bounds": [
+        152.5000039350001,
+        -30.999987647999944,
+        153.00000424600012,
+        -30.499987183999963
+      ]
+    },
+    {
+      "id": "Manara-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "MANARA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Manara-CONT-AHD_54_2m.zip",
+      "bytes": 17736468,
+      "etag": "\"3a942ebb80700a0d5886e3aac4c381bc\"",
+      "bounds": [
+        143.5000065270001,
+        -32.49998668199993,
+        144.00000712700012,
+        -31.999986668999952
+      ]
+    },
+    {
+      "id": "Manfred-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "MANFRED",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Manfred-CONT-AHD_54_2m.zip",
+      "bytes": 16246390,
+      "etag": "\"f3f3a02a11679a25cbe66c52f6866610\"",
+      "bounds": [
+        143.50000680800008,
+        -33.49998674999995,
+        144.00000744500005,
+        -32.999986698999976
+      ]
+    },
+    {
+      "id": "Manilla-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "MANILLA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Manilla-CONT-AHD_56_2m.zip",
+      "bytes": 175719427,
+      "etag": "\"b3a0e3c1c1429eba74343621531e6154-3\"",
+      "bounds": [
+        150.50000586800002,
+        -30.999987290999968,
+        151.0000057740001,
+        -30.49998740799998
+      ]
+    },
+    {
+      "id": "Marsden-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "MARSDEN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Marsden-CONT-AHD_55_2m.zip",
+      "bytes": 23339960,
+      "etag": "\"368f9256216c14f2f75e90f89d463e34\"",
+      "bounds": [
+        147.5000060860001,
+        -33.99998738199997,
+        148.00000655700012,
+        -33.49998704899997
+      ]
+    },
+    {
+      "id": "Mathoura-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "MATHOURA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Mathoura-CONT-AHD_55_2m.zip",
+      "bytes": 17843829,
+      "etag": "\"263d74e176c404e29cb2704fb7ca29d0\"",
+      "bounds": [
+        144.50000536200002,
+        -35.99998672999993,
+        145.0000065060001,
+        -35.499986784999976
+      ]
+    },
+    {
+      "id": "MenaMurtee-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "MENA MURTEE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/MenaMurtee-CONT-AHD_54_2m.zip",
+      "bytes": 17571618,
+      "etag": "\"d364f9e1e53f767ecd0467851cfa7187\"",
+      "bounds": [
+        143.00000657100009,
+        -31.499986946999968,
+        143.5000067320001,
+        -30.999986691999936
+      ]
+    },
+    {
+      "id": "Mendooran-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "MENDOORAN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Mendooran-CONT-AHD_55_2m.zip",
+      "bytes": 58596988,
+      "etag": "\"1b4e086f5929254c1492d540e965bf4d\"",
+      "bounds": [
+        149.0000060960001,
+        -31.999987440999973,
+        149.50000617000012,
+        -31.499987218999934
+      ]
+    },
+    {
+      "id": "Menindee-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "MENINDEE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Menindee-CONT-AHD_54_2m.zip",
+      "bytes": 17507235,
+      "etag": "\"f2d60942383fcaa3de5e64d3a9c45325\"",
+      "bounds": [
+        142.00000685500004,
+        -32.499986760999946,
+        142.50000684000008,
+        -31.99998672499993
+      ]
+    },
+    {
+      "id": "Merriwa-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "MERRIWA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Merriwa-CONT-AHD_56_2m.zip",
+      "bytes": 260096866,
+      "etag": "\"a2a0208c62c36c86b61658d3b2f72fc9-4\"",
+      "bounds": [
+        150.00000613200007,
+        -32.49998741999997,
+        150.5000062570001,
+        -31.999986698999976
+      ]
+    },
+    {
+      "id": "Merriwagga-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "MERRIWAGGA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Merriwagga-CONT-AHD_55_2m.zip",
+      "bytes": 22276321,
+      "etag": "\"e7423ce168c63c942422cd4182e441a2\"",
+      "bounds": [
+        145.50000625500002,
+        -33.999987215999965,
+        146.0000059680001,
+        -33.49998685699995
+      ]
+    },
+    {
+      "id": "Michelago-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "MICHELAGO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Michelago-CONT-AHD_55_2m.zip",
+      "bytes": 266341992,
+      "etag": "\"b1590e89a2e0d348bbd0664cd92a4f5f-4\"",
+      "bounds": [
+        149.0000051180001,
+        -35.999986931999956,
+        149.500005116,
+        -35.499987070999964
+      ]
+    },
+    {
+      "id": "MiddleCamp-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "MIDDLE CAMP",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/MiddleCamp-CONT-AHD_54_2m.zip",
+      "bytes": 21950725,
+      "etag": "\"615f8574e788196c092afba86c532622\"",
+      "bounds": [
+        141.50000616400007,
+        -32.999986485999955,
+        142.00000685500004,
+        -32.49998661099994
+      ]
+    },
+    {
+      "id": "Mildura-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "MILDURA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Mildura-CONT-AHD_54_2m.zip",
+      "bytes": 22724698,
+      "etag": "\"7d09aeee0b6dac49ee9f84ac2e92ed51\"",
+      "bounds": [
+        142.00000668100006,
+        -34.49998654799998,
+        142.50000693000004,
+        -33.99998658599998
+      ]
+    },
+    {
+      "id": "Milparinka-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "MILPARINKA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Milparinka-CONT-AHD_54_2m.zip",
+      "bytes": 44635999,
+      "etag": "\"9fb262432b843c17b9814dcf5a9d8ac9\"",
+      "bounds": [
+        141.50000710100005,
+        -29.999986888999956,
+        142.00000695500012,
+        -29.499986561999947
+      ]
+    },
+    {
+      "id": "Moggumbill-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "MOGGUMBILL",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Moggumbill-CONT-AHD_55_2m.zip",
+      "bytes": 12073132,
+      "etag": "\"8f68123e37d7349e83db458c8e71243f\"",
+      "bounds": [
+        145.00000610200004,
+        -34.99998703299997,
+        145.5000060740001,
+        -34.49998697999996
+      ]
+    },
+    {
+      "id": "MogilMogil-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "MOGIL MOGIL",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/MogilMogil-CONT-AHD_55_2m.zip",
+      "bytes": 15607404,
+      "etag": "\"4d2e93e9047b7c20623cde64c2a6bd90\"",
+      "bounds": [
+        148.50000626200006,
+        -29.499987720999968,
+        149.00000645400007,
+        -28.99998700499998
+      ]
+    },
+    {
+      "id": "Molong-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "MOLONG",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Molong-CONT-AHD_55_2m.zip",
+      "bytes": 107578542,
+      "etag": "\"f438b3732912e3f9631ef97208d329d9-2\"",
+      "bounds": [
+        148.50000600700002,
+        -33.49998708199996,
+        149.0000063000001,
+        -32.99998718299997
+      ]
+    },
+    {
+      "id": "Monolon-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "MONOLON",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Monolon-CONT-AHD_54_2m.zip",
+      "bytes": 22862291,
+      "etag": "\"7999b71d61263c0baf2a7fc111146e43\"",
+      "bounds": [
+        143.0000066660001,
+        -30.49998655099995,
+        143.50000672200008,
+        -29.999986355999965
+      ]
+    },
+    {
+      "id": "Moree-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "MOREE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Moree-CONT-AHD_55_2m.zip",
+      "bytes": 16845135,
+      "etag": "\"5dd16f8ec06441ad44d40ded1613fb6d\"",
+      "bounds": [
+        149.50000611600012,
+        -29.49998752399995,
+        150.00000620600008,
+        -28.999987304999934
+      ]
+    },
+    {
+      "id": "MossVale-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "MOSS VALE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/MossVale-CONT-AHD_56_2m.zip",
+      "bytes": 321056454,
+      "etag": "\"2d5072b7d94960269740039afa64b365-5\"",
+      "bounds": [
+        150.00000562500009,
+        -34.99998761699993,
+        150.50000578300012,
+        -34.499987429999976
+      ]
+    },
+    {
+      "id": "Mossgiel-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "MOSSGIEL",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Mossgiel-CONT-AHD_55_2m.zip",
+      "bytes": 8891016,
+      "etag": "\"8f2c568e9090193de424a17aa2812064\"",
+      "bounds": [
+        144.500006868,
+        -33.49998706599996,
+        145.00000688900002,
+        -32.99998675299997
+      ]
+    },
+    {
+      "id": "Moulamein-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "MOULAMEIN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Moulamein-CONT-AHD_55_2m.zip",
+      "bytes": 21033005,
+      "etag": "\"51db7d39fadbf55e93b0776a2ca1f49d\"",
+      "bounds": [
+        144.00000651300002,
+        -35.49998707199995,
+        144.50000630600005,
+        -34.999986804999935
+      ]
+    },
+    {
+      "id": "MountAllen-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "MOUNT ALLEN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/MountAllen-CONT-AHD_55_2m.zip",
+      "bytes": 12121623,
+      "etag": "\"397262dce48020232077a27a95d429bf\"",
+      "bounds": [
+        145.50000661500007,
+        -32.999986940999975,
+        146.000006524,
+        -32.49998667699998
+      ]
+    },
+    {
+      "id": "MountArrowsmith-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "MOUNT ARROWSMITH",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/MountArrowsmith-CONT-AHD_54_2m.zip",
+      "bytes": 36124905,
+      "etag": "\"c88689f87554be56582c5801c8c8216d\"",
+      "bounds": [
+        141.5000072460001,
+        -30.49998673799996,
+        142.00000695500012,
+        -29.999986621999938
+      ]
+    },
+    {
+      "id": "MountHarris-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "MOUNT HARRIS",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/MountHarris-CONT-AHD_55_2m.zip",
+      "bytes": 12100129,
+      "etag": "\"73f058b7d2bac7cdc08c36a31937b727\"",
+      "bounds": [
+        147.50000654200005,
+        -31.49998730599998,
+        148.00000659400007,
+        -30.99998726399997
+      ]
+    },
+    {
+      "id": "MountLindesay-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "MOUNT LINDESAY",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/MountLindesay-CONT-AHD_56_2m.zip",
+      "bytes": 167601779,
+      "etag": "\"3607292ca00e4639e23c45e09c014cca-3\"",
+      "bounds": [
+        152.50000556400005,
+        -28.49998682699993,
+        153.00000594300002,
+        -27.99998743599997
+      ]
+    },
+    {
+      "id": "MountOxley-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "MOUNT OXLEY",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/MountOxley-CONT-AHD_55_2m.zip",
+      "bytes": 8707986,
+      "etag": "\"70ffcf0f1219ca5d6d06e0d41356e0ee\"",
+      "bounds": [
+        146.00000651800008,
+        -30.499987069999975,
+        146.50000655000008,
+        -29.999986615999944
+      ]
+    },
+    {
+      "id": "MountPomany-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "MOUNT POMANY",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/MountPomany-CONT-AHD_56_2m.zip",
+      "bytes": 596521280,
+      "etag": "\"712d27d7111d3cb6d08150a0d7062050-9\"",
+      "bounds": [
+        150.00000539200005,
+        -32.99998764199995,
+        150.5000053110001,
+        -32.499987328999964
+      ]
+    },
+    {
+      "id": "Muckerumba-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "MUCKERUMBA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Muckerumba-CONT-AHD_55_2m.zip",
+      "bytes": 10616635,
+      "etag": "\"8c7605cc84e432da85243f6350dcbc6f\"",
+      "bounds": [
+        145.00000637300002,
+        -33.999987215999965,
+        145.5000064840001,
+        -33.49998702999994
+      ]
+    },
+    {
+      "id": "Mudgee-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "MUDGEE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Mudgee-CONT-AHD_55_2m.zip",
+      "bytes": 264001722,
+      "etag": "\"34014415e35956f34bc2d2c88f1c1c45-4\"",
+      "bounds": [
+        149.50000594000005,
+        -32.999987533999956,
+        150.00000606900005,
+        -32.49998720899998
+      ]
+    },
+    {
+      "id": "Mulurulu-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "MULURULU",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Mulurulu-CONT-AHD_54_2m.zip",
+      "bytes": 20103797,
+      "etag": "\"62727ab4b4eb23c971b27a12bb4a94c3\"",
+      "bounds": [
+        143.00000675500007,
+        -33.499986745999934,
+        143.50000692000003,
+        -32.99998669299998
+      ]
+    },
+    {
+      "id": "Murrurundi-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "MURRURUNDI",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Murrurundi-CONT-AHD_56_2m.zip",
+      "bytes": 218149844,
+      "etag": "\"c2884779eec84aaea0f92c1e27fc2f50-4\"",
+      "bounds": [
+        150.5000057530001,
+        -31.999987678999958,
+        151.00000588300009,
+        -31.49998717799997
+      ]
+    },
+    {
+      "id": "Murtee-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "MURTEE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Murtee-CONT-AHD_54_2m.zip",
+      "bytes": 19228388,
+      "etag": "\"22de2f2520f230dbd4d48743f49ac528\"",
+      "bounds": [
+        143.50000670600002,
+        -31.99998669599995,
+        144.00000676900004,
+        -31.499986921999948
+      ]
+    },
+    {
+      "id": "Murwillumbah-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "MURWILLUMBAH",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Murwillumbah-CONT-AHD_56_2m.zip",
+      "bytes": 233419812,
+      "etag": "\"d29e2b7b2d8532e8d2c4e8473e12a3df-4\"",
+      "bounds": [
+        153.0000049240001,
+        -28.499987482999984,
+        153.5000058700001,
+        -27.999987485999952
+      ]
+    },
+    {
+      "id": "Muswellbrook-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "MUSWELLBROOK",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Muswellbrook-CONT-AHD_56_2m.zip",
+      "bytes": 204811152,
+      "etag": "\"00120a8ad1acbed64fdb2c2c96ba6656-4\"",
+      "bounds": [
+        150.50000530700004,
+        -32.49998751499993,
+        151.00000588300009,
+        -31.999986698999976
+      ]
+    },
+    {
+      "id": "Nambucca-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "NAMBUCCA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Nambucca-CONT-AHD_56_2m.zip",
+      "bytes": 5199945,
+      "etag": "\"d8946d8948eff229034f8baee33ab317\"",
+      "bounds": [
+        153.00000294500012,
+        -30.999987747999967,
+        153.50000572200008,
+        -30.499987370999975
+      ]
+    },
+    {
+      "id": "Narooma-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "NAROOMA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Narooma-CONT-AHD_56_2m.zip",
+      "bytes": 56348411,
+      "etag": "\"c248e06b16ed2e0668320ad1b112ad45\"",
+      "bounds": [
+        150.0000049040001,
+        -36.49998730699997,
+        150.24906461600006,
+        -35.99998715199996
+      ]
+    },
+    {
+      "id": "Narrabri-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "NARRABRI",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Narrabri-CONT-AHD_55_2m.zip",
+      "bytes": 28906743,
+      "etag": "\"3f8b1ebfbb078b8a935709631a10e9b1\"",
+      "bounds": [
+        149.50000596600012,
+        -30.49998744399994,
+        150.00000644700003,
+        -29.999987398999963
+      ]
+    },
+    {
+      "id": "Narran-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "NARRAN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Narran-CONT-AHD_55_2m.zip",
+      "bytes": 12386146,
+      "etag": "\"726e789039848d129fc6ec5bf61f7768\"",
+      "bounds": [
+        147.0000063000001,
+        -29.999987088999944,
+        147.50000637300002,
+        -29.499986865999972
+      ]
+    },
+    {
+      "id": "Narrandera-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "NARRANDERA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Narrandera-CONT-AHD_55_2m.zip",
+      "bytes": 21589845,
+      "etag": "\"3ba3f1ee7e6f7ac9221dbb3b39690dea\"",
+      "bounds": [
+        146.50000602900002,
+        -34.999987518999944,
+        147.00000645500006,
+        -34.49998649699995
+      ]
+    },
+    {
+      "id": "Narromine-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "NARROMINE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Narromine-CONT-AHD_55_2m.zip",
+      "bytes": 25453749,
+      "etag": "\"28efdd68fb72df218e7d4739eef27b85\"",
+      "bounds": [
+        148.00000655700012,
+        -32.49998728099996,
+        148.5000063550001,
+        -31.999987243999954
+      ]
+    },
+    {
+      "id": "Nartooka-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "NARTOOKA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Nartooka-CONT-AHD_54_2m.zip",
+      "bytes": 23322056,
+      "etag": "\"afd53302d17efafd98cafef2888d9c8c\"",
+      "bounds": [
+        142.5000068390001,
+        -32.499986760999946,
+        143.00000687500005,
+        -31.99998672499993
+      ]
+    },
+    {
+      "id": "Neckarboo-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "NECKARBOO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Neckarboo-CONT-AHD_55_2m.zip",
+      "bytes": 24015610,
+      "etag": "\"808ac3645d4107df3d408d3100119889\"",
+      "bounds": [
+        144.50000661100012,
+        -32.49998683599995,
+        145.0000071290001,
+        -31.999986750999938
+      ]
+    },
+    {
+      "id": "Nelyambo-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "NELYAMBO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Nelyambo-CONT-AHD_55_2m.zip",
+      "bytes": 18008015,
+      "etag": "\"faf5a90924b36d4bb0944d6b446bf377\"",
+      "bounds": [
+        144.00000647600007,
+        -31.49998695399995,
+        144.5000068170001,
+        -30.999986921999948
+      ]
+    },
+    {
+      "id": "Newcastle-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "NEWCASTLE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Newcastle-CONT-AHD_56_2m.zip",
+      "bytes": 107312441,
+      "etag": "\"8387a26a0dfcc583c076834979ea3393-2\"",
+      "bounds": [
+        151.50000461500008,
+        -32.99998735299994,
+        152.000004772,
+        -32.49998731399995
+      ]
+    },
+    {
+      "id": "NewtonBoyd-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "NEWTON BOYD",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/NewtonBoyd-CONT-AHD_56_2m.zip",
+      "bytes": 437627844,
+      "etag": "\"1f7d500df37675b4142607e6ea1bc5d9-7\"",
+      "bounds": [
+        152.00000529800002,
+        -29.99998758399994,
+        152.50000551800008,
+        -29.499987335999947
+      ]
+    },
+    {
+      "id": "Nowingi-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "NOWINGI",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Nowingi-CONT-AHD_54_2m.zip",
+      "bytes": 10623957,
+      "etag": "\"dfeb9737f56080b2bb135ba33d830194\"",
+      "bounds": [
+        142.00000648900004,
+        -34.999986717999946,
+        142.50000690900004,
+        -34.499986296999964
+      ]
+    },
+    {
+      "id": "Nuchea-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "NUCHEA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Nuchea-CONT-AHD_54_2m.zip",
+      "bytes": 45932559,
+      "etag": "\"813df4f7a2bcd44208f5f454207c2d00\"",
+      "bounds": [
+        142.00000691600007,
+        -31.49998683499996,
+        142.50000679900006,
+        -30.99998663899993
+      ]
+    },
+    {
+      "id": "Numbla-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "NUMBLA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Numbla-CONT-AHD_55_2m.zip",
+      "bytes": 265095085,
+      "etag": "\"0a1e898cfc001287bd94767bab03ad68-4\"",
+      "bounds": [
+        148.5000052900001,
+        -36.99998724499994,
+        149.00000506800006,
+        -36.49998709799996
+      ]
+    },
+    {
+      "id": "Nundle-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "NUNDLE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Nundle-CONT-AHD_56_2m.zip",
+      "bytes": 247297449,
+      "etag": "\"94d64fc95ab786986d3e12786068c090-4\"",
+      "bounds": [
+        151.00000558800002,
+        -31.49998769399997,
+        151.50000570300006,
+        -30.99998726499996
+      ]
+    },
+    {
+      "id": "Nyah-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "NYAH",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Nyah-CONT-AHD_54_2m.zip",
+      "bytes": 7402094,
+      "etag": "\"2dac148e5f2642a16d1d4f054cb14201\"",
+      "bounds": [
+        143.0000064180001,
+        -35.49998669799993,
+        143.50000641500003,
+        -34.99998674099993
+      ]
+    },
+    {
+      "id": "Nymagee-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "NYMAGEE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Nymagee-CONT-AHD_55_2m.zip",
+      "bytes": 31520913,
+      "etag": "\"f8bd82461c2dbdfab032c149e5dba815\"",
+      "bounds": [
+        146.0000063760001,
+        -32.499987448999946,
+        146.50000594100004,
+        -31.999986700999955
+      ]
+    },
+    {
+      "id": "Nyngan-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "NYNGAN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Nyngan-CONT-AHD_55_2m.zip",
+      "bytes": 11307174,
+      "etag": "\"186536bf8a61444363491f300b4b95d2\"",
+      "bounds": [
+        147.0000066350001,
+        -31.99998721099996,
+        147.50000692300011,
+        -31.499987116999932
+      ]
+    },
+    {
+      "id": "Oberon-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "OBERON",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Oberon-CONT-AHD_55_2m.zip",
+      "bytes": 156243428,
+      "etag": "\"5704744d7694dc076b14d74222dd07c8-3\"",
+      "bounds": [
+        149.50000566200004,
+        -33.99998624699998,
+        150.00000533800005,
+        -33.49998703999995
+      ]
+    },
+    {
+      "id": "OliveDowns-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "OLIVE DOWNS",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/OliveDowns-CONT-AHD_54_2m.zip",
+      "bytes": 38372244,
+      "etag": "\"67d6e2c27ee8eda5e6861339e634a966\"",
+      "bounds": [
+        141.50000710100005,
+        -29.49998656699995,
+        142.00000717800003,
+        -28.99998646299997
+      ]
+    },
+    {
+      "id": "OneTree-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "ONE TREE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/OneTree-CONT-AHD_55_2m.zip",
+      "bytes": 11123114,
+      "etag": "\"b97d129c8ed8ea74237cc09442f3f1ba\"",
+      "bounds": [
+        144.500006148,
+        -34.49998697999996,
+        145.00000637300002,
+        -33.999987103999956
+      ]
+    },
+    {
+      "id": "Orange-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "ORANGE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Orange-CONT-AHD_55_2m.zip",
+      "bytes": 176632179,
+      "etag": "\"856687b6e44e9cd226bf8c945ab07185-3\"",
+      "bounds": [
+        149.0000061940001,
+        -33.49998708199996,
+        149.50000594000005,
+        -32.99998718299997
+      ]
+    },
+    {
+      "id": "Oxley-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "OXLEY",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Oxley-CONT-AHD_55_2m.zip",
+      "bytes": 13478750,
+      "etag": "\"b6ce6b93d581e5b10aa5e0e6c27238fc\"",
+      "bounds": [
+        144.000006374,
+        -34.49998690799998,
+        144.50000640000007,
+        -33.999987026999975
+      ]
+    },
+    {
+      "id": "Paika-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "PAIKA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Paika-CONT-AHD_54_2m.zip",
+      "bytes": 15297439,
+      "etag": "\"d541d9da63ed918dd99376b83f58e1ce\"",
+      "bounds": [
+        143.50000651000005,
+        -34.49998690799998,
+        144.0000063650001,
+        -33.999986871999965
+      ]
+    },
+    {
+      "id": "Para-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "PARA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Para-CONT-AHD_54_2m.zip",
+      "bytes": 24755650,
+      "etag": "\"a502179be658110c9acf7adfacfd2408\"",
+      "bounds": [
+        142.0000066550001,
+        -33.99998662199994,
+        142.50000693000004,
+        -33.499986530999934
+      ]
+    },
+    {
+      "id": "Parkes-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "PARKES",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Parkes-CONT-AHD_55_2m.zip",
+      "bytes": 59418206,
+      "etag": "\"0d95cbfca014d6fb23f054744ef6d6aa\"",
+      "bounds": [
+        148.00000609100005,
+        -33.499987104999946,
+        148.50000688400007,
+        -32.99998718499995
+      ]
+    },
+    {
+      "id": "PeakHill-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "PEAK HILL",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/PeakHill-CONT-AHD_55_2m.zip",
+      "bytes": 50797794,
+      "etag": "\"932d217b2cd5bfb3811281fcec2e5211\"",
+      "bounds": [
+        148.00000609100005,
+        -32.99998727999997,
+        148.50000621700008,
+        -32.49998727199994
+      ]
+    },
+    {
+      "id": "Penrith-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "PENRITH",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Penrith-CONT-AHD_56_2m.zip",
+      "bytes": 216456855,
+      "etag": "\"1650b17f6372100352c5af7447d3abae-4\"",
+      "bounds": [
+        150.50000545400007,
+        -33.999987130999955,
+        151.00000537800008,
+        -33.49998707299994
+      ]
+    },
+    {
+      "id": "Pilliga-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "PILLIGA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Pilliga-CONT-AHD_55_2m.zip",
+      "bytes": 13507163,
+      "etag": "\"7c88c6db628d385120ec1449ea98b437\"",
+      "bounds": [
+        148.5000061280001,
+        -30.499987406999935,
+        149.00000588900002,
+        -29.999987095999984
+      ]
+    },
+    {
+      "id": "Pooncarie-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "POONCARIE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Pooncarie-CONT-AHD_54_2m.zip",
+      "bytes": 27104725,
+      "etag": "\"b5c70c407b16fe7c493df072044f046e\"",
+      "bounds": [
+        142.50000688000011,
+        -33.49998673199997,
+        143.0000069680001,
+        -32.99998667799997
+      ]
+    },
+    {
+      "id": "Popiltah-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "POPILTAH",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Popiltah-CONT-AHD_54_2m.zip",
+      "bytes": 22699388,
+      "etag": "\"655967aa6e21a393c2afa1c536e37c2a\"",
+      "bounds": [
+        141.50000616400007,
+        -33.49998653999995,
+        142.0000066550001,
+        -32.99998638799997
+      ]
+    },
+    {
+      "id": "PortHacking-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "PORT HACKING",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/PortHacking-CONT-AHD_56_2m.zip",
+      "bytes": 22985106,
+      "etag": "\"6a51bc0d5c5516f13c971c83780b5296\"",
+      "bounds": [
+        151.0000053020001,
+        -34.49998736999993,
+        151.50000560900003,
+        -33.999986984999964
+      ]
+    },
+    {
+      "id": "PortStephens-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "PORT STEPHENS",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/PortStephens-CONT-AHD_56_2m.zip",
+      "bytes": 26298171,
+      "etag": "\"ea8579abbc77a8c2c8972bdb897a6690\"",
+      "bounds": [
+        152.0000045800001,
+        -32.99998759399995,
+        152.50000534200012,
+        -32.49998658399994
+      ]
+    },
+    {
+      "id": "Quambone-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "QUAMBONE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Quambone-CONT-AHD_55_2m.zip",
+      "bytes": 11493268,
+      "etag": "\"1a497d4785cd54a2dc0cad7b6b0ee405\"",
+      "bounds": [
+        147.50000649800006,
+        -30.999987291999958,
+        148.00000653000006,
+        -30.49998721999998
+      ]
+    },
+    {
+      "id": "RankinsSprings-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "RANKINS SPRINGS",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/RankinsSprings-CONT-AHD_55_2m.zip",
+      "bytes": 35477363,
+      "etag": "\"e0c81ccd13ba71a619162c34266f43dd\"",
+      "bounds": [
+        146.0000055270001,
+        -33.999987156999964,
+        146.50000612300005,
+        -33.49998684499997
+      ]
+    },
+    {
+      "id": "Redan-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "REDAN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Redan-CONT-AHD_54_2m.zip",
+      "bytes": 19722519,
+      "etag": "\"201ec9e6bddbc34ebb56740f25e10286\"",
+      "bounds": [
+        141.50000678800006,
+        -32.49998674999995,
+        142.00000692000003,
+        -31.999986656999965
+      ]
+    },
+    {
+      "id": "Robinvale-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "ROBINVALE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Robinvale-CONT-AHD_54_2m.zip",
+      "bytes": 12894131,
+      "etag": "\"953d25f6a631bb7b2ee68cc38b5b34a7\"",
+      "bounds": [
+        142.50000666000005,
+        -34.99998674099993,
+        143.00000687300007,
+        -34.49998637899995
+      ]
+    },
+    {
+      "id": "Rosewood-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "ROSEWOOD",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Rosewood-CONT-AHD_55_2m.zip",
+      "bytes": 225780159,
+      "etag": "\"3c8ed03e1641f4ba75663729f50c2bdb-4\"",
+      "bounds": [
+        147.50000549100002,
+        -35.99998715899994,
+        148.00000604000002,
+        -35.499986828999965
+      ]
+    },
+    {
+      "id": "Scotia-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "SCOTIA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Scotia-CONT-AHD_54_2m.zip",
+      "bytes": 23685810,
+      "etag": "\"6b3e6d5a4334cac131ed1b6c3f8bd216\"",
+      "bounds": [
+        141.00000710900008,
+        -33.49998660099993,
+        141.50000636700008,
+        -32.99998638799997
+      ]
+    },
+    {
+      "id": "Smithville-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "SMITHVILLE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Smithville-CONT-AHD_54_2m.zip",
+      "bytes": 41062069,
+      "etag": "\"9c9b1e61a697e60f253a043d9bfc8b3c\"",
+      "bounds": [
+        141.00000728600003,
+        -30.49998665399994,
+        141.50000726000007,
+        -29.99998659399995
+      ]
+    },
+    {
+      "id": "StAlbans-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "ST ALBANS",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/StAlbans-CONT-AHD_56_2m.zip",
+      "bytes": 452267894,
+      "etag": "\"4a8741846896088274aed504b2360f2e-7\"",
+      "bounds": [
+        150.5000053110001,
+        -33.499987164999936,
+        151.000005331,
+        -32.999987587999954
+      ]
+    },
+    {
+      "id": "Stanthorpe-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "STANTHORPE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Stanthorpe-CONT-AHD_56_2m.zip",
+      "bytes": 104974820,
+      "etag": "\"e2f69c329c467a075f8bdbe0a7614c59-2\"",
+      "bounds": [
+        151.50000605800005,
+        -28.99998722299995,
+        152.00000604600007,
+        -28.499987277999935
+      ]
+    },
+    {
+      "id": "Sussex-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "SUSSEX",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Sussex-CONT-AHD_55_2m.zip",
+      "bytes": 25469437,
+      "etag": "\"f377b2440276aace99533a6d67c638cc\"",
+      "bounds": [
+        146.00000647800005,
+        -31.499987032999968,
+        146.50000671500004,
+        -30.999986889999946
+      ]
+    },
+    {
+      "id": "SwanHill-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "SWAN HILL",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/SwanHill-CONT-AHD_54_2m.zip",
+      "bytes": 28462952,
+      "etag": "\"ef620ab27a1f2fb66219c31b2d8e7b05\"",
+      "bounds": [
+        143.50000641400004,
+        -35.49998707199995,
+        144.00000667900008,
+        -34.999986804999935
+      ]
+    },
+    {
+      "id": "Sydney-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "SYDNEY",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Sydney-CONT-AHD_56_2m.zip",
+      "bytes": 128511937,
+      "etag": "\"79995482827aa435ccb071217b829723-2\"",
+      "bounds": [
+        151.000005331,
+        -33.99998715399994,
+        151.50000563600008,
+        -33.49998714299994
+      ]
+    },
+    {
+      "id": "Tallangatta-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "TALLANGATTA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Tallangatta-CONT-AHD_55_2m.zip",
+      "bytes": 15074800,
+      "etag": "\"c21076018c398ce36567d4fa32bf3643\"",
+      "bounds": [
+        147.00000570500004,
+        -36.49998708199996,
+        147.50000562800005,
+        -35.99998715899994
+      ]
+    },
+    {
+      "id": "Taltingan-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "TALTINGAN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Taltingan-CONT-AHD_54_2m.zip",
+      "bytes": 46364226,
+      "etag": "\"5ac26a478f10e5c9a1c28ac3c38ee236\"",
+      "bounds": [
+        141.50000670600002,
+        -31.99998674099993,
+        142.00000692000003,
+        -31.499986732999957
+      ]
+    },
+    {
+      "id": "Talyealye-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "TALYEALYE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Talyealye-CONT-AHD_55_2m.zip",
+      "bytes": 12167493,
+      "etag": "\"7c4ec306cb811653e3de3286f0fb8067\"",
+      "bounds": [
+        144.00000680300002,
+        -29.499986582999952,
+        144.50000683100006,
+        -28.99998673799996
+      ]
+    },
+    {
+      "id": "TambarSprings-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "TAMBAR SPRINGS",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/TambarSprings-CONT-AHD_55_2m.zip",
+      "bytes": 58745996,
+      "etag": "\"aae8379ffb0dc03cc09a995b58b1c567\"",
+      "bounds": [
+        149.50000617000012,
+        -31.499987218999934,
+        150.0000062590001,
+        -30.99998721999998
+      ]
+    },
+    {
+      "id": "Tamworth-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "TAMWORTH",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Tamworth-CONT-AHD_56_2m.zip",
+      "bytes": 110119123,
+      "etag": "\"6009a4de1895da6f5b847c0dd5830edb-2\"",
+      "bounds": [
+        150.5000057530001,
+        -31.49998762599995,
+        151.0000057740001,
+        -30.99998726499996
+      ]
+    },
+    {
+      "id": "Tantangara-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "TANTANGARA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Tantangara-CONT-AHD_55_2m.zip",
+      "bytes": 245947152,
+      "etag": "\"891255ff667437db5724ecda993cf91e-4\"",
+      "bounds": [
+        148.5000051820001,
+        -35.999987259999955,
+        149.0000055710001,
+        -35.49998709799996
+      ]
+    },
+    {
+      "id": "Taralga-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "TARALGA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Taralga-CONT-AHD_55_2m.zip",
+      "bytes": 258948662,
+      "etag": "\"c6aa57ecfe92a028c26b74c1ffa87974-4\"",
+      "bounds": [
+        149.50000579400012,
+        -34.49998762499996,
+        150.00000564100003,
+        -33.999986235999984
+      ]
+    },
+    {
+      "id": "Tarcutta-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "TARCUTTA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Tarcutta-CONT-AHD_55_2m.zip",
+      "bytes": 159125318,
+      "etag": "\"e6e501760fd4eeb723d6338140287873-3\"",
+      "bounds": [
+        147.500005686,
+        -35.49998707599997,
+        148.00000685400005,
+        -34.99998720899998
+      ]
+    },
+    {
+      "id": "Teilta-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "TEILTA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Teilta-CONT-AHD_54_2m.zip",
+      "bytes": 36903948,
+      "etag": "\"27903e68e32022774312cea632c88bd9\"",
+      "bounds": [
+        141.00000723800008,
+        -30.99998655199994,
+        141.50000726000007,
+        -30.49998656899993
+      ]
+    },
+    {
+      "id": "Temora-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "TEMORA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Temora-CONT-AHD_55_2m.zip",
+      "bytes": 24949081,
+      "etag": "\"5643c69c8eb3db33c2494c21020431ba\"",
+      "bounds": [
+        147.50000598300005,
+        -34.49998711599994,
+        148.0000067740001,
+        -33.99998710099993
+      ]
+    },
+    {
+      "id": "Tenandra-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "TENANDRA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Tenandra-CONT-AHD_55_2m.zip",
+      "bytes": 54990176,
+      "etag": "\"6730f9211c5087daa8b8c9e230549199\"",
+      "bounds": [
+        148.5000061390001,
+        -31.499987586999964,
+        149.00000627600002,
+        -30.99998723899995
+      ]
+    },
+    {
+      "id": "Tenterfield-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "TENTERFIELD",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Tenterfield-CONT-AHD_56_2m.zip",
+      "bytes": 413057929,
+      "etag": "\"9f4c9871bafbdfcddf0155637403b5c7-7\"",
+      "bounds": [
+        152.00000558800002,
+        -29.49998736499998,
+        152.50000551800008,
+        -28.999986944999932
+      ]
+    },
+    {
+      "id": "Teryawynia-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "TERYAWYNIA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Teryawynia-CONT-AHD_54_2m.zip",
+      "bytes": 20013971,
+      "etag": "\"08710c6a34c3d92d157bdbc515067145\"",
+      "bounds": [
+        143.0000068610001,
+        -32.499986717999946,
+        143.50000672700003,
+        -31.99998669599995
+      ]
+    },
+    {
+      "id": "Texas-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "TEXAS",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Texas-CONT-AHD_56_2m.zip",
+      "bytes": 53841494,
+      "etag": "\"92283ab5aa39f5fdf758b6bb2877f67e\"",
+      "bounds": [
+        151.00000596200005,
+        -28.99998749599996,
+        151.50000618700005,
+        -28.499987230999977
+      ]
+    },
+    {
+      "id": "Thackaringa-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "THACKARINGA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Thackaringa-CONT-AHD_54_2m.zip",
+      "bytes": 28628945,
+      "etag": "\"010d2f56956736cfd56fa6dd211eabf3\"",
+      "bounds": [
+        141.0000070630001,
+        -32.499986657999955,
+        141.50000701600004,
+        -31.999986529999944
+      ]
+    },
+    {
+      "id": "Thallon-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "THALLON",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Thallon-CONT-AHD_55_2m.zip",
+      "bytes": 827582,
+      "etag": "\"16f43a2e03d765fb30270bad1df21797\"",
+      "bounds": [
+        148.50000626200006,
+        -28.99998715399994,
+        149.00000633600007,
+        -28.499987012999952
+      ]
+    },
+    {
+      "id": "TheMeadows-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "THE MEADOWS",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/TheMeadows-CONT-AHD_55_2m.zip",
+      "bytes": 18634731,
+      "etag": "\"b78b1a3fc49074230b098d2e43f0ddeb\"",
+      "bounds": [
+        145.00000676700006,
+        -31.99998676599995,
+        145.50000669400004,
+        -31.499986944999932
+      ]
+    },
+    {
+      "id": "Thoolabool-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "THOOLABOOL",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Thoolabool-CONT-AHD_55_2m.zip",
+      "bytes": 21829644,
+      "etag": "\"cecc9802fd5fec8a12756c48652a95bf\"",
+      "bounds": [
+        144.0000062460001,
+        -30.999987009999984,
+        144.50000639600012,
+        -30.49998650799995
+      ]
+    },
+    {
+      "id": "ThurlooDowns-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "THURLOO DOWNS",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/ThurlooDowns-CONT-AHD_54_2m.zip",
+      "bytes": 26371170,
+      "etag": "\"74e62e9cd5c9e8ecf8b6068ec2f90442\"",
+      "bounds": [
+        143.0000069470001,
+        -29.499986685999943,
+        143.50000675,
+        -28.99998673899995
+      ]
+    },
+    {
+      "id": "Tibooburra-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "TIBOOBURRA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Tibooburra-CONT-AHD_54_2m.zip",
+      "bytes": 31227337,
+      "etag": "\"9a200c0074db0e3fe1a828545ee4cc30\"",
+      "bounds": [
+        142.00000692600008,
+        -29.49998660999995,
+        142.5000070200001,
+        -28.99998646299997
+      ]
+    },
+    {
+      "id": "Tinchelooka-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "TINCHELOOKA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Tinchelooka-CONT-AHD_55_2m.zip",
+      "bytes": 17202100,
+      "etag": "\"b2eb734d8fd2910ac7d76676c4d84562\"",
+      "bounds": [
+        144.50000647500008,
+        -29.99998668099994,
+        145.0000064190001,
+        -29.49998656899993
+      ]
+    },
+    {
+      "id": "Tongo-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "TONGO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Tongo-CONT-AHD_54_2m.zip",
+      "bytes": 20849670,
+      "etag": "\"3adead9546eb1e66c1d2327b7474f554\"",
+      "bounds": [
+        143.50000661100012,
+        -30.49998666199997,
+        144.00000656100008,
+        -29.999986355999965
+      ]
+    },
+    {
+      "id": "Tongowoko-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "TONGOWOKO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Tongowoko-CONT-AHD_54_2m.zip",
+      "bytes": 24580512,
+      "etag": "\"a7e8ea27e2b2982cc5caefd9d2e18dd0\"",
+      "bounds": [
+        142.50000698300005,
+        -29.499986685999943,
+        143.00000709100004,
+        -28.999986718999935
+      ]
+    },
+    {
+      "id": "Toorale-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "TOORALE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Toorale-CONT-AHD_55_2m.zip",
+      "bytes": 14717805,
+      "etag": "\"e11977f7794c650f7fc92fb826717f1d\"",
+      "bounds": [
+        145.0000063770001,
+        -30.49998713699995,
+        145.5000070740001,
+        -29.99998668099994
+      ]
+    },
+    {
+      "id": "Topar-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "TOPAR",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Topar-CONT-AHD_54_2m.zip",
+      "bytes": 25633505,
+      "etag": "\"b927fabe7a303e9718618d2a483b9b15\"",
+      "bounds": [
+        142.00000691600007,
+        -31.99998674099993,
+        142.50000684000008,
+        -31.499986757999977
+      ]
+    },
+    {
+      "id": "Tottenham-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "TOTTENHAM",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Tottenham-CONT-AHD_55_2m.zip",
+      "bytes": 15580473,
+      "etag": "\"845186532adddea9107a9ed17dad1363\"",
+      "bounds": [
+        147.00000623800008,
+        -32.499987860999966,
+        147.5000065900001,
+        -31.999987034999947
+      ]
+    },
+    {
+      "id": "Tullamore-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "TULLAMORE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Tullamore-CONT-AHD_55_2m.zip",
+      "bytes": 19124162,
+      "etag": "\"32c774118c90ba93c5df48d11d9e15b6\"",
+      "bounds": [
+        147.500006223,
+        -32.99998727999997,
+        148.00000658500005,
+        -32.499987121999936
+      ]
+    },
+    {
+      "id": "Tullibigeal-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "TULLIBIGEAL",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Tullibigeal-CONT-AHD_55_2m.zip",
+      "bytes": 19560524,
+      "etag": "\"7b9943a1caefd6f0efbf343e7832a7d7\"",
+      "bounds": [
+        146.50000612300005,
+        -33.49998698099995,
+        147.00000639100006,
+        -32.99998691999997
+      ]
+    },
+    {
+      "id": "Tumut-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "TUMUT",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Tumut-CONT-AHD_55_2m.zip",
+      "bytes": 248839003,
+      "etag": "\"286513ba02658cc865e434210e73fb39-4\"",
+      "bounds": [
+        148.00000604000002,
+        -35.49998729699996,
+        148.50000596200005,
+        -34.99998720899998
+      ]
+    },
+    {
+      "id": "Tuppal-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "TUPPAL",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Tuppal-CONT-AHD_55_2m.zip",
+      "bytes": 18847152,
+      "etag": "\"d7ec622adb8d429febf516c4735da5e8\"",
+      "bounds": [
+        145.00000635900005,
+        -35.99998675299997,
+        145.500006094,
+        -35.49998667799997
+      ]
+    },
+    {
+      "id": "Turlee-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "TURLEE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Turlee-CONT-AHD_54_2m.zip",
+      "bytes": 22583565,
+      "etag": "\"d0fae8f9689ddee97c90d100fa3833e3\"",
+      "bounds": [
+        143.00000667900008,
+        -33.99998687699997,
+        143.50000692000003,
+        -33.49998673199997
+      ]
+    },
+    {
+      "id": "TweedHeads-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "TWEED HEADS",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/TweedHeads-CONT-AHD_56_2m.zip",
+      "bytes": 13931964,
+      "etag": "\"9edbac70feba19c553bb66cee5a6614e\"",
+      "bounds": [
+        153.50000534100002,
+        -28.49998762599995,
+        154.00000585100008,
+        -27.99998753699998
+      ]
+    },
+    {
+      "id": "Ulladulla-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "ULLADULLA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Ulladulla-CONT-AHD_56_2m.zip",
+      "bytes": 320749948,
+      "etag": "\"77bd6a9ceb6e649ccd6a7c575bff479d-5\"",
+      "bounds": [
+        150.00000503100011,
+        -35.49998763399998,
+        150.500005191,
+        -34.99998731299996
+      ]
+    },
+    {
+      "id": "Ungarie-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "UNGARIE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Ungarie-CONT-AHD_55_2m.zip",
+      "bytes": 23692050,
+      "etag": "\"01ca9d06acb0709c8e3381dfa4d1348c\"",
+      "bounds": [
+        146.50000586700003,
+        -33.99998703199998,
+        147.00000639100006,
+        -33.49998684499997
+      ]
+    },
+    {
+      "id": "UpperManning-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "UPPER MANNING",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/UpperManning-CONT-AHD_56_2m.zip",
+      "bytes": 456872427,
+      "etag": "\"dcb7dcd2ddcbc146395efff8a72ba611-7\"",
+      "bounds": [
+        151.50000536000005,
+        -31.99998782299997,
+        152.00000561000002,
+        -31.499987328999964
+      ]
+    },
+    {
+      "id": "Urana-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "URANA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Urana-CONT-AHD_55_2m.zip",
+      "bytes": 13114577,
+      "etag": "\"6dc886e3455cf81b76290b2ec38ddc33\"",
+      "bounds": [
+        146.0000059250001,
+        -35.49998718899997,
+        146.5000064940001,
+        -34.99998701699997
+      ]
+    },
+    {
+      "id": "Urella-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "URELLA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Urella-CONT-AHD_54_2m.zip",
+      "bytes": 18990013,
+      "etag": "\"659f9db1d39f72573d36098385612869\"",
+      "bounds": [
+        143.0000066660001,
+        -29.999986367999952,
+        143.50000675,
+        -29.499986600999932
+      ]
+    },
+    {
+      "id": "Urisino-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "URISINO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Urisino-CONT-AHD_54_2m.zip",
+      "bytes": 13259037,
+      "etag": "\"1dbf46c251ed4d9911bbe1f1ca288e2b\"",
+      "bounds": [
+        143.50000661100012,
+        -29.99998685299994,
+        144.00000672200008,
+        -29.499986582999952
+      ]
+    },
+    {
+      "id": "UtahLake-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "UTAH LAKE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/UtahLake-CONT-AHD_55_2m.zip",
+      "bytes": 15814860,
+      "etag": "\"acadd2eccb07c212616227e850d6ed02\"",
+      "bounds": [
+        144.5000061930001,
+        -30.499986693999972,
+        145.0000064190001,
+        -29.99998659499994
+      ]
+    },
+    {
+      "id": "WaggaWagga-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "WAGGA WAGGA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/WaggaWagga-CONT-AHD_55_2m.zip",
+      "bytes": 57299614,
+      "etag": "\"4ca103308f4ddfb3f46217382727e571\"",
+      "bounds": [
+        147.00000571500004,
+        -35.49998695099998,
+        147.50000612500003,
+        -34.99998720899998
+      ]
+    },
+    {
+      "id": "Walbundrie-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "WALBUNDRIE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Walbundrie-CONT-AHD_55_2m.zip",
+      "bytes": 33573282,
+      "etag": "\"f39dd74b90a13c54e5c417da3efb2fa6\"",
+      "bounds": [
+        146.50000590900004,
+        -35.99998733499996,
+        147.00000571500004,
+        -35.49998695099998
+      ]
+    },
+    {
+      "id": "Walgett-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "WALGETT",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Walgett-CONT-AHD_55_2m.zip",
+      "bytes": 12675985,
+      "etag": "\"ed16682d62bf997c597c315fd9a8e0c6\"",
+      "bounds": [
+        148.00000632500007,
+        -30.499987389999944,
+        148.50000614300006,
+        -29.99998709199997
+      ]
+    },
+    {
+      "id": "Wallerawang-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "WALLERAWANG",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Wallerawang-CONT-AHD_56_2m.zip",
+      "bytes": 463250511,
+      "etag": "\"fda4b20eddd057041495a82f41e028fa-7\"",
+      "bounds": [
+        150.00000539200005,
+        -33.49998735499997,
+        150.500005718,
+        -32.999987533999956
+      ]
+    },
+    {
+      "id": "Wanaaring-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "WANAARING",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Wanaaring-CONT-AHD_55_2m.zip",
+      "bytes": 17789927,
+      "etag": "\"e554e6beca16b6ecd711120d9c2154fe\"",
+      "bounds": [
+        144.00000664200002,
+        -29.999986847999935,
+        144.50000683100006,
+        -29.49998656899993
+      ]
+    },
+    {
+      "id": "Wanganella-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "WANGANELLA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Wanganella-CONT-AHD_55_2m.zip",
+      "bytes": 17219420,
+      "etag": "\"ccdac7e989a98ca67363514418dbdb80\"",
+      "bounds": [
+        144.50000624900008,
+        -35.49998683499996,
+        145.0000065060001,
+        -34.99998681899996
+      ]
+    },
+    {
+      "id": "Wangaratta-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "WANGARATTA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Wangaratta-CONT-AHD_55_2m.zip",
+      "bytes": 2158074,
+      "etag": "\"6b8c97d858bcaa29c42e70d175a883c2\"",
+      "bounds": [
+        146.0000059790001,
+        -36.499986984999964,
+        146.50000590900004,
+        -35.99998692899993
+      ]
+    },
+    {
+      "id": "Warraweena-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "WARRAWEENA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Warraweena-CONT-AHD_55_2m.zip",
+      "bytes": 11690534,
+      "etag": "\"6bdc133b59031f8dfb8ea94e6f45f86c\"",
+      "bounds": [
+        146.00000651800008,
+        -29.99998689499995,
+        146.50000655000008,
+        -29.499986822999972
+      ]
+    },
+    {
+      "id": "Warren-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "WARREN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Warren-CONT-AHD_55_2m.zip",
+      "bytes": 13172425,
+      "etag": "\"ee3931ae023f9b567faac01138dd4d68\"",
+      "bounds": [
+        147.5000065900001,
+        -31.999987243999954,
+        148.00000659400007,
+        -31.49998728299994
+      ]
+    },
+    {
+      "id": "Warwick-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "WARWICK",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Warwick-CONT-AHD_56_2m.zip",
+      "bytes": 61398290,
+      "etag": "\"a4412fad7e5ddd8fa5e9fef1446816c0\"",
+      "bounds": [
+        152.00000604600007,
+        -28.49998732599994,
+        152.50000599800012,
+        -27.99998739299997
+      ]
+    },
+    {
+      "id": "WeeWaa-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "WEE WAA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/WeeWaa-CONT-AHD_55_2m.zip",
+      "bytes": 15703191,
+      "etag": "\"9e2a60410c407c1e59ad41a42494d3ae\"",
+      "bounds": [
+        149.00000586300007,
+        -30.49998744399994,
+        149.50000611400003,
+        -29.999987247999968
+      ]
+    },
+    {
+      "id": "Weilmoringle-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "WEILMORINGLE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Weilmoringle-CONT-AHD_55_2m.zip",
+      "bytes": 8404002,
+      "etag": "\"e1edd5e3ea5d1239c454d31eee5054b2\"",
+      "bounds": [
+        146.50000650700008,
+        -29.499986880999984,
+        147.00000642100008,
+        -28.999986943999943
+      ]
+    },
+    {
+      "id": "Weimby-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "WEIMBY",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Weimby-CONT-AHD_54_2m.zip",
+      "bytes": 21952773,
+      "etag": "\"4635e98403f010df674b50df1ea2d95c\"",
+      "bounds": [
+        143.00000656300006,
+        -34.999987086999965,
+        143.50000661900003,
+        -34.49998637899995
+      ]
+    },
+    {
+      "id": "Wellington-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "WELLINGTON",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Wellington-CONT-AHD_55_2m.zip",
+      "bytes": 98176833,
+      "etag": "\"edc95b941cd0d0782b08f5c4a57e0160-2\"",
+      "bounds": [
+        148.50000600700002,
+        -32.99998718499995,
+        149.0000061940001,
+        -32.499987085999976
+      ]
+    },
+    {
+      "id": "Wentworth-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "WENTWORTH",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Wentworth-CONT-AHD_54_2m.zip",
+      "bytes": 10792771,
+      "etag": "\"b54a3f1fc3f71fb9e862f3afbfeec9dd\"",
+      "bounds": [
+        141.50000685100008,
+        -34.499986554999964,
+        142.00000688800003,
+        -33.999986596999975
+      ]
+    },
+    {
+      "id": "WhiteCliffs-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "WHITE CLIFFS",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/WhiteCliffs-CONT-AHD_54_2m.zip",
+      "bytes": 31277022,
+      "etag": "\"97bc488852ca1c7553e2349376851c28\"",
+      "bounds": [
+        143.00000672800002,
+        -30.99998679199996,
+        143.5000067320001,
+        -30.49998650799995
+      ]
+    },
+    {
+      "id": "Wilcannia-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "WILCANNIA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Wilcannia-CONT-AHD_54_2m.zip",
+      "bytes": 18881054,
+      "etag": "\"fb95cf0e8cd2c7759c7aeb8815f9128f\"",
+      "bounds": [
+        143.00000657100009,
+        -31.999986828999965,
+        143.50000672700003,
+        -31.499986921999948
+      ]
+    },
+    {
+      "id": "WildDog-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "WILD DOG",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/WildDog-CONT-AHD_54_2m.zip",
+      "bytes": 16413729,
+      "etag": "\"445b9ddbc804152e176d8486a6d583e0\"",
+      "bounds": [
+        142.50000690900004,
+        -34.49998654799998,
+        143.00000687300007,
+        -33.99998658599998
+      ]
+    },
+    {
+      "id": "Willandra-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "WILLANDRA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Willandra-CONT-AHD_55_2m.zip",
+      "bytes": 10678530,
+      "etag": "\"2d8d1ff40aa6e79d7eda68dd41aafbdb\"",
+      "bounds": [
+        145.00000688400007,
+        -33.49998706599996,
+        145.50000661500007,
+        -32.99998675299997
+      ]
+    },
+    {
+      "id": "Winbar-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "WINBAR",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Winbar-CONT-AHD_55_2m.zip",
+      "bytes": 17664392,
+      "etag": "\"072e7b989e2dec72d3d067707fae5c13\"",
+      "bounds": [
+        144.5000061930001,
+        -30.999987009999984,
+        145.00000686600004,
+        -30.49998650799995
+      ]
+    },
+    {
+      "id": "Wingham-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "WINGHAM",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Wingham-CONT-AHD_56_2m.zip",
+      "bytes": 381646065,
+      "etag": "\"82518c61bf3228dcfd16b44bf29ce66e-6\"",
+      "bounds": [
+        152.00000485500004,
+        -31.999987558999976,
+        152.50000462100002,
+        -31.499987328999964
+      ]
+    },
+    {
+      "id": "Wollongong-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "WOLLONGONG",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Wollongong-CONT-AHD_56_2m.zip",
+      "bytes": 199185527,
+      "etag": "\"c2eb3c90a4558952ec1a0a77ac46da5d-3\"",
+      "bounds": [
+        150.50000545400007,
+        -34.499987690999944,
+        151.00000537800008,
+        -33.999986984999964
+      ]
+    },
+    {
+      "id": "Wonnaminta-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "WONNAMINTA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Wonnaminta-CONT-AHD_54_2m.zip",
+      "bytes": 39454848,
+      "etag": "\"edb04e16cf0f44d7613fdead5b300b03\"",
+      "bounds": [
+        142.00000695100005,
+        -30.999986708999984,
+        142.50000685500004,
+        -30.499986649999983
+      ]
+    },
+    {
+      "id": "Woodburn-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "WOODBURN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Woodburn-CONT-AHD_56_2m.zip",
+      "bytes": 53851783,
+      "etag": "\"3078d233ddc7bffdf831711e8aa4d2c3\"",
+      "bounds": [
+        153.00000486900012,
+        -29.499987476999934,
+        153.5000042570001,
+        -28.999986857999943
+      ]
+    },
+    {
+      "id": "Woolakulkra-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "WOOLAKULKRA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Woolakulkra-CONT-AHD_55_2m.zip",
+      "bytes": 18753654,
+      "etag": "\"f10301834bcf8851425222f44025cfc5\"",
+      "bounds": [
+        144.00000647600007,
+        -31.999986750999938,
+        144.5000068170001,
+        -31.49998685299994
+      ]
+    },
+    {
+      "id": "Wrightville-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "WRIGHTVILLE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Wrightville-CONT-AHD_55_2m.zip",
+      "bytes": 21682788,
+      "etag": "\"14d5ecee30eec122d88aeebc96cabd72\"",
+      "bounds": [
+        145.50000645600005,
+        -31.999986700999955,
+        146.00000647800005,
+        -31.499986968999963
+      ]
+    },
+    {
+      "id": "Wyalong-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "WYALONG",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Wyalong-CONT-AHD_55_2m.zip",
+      "bytes": 19519226,
+      "etag": "\"7890ffafc6915a2e5b260402d7a30131\"",
+      "bounds": [
+        147.00000602400007,
+        -33.99998710099993,
+        147.50000640200005,
+        -33.49998698099995
+      ]
+    },
+    {
+      "id": "Yallaroi-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "YALLAROI",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Yallaroi-CONT-AHD_56_2m.zip",
+      "bytes": 101523679,
+      "etag": "\"9417006a415dc09c982b078317d81e18-2\"",
+      "bounds": [
+        150.5000060420001,
+        -29.499987460999932,
+        151.00000596200005,
+        -28.999987371999964
+      ]
+    },
+    {
+      "id": "Yancannia-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "YANCANNIA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Yancannia-CONT-AHD_54_2m.zip",
+      "bytes": 25557013,
+      "etag": "\"4c20cd3f655acbea6a344e9078b128ec\"",
+      "bounds": [
+        142.50000682600012,
+        -30.499986649999983,
+        143.00000672800002,
+        -29.999986367999952
+      ]
+    },
+    {
+      "id": "Yanco-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "YANCO",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Yanco-CONT-AHD_55_2m.zip",
+      "bytes": 16099645,
+      "etag": "\"1b059f6702b5491bf1b4cda3c79cfce8\"",
+      "bounds": [
+        146.0000059250001,
+        -34.99998724499994,
+        146.50000616500006,
+        -34.49998692299994
+      ]
+    },
+    {
+      "id": "Yantabangee-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "YANTABANGEE",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Yantabangee-CONT-AHD_54_2m.zip",
+      "bytes": 28739111,
+      "etag": "\"29450c94646fe6a3131a32b3dbf7cc63\"",
+      "bounds": [
+        143.50000672200008,
+        -30.999986926999952,
+        144.00000647600007,
+        -30.49998650799995
+      ]
+    },
+    {
+      "id": "Yantabulla-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "YANTABULLA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Yantabulla-CONT-AHD_55_2m.zip",
+      "bytes": 12018342,
+      "etag": "\"f76c0342effa84afb1ce216fe59eccd2\"",
+      "bounds": [
+        145.0000059020001,
+        -29.49998699699995,
+        145.50000713100007,
+        -28.999986750999938
+      ]
+    },
+    {
+      "id": "Yantara-CONT-AHD_54_2m",
+      "zone": "54",
+      "name": "YANTARA",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/54/Yantara-CONT-AHD_54_2m.zip",
+      "bytes": 39168023,
+      "etag": "\"c717c347b49e7925dfe5859e78cce060\"",
+      "bounds": [
+        142.00000692600008,
+        -29.999986888999956,
+        142.50000698300005,
+        -29.49998656699995
+      ]
+    },
+    {
+      "id": "Yarrangobilly-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "YARRANGOBILLY",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Yarrangobilly-CONT-AHD_55_2m.zip",
+      "bytes": 292424580,
+      "etag": "\"4eecaf4938c77f99d19d52337e287f4d-5\"",
+      "bounds": [
+        148.00000530500006,
+        -35.999987259999955,
+        148.50000537500011,
+        -35.49998707599997
+      ]
+    },
+    {
+      "id": "Yarrowitch-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "YARROWITCH",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Yarrowitch-CONT-AHD_56_2m.zip",
+      "bytes": 220927842,
+      "etag": "\"7eddc7d6656500c0cf61111297aca6d9-4\"",
+      "bounds": [
+        151.5000055050001,
+        -31.49998769399997,
+        152.00000567900008,
+        -30.999987635999958
+      ]
+    },
+    {
+      "id": "Yass-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "YASS",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Yass-CONT-AHD_55_2m.zip",
+      "bytes": 134838101,
+      "etag": "\"ccdea739b633701f0243121a82c514b0-3\"",
+      "bounds": [
+        148.5000059890001,
+        -34.999987707999935,
+        149.00000599400005,
+        -34.499987422999936
+      ]
+    },
+    {
+      "id": "Yetman-CONT-AHD_56_2m",
+      "zone": "56",
+      "name": "YETMAN",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/56/Yetman-CONT-AHD_56_2m.zip",
+      "bytes": 33878138,
+      "etag": "\"e2f4a56cce05e25d5ca5e16858f7184c\"",
+      "bounds": [
+        150.5000060970001,
+        -28.99998749599996,
+        151.00000616800003,
+        -28.49998718599994
+      ]
+    },
+    {
+      "id": "Young-CONT-AHD_55_2m",
+      "zone": "55",
+      "name": "YOUNG",
+      "url": "https://portal.spatial.nsw.gov.au/download/contours/55/Young-CONT-AHD_55_2m.zip",
+      "bytes": 70952243,
+      "etag": "\"b0aee39923ab87a7609ce49a778882a2-2\"",
+      "bounds": [
+        148.00000655700012,
+        -34.499987422999936,
+        148.500006804,
+        -33.99998738199997
+      ]
+    }
+  ]
+}

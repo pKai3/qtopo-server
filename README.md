@@ -36,6 +36,8 @@ Keep the existing container port **8080**, host port (for example 9878), and hos
 | Optional ownership | `PUID=99`, `PGID=100` (Unraid nobody:users) |
 | Maximum cache size | `CACHE_MAX_GIB=20` |
 | Minimum free disk space | `CACHE_MIN_FREE_GIB=5` |
+| Prepare NSW 2 m contours at boot | `NSW_CONTOURS_ENABLED=1` |
+| Retained NSW contour packages | `NSW_CONTOURS_DIR=/data/contours/nsw` |
 
 Existing `/data/styles/style.json` edits are retained. NSW's style is seeded into `/data/styles/nsw.style.json` on first boot. New caches live in `vector/v2`, `raster/v2`, and `resources/v2`; older cache files are left in place for rollback.
 
@@ -84,14 +86,29 @@ The unqualified `/{z}/{x}/{y}.png` and `/raster/{z}/{x}/{y}.png` URLs follow `DE
 | `/classic/{z}/{x}/{y}.png` | Existing colours, symbols and desktop sizing |
 | `/readable/{z}/{x}/{y}.png` | Revised colours, water masking and icon-label placement, at original desktop size |
 | `/mobile/{z}/{x}/{y}.png` | Mobile sizing (formerly Mobile 3×) |
+| `/nsw-2m/{z}/{x}/{y}.png` | Readable with official NSW 2 m derived contours; available after preparation |
 
 `/mobile-3x/{z}/{x}/{y}.png` remains an alias to Mobile, using the same live style and rendered cache. Mobile 2× and the original enlarged variants are retired from the viewer choices; existing URLs remain compatible. Open `/classic` for the Classic viewer. Readable is the default on `/`.
 
-These names always select the current recipe; no version suffix is required. QLD/NSW selection remains automatic. The PNG dimensions, XYZ geography, source zoom thresholds and upstream features stay the same. Source data, fonts and sprites are shared; prepared styles, rendered tiles and prefetch groups are isolated by profile. Classic retains the previous cache revision exactly. Saved style files are never overwritten. Recipe changes get fresh server cache revisions without clearing any existing cache; Gaia's own saved/offline tiles still require a refresh or download to see changes.
+These names always select the current recipe; no version suffix is required. QLD/NSW selection remains automatic. The PNG dimensions and XYZ geography stay the same. The NSW 2 m profile uses its independent prepared contour source; other profiles retain their existing sources. Source data, fonts and sprites are shared; prepared styles, rendered tiles and prefetch groups are isolated by profile. Classic retains the previous cache revision exactly. Saved style files are never overwritten. Recipe changes get fresh server cache revisions without clearing any existing cache; Gaia's own saved/offline tiles still require a refresh or download to see changes.
 
 Readable and Mobile use softer land/contour colours and stronger text halos. Power lines are thin grey dashes at every display scale. In QLD, opaque water polygons cover waterway skeleton lines inside permanent water bodies while keeping external creek segments and drawing shorelines, roads and bridges above them. QLD point symbols that previously centred icon and text together let their label choose a clear side; the icon remains at its actual location. Existing custom label offsets are respected. NSW uses its own published ordering and collision rules, with larger features and revised water/contour colours. Pre-rendered NSW map sheets cannot be restyled.
 
 Advanced clients can request `/raster/{profile}/{provider}/{z}/{x}/{y}.png` or `/styles/{profile}/{provider}.json`. Legacy provider-specific routes follow the configured default. `/api/providers` lists profiles, aliases, retired-choice visibility and absolute tile templates; `/?profile=mobile&mode=raster` opens the Mobile preview.
+
+### Retained NSW 2 m contours
+
+Startup automatically downloads and prepares the complete official NSW derived contour catalogue in the background. The current catalogue contains **343 sheets and 29.2 GB (27.2 GiB) of compressed source archives**. Allow additional space for prepared per-sheet tiles, the assembled map and temporary processing files. The normal map stays usable throughout preparation. Set `NSW_CONTOURS_ENABLED=0` to disable this feature, including its download.
+
+All source packages and prepared tiles remain under `NSW_CONTOURS_DIR`, normally `/data/contours/nsw` on the persistent data mount. This is retained map data, separate from the disposable **20 GiB cache**. It is never removed by cache expiry, the cache-clearing command or a container restart. Keep this directory outside `vector`, `raster` and `resources`; a separate disk can be mounted here if desired. The importer respects `CACHE_MIN_FREE_GIB` (5 GiB by default) on its own filesystem, reserves working space before preparing a sheet, and waits when space is insufficient. It does not delete source packages to free space.
+
+Interrupted downloads resume with checked byte ranges and pinned source versions. Complete archives receive CRC and SHA-256 checks. Each prepared sheet is saved before moving to the next; a restart reuses completed work. Preparation runs one sheet at a time with two processing threads by default and reduced CPU priority. Temporary network failures or insufficient space retry automatically after 60 seconds. Container logs contain diagnostic details; `/api/contours` and the compact line beneath **Appearance** report public progress.
+
+Once every sheet is prepared, one complete tile set is published atomically and **NSW · 2 m contours** appears in Appearance. Existing map selections stay as they are. Choose it and copy the tile URL for Gaia, or use `/nsw-2m/{z}/{x}/{y}.png`. Explicit requests for that profile return a retryable 503 while it is unavailable. If configured as `DEFAULT_PROFILE`, unqualified URLs use Readable until preparation finishes. Later updates continue serving the previous complete dataset until the replacement is ready.
+
+The profile replaces NSW's original contour strokes and labels while retaining other map detail. QLD retains Readable's appearance. Contour intervals shown are 50 m from zoom 10, 10 m from zoom 12, and 2 m from zoom 15. Prepared vector tiles extend through zoom 16 and retain their detail when zoomed further in, independently of the older NSW basemap's coverage. Both the browser map and native PNG renderer use these same tiles. No source conversion or contour generation runs in a map request.
+
+These are the official **2 m vertical-interval contours**, derived from a 5 m elevation grid with mixed LiDAR and photogrammetric inputs; the interval does not imply a 2 m terrain grid or uniform vertical accuracy. The pinned source catalogue, bounds, sizes, source versions and attribution are in `assets/nsw-contours-catalog.json`. Retained publication manifests record source checksums and the preparation recipe. The Docker image includes GDAL and the checksum-pinned Tippecanoe 2.78.0 toolchain; native development needs `python3`, `ogr2ogr`, `tippecanoe` and `tile-join` on PATH. Changes to the preparation algorithm or pinned tiler must also advance the importer's recipe version.
 
 ### Live profile updates
 
@@ -106,6 +123,8 @@ ssh root@your-server 'docker exec -i qtopo-server-latest node scripts/profiles.j
 Use `docker exec -u <PUID>:<PGID>` when the container runs as a configured Unraid user. The CLI also accepts ordinary file paths and has `list` and `validate` commands. The JSON's `id` determines the URL: keeping `mobile-3x` updates that existing source; changing it to a new name creates another source. Classic is protected from file overrides, and syncing does not change `DEFAULT_PROFILE`.
 
 One file contains both state styles. Sync validates it before installation and keeps the previous file under `/data/styles/history`. Sync a history file to roll back. New requests detect changes within 250 ms; in-flight requests finish with their captured style. Only changed styles get new raster cache identities, and old tiles remain available for rollback. Live profiles use immediate HTTP revalidation, but Gaia's downloaded/offline tiles may still need refreshing in the app. Invalid file edits keep the last valid in-memory profile; always use the CLI to avoid leaving invalid data on disk across a restart.
+
+Exporting `nsw-2m` saves its editable base styles, without generated contour sources or fixed dataset URLs. Keep that profile ID when syncing: the server adds the current completed contour dataset at render time. Export and editing also work before the download finishes.
 
 Live files in `/data/styles` override committed defaults in the image's `styles/` directory. The original provider styles and named profiles share this folder. Upgrading automatically moves files and history from the former `/data/profiles` default, preserving newer files already in `styles/` and archiving conflicting older copies. Explicit custom `PROFILE_DIR` settings are honoured. To include an approved profile in a later release, export it, validate it and commit it as `styles/<id>.json`. Image updates never overwrite live files. To resume following the bundled profile, move the corresponding live JSON out of `/data/styles` after saving a copy.
 
@@ -159,6 +178,10 @@ Additional endpoints:
 | STYLE_PATH | /data/styles/style.json | Editable QLD style |
 | PROFILE_DIR | STYLE_DIR (/data/styles) | Validated live profile JSON files; persistent overrides of bundled profiles |
 | FONT_DIR | Bundled fonts | Local QLD glyph directory |
+| NSW_CONTOURS_ENABLED | 1 | Download and prepare the retained official NSW 2 m catalogue at boot; 0 disables it and its profile |
+| NSW_CONTOURS_DIR | /data/contours/nsw | Persistent source archives and prepared contour tiles, outside the disposable cache directories |
+| NSW_CONTOURS_THREADS | 2 | Background processing threads, 1–8; map sheets are prepared sequentially |
+| NSW_CONTOURS_RETRY_SECONDS | 60 | Retry interval after preparation failure or insufficient free disk space, 5–3600 seconds |
 | DEFAULT_PROFILE | readable | Appearance for unqualified raster/style URLs; a built-in or installed profile name. Named URLs remain independent of this choice. |
 | DEFAULT_PROVIDER | qld | Initial viewer location: qld, nsw, nsw-topo; automatic GPS coverage is always enabled |
 | PUBLIC_URL | Request origin | External origin, e.g. https://maps.example.com, when using an HTTPS reverse proxy |
@@ -279,10 +302,10 @@ MapLibre Native 6.4.1's indirect `minimatch` dependency is overridden to 11.0.9 
 npm ci
 npm test
 npm run build:sprites
-DATA_DIR=/tmp/qtopo node server.js
+NSW_CONTOURS_ENABLED=0 DATA_DIR=/tmp/qtopo node server.js
 ```
 
-Native raster rendering needs the platform's graphics libraries; Linux headless operation uses Xvfb. GitHub Actions builds the amd64 Unraid image, runs native rendering checks against QLD and both NSW services at 256, 512 and 1024 pixels, verifies neighbouring-tile prefetch, and saves sample tiles as the `map-render-checks` artifact. PRs never publish latest or stable.
+Native raster rendering needs the platform's graphics libraries; Linux headless operation uses Xvfb. GitHub Actions builds the amd64 Unraid image, runs native rendering checks against QLD and both NSW services at 256, 512 and 1024 pixels, verifies neighbouring-tile prefetch, and saves sample tiles as the `map-render-checks` artifact. Contour checks use a tiny offline package to verify boot preparation, native output and restart reuse; ordinary smoke containers explicitly disable the statewide download. PRs never publish latest or stable.
 
 The live rendering checks depend on public government services. If an upstream service is down, publishing stops until the checks pass.
 
@@ -291,6 +314,7 @@ The live rendering checks depend on public government services. If an upstream s
 - [Queensland vector service](https://spatial.information.qld.gov.au/arcgis/rest/services/Hosted/Basemaps_QldBase_Topographic/VectorTileServer), © State of Queensland.
 - [NSW vector basemap](https://portal.spatial.nsw.gov.au/vectortileservices/rest/services/Hosted/NSW_BaseMap_VectorTile/VectorTileServer), © State of New South Wales (Spatial Services).
 - [NSW topographic map sheets](https://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Topo_Map/MapServer), © State of New South Wales (Spatial Services).
+- [NSW 2 m derived contour packages](https://portal.spatial.nsw.gov.au/portal/home/item.html?id=437c0697e6524d8ebf10ad0d915bc219), © State of New South Wales, Department of Finance, Services and Innovation; [CC BY 3.0 Australia](https://creativecommons.org/licenses/by/3.0/au/). Geometry is reprojected and tiled for display; source ZIPs are retained unchanged.
 - QLD point symbols use [Maki](https://github.com/mapbox/maki); its license is included with the generated sprites. NSW uses its published symbol atlas and Public Sans glyphs.
 - The complete bundled default QLD glyph stack comes from [MapLibre demotiles](https://github.com/maplibre/demotiles); its source revision and license are included under `assets/fonts`. The original Latin glyph range is retained unchanged, with the remaining Unicode ranges included for expanded render areas.
 

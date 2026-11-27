@@ -5,6 +5,7 @@ export VECTOR_DIR="${VECTOR_DIR:-$DATA_DIR/vector}"
 export RASTER_DIR="${RASTER_DIR:-$DATA_DIR/raster}"
 export STYLE_DIR="${STYLE_DIR:-$DATA_DIR/styles}"
 export PROFILE_DIR="${PROFILE_DIR:-$STYLE_DIR}"
+export NSW_CONTOURS_DIR="${NSW_CONTOURS_DIR:-$DATA_DIR/contours/nsw}"
 # Numeric Unraid users may not have a writable home directory. Share compiled
 # shaders across workers in the mounted data directory instead.
 export MESA_SHADER_CACHE_DIR="${MESA_SHADER_CACHE_DIR:-$DATA_DIR/resources/mesa}"
@@ -12,16 +13,16 @@ umask 0002
 # Unraid normally uses nobody:users (99:100). Ownership changes are opt-in.
 if [[ "$(id -u)" == 0 && -n "${PUID:-}" ]]; then
   [[ "$PUID" =~ ^[0-9]+$ && "$PUID" -gt 0 && "${PGID:-}" =~ ^[0-9]+$ ]] || { echo "PUID and PGID must both be numeric"; exit 2; }
-  for dir in "$DATA_DIR" "$VECTOR_DIR" "$RASTER_DIR" "$STYLE_DIR" "$PROFILE_DIR" "$DATA_DIR/resources" "$MESA_SHADER_CACHE_DIR"; do
+  for dir in "$DATA_DIR" "$VECTOR_DIR" "$RASTER_DIR" "$STYLE_DIR" "$PROFILE_DIR" "$DATA_DIR/resources" "$MESA_SHADER_CACHE_DIR" "$NSW_CONTOURS_DIR"; do
     mkdir -p "$dir"
     chown "$PUID:$PGID" "$dir"
   done
   if [[ "${FIX_PERMISSIONS:-0}" == 1 ]]; then
-    chown -R "$PUID:$PGID" "$DATA_DIR" "$VECTOR_DIR" "$RASTER_DIR" "$STYLE_DIR" "$PROFILE_DIR"
+    chown -R "$PUID:$PGID" "$DATA_DIR" "$VECTOR_DIR" "$RASTER_DIR" "$STYLE_DIR" "$PROFILE_DIR" "$NSW_CONTOURS_DIR"
   fi
   exec gosu "$PUID:$PGID" "$0" "$@"
 fi
-mkdir -p "$VECTOR_DIR" "$RASTER_DIR" "$STYLE_DIR" "$PROFILE_DIR" "$MESA_SHADER_CACHE_DIR"
+mkdir -p "$VECTOR_DIR" "$RASTER_DIR" "$STYLE_DIR" "$PROFILE_DIR" "$MESA_SHADER_CACHE_DIR" "$NSW_CONTOURS_DIR"
 # Workers connect only while rendering. Keep the display alive between jobs so
 # disconnecting the last worker does not reset it and recompile the keyboard map.
 # Let Xvfb select a free display instead of trusting an old :99 socket after a
@@ -30,6 +31,16 @@ display_file=$(mktemp /tmp/qtopo-display.XXXXXX)
 xvfb_pid="" app_pid="" display_failure="" display_dead=0
 cleanup() {
   [[ -z "$app_pid" ]] || kill -TERM "$app_pid" 2>/dev/null || true
+  # Keep PID 1 alive while Node stops the importer and flushes its checkpoints.
+  # Exiting the wrapper immediately would kill the container's remaining jobs.
+  if [[ -n "$app_pid" ]]; then
+    for _ in {1..90}; do
+      kill -0 "$app_pid" 2>/dev/null || break
+      sleep 0.1
+    done
+    kill -KILL "$app_pid" 2>/dev/null || true
+    wait "$app_pid" 2>/dev/null || true
+  fi
   [[ -z "$xvfb_pid" || "$display_dead" == 1 ]] || kill -TERM "$xvfb_pid" 2>/dev/null || true
   rm -f "$display_file" "$display_file.error"
 }

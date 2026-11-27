@@ -1,6 +1,7 @@
 import * as maplibregl from '/vendor/maplibre/maplibre-gl.mjs';
 import { createStateSelector, selectPreview } from './preview.mjs';
 import { attachMapSearch } from './map-search.mjs';
+import { attachContourStatus, addAvailableProfiles } from './contour-status.mjs';
 (async () => {
   const $ = id => document.getElementById(id);
   const params = new URLSearchParams(location.search);
@@ -120,5 +121,9 @@ import { attachMapSearch } from './map-search.mjs';
     });
     await switchStyle();
     if (innerWidth < 600) $('map-controls').open = false;
+    attachContourStatus({ element: $('contour-status'), panel: $('map-controls'),
+      available: catalog.profiles.some(p => p.id === 'nsw-2m'),
+      onProfiles: available => { catalog.profiles = addAvailableProfiles($('profile'), catalog.profiles, available); },
+    });
   } catch (err) { $('status').textContent = err.message; $('status').className = 'error'; }
 })();

@@ -17,7 +17,8 @@ test('profiles validate for both states, preserve Classic and keep independent c
   const cache = createStyleCache(config);
   for (const id of ['qld', 'nsw']) {
     const provider = providers[id], original = await getStyle(config, provider), revisions = new Set(), emptyRevisions = new Set();
-    for (const profile of profiles) {
+    const appearanceProfiles = profiles.filter(profile => profile.id !== 'nsw-2m');
+    for (const profile of appearanceProfiles) {
       const prepared = await cache.get(provider, profile.id);
       assert.equal(prepared, await cache.get(provider, profile.id));
       revisions.add(prepared.revision); emptyRevisions.add(prepared.atZoom(null).revision);
@@ -50,8 +51,8 @@ test('profiles validate for both states, preserve Classic and keep independent c
         if (profile.id === 'classic' || !layer.id.startsWith('powerlines-')) assert.deepEqual(layer.paint?.['line-width'], before.paint?.['line-width'], `${profile.id}/${layer.id}/line-width`);
       }
     }
-    assert.equal(revisions.size, profiles.length);
-    assert.equal(emptyRevisions.size, profiles.length, 'sparse NSW variants remain profile-specific');
+    assert.equal(revisions.size, appearanceProfiles.length);
+    assert.equal(emptyRevisions.size, appearanceProfiles.length, 'sparse NSW variants remain profile-specific');
     assert.deepEqual(await getStyle(config, provider), original, 'persisted styles are never rewritten');
   }
   const original = (await cache.get(providers.qld)).style;
