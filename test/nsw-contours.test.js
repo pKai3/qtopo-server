@@ -32,15 +32,16 @@ async function publication(root, digit = 'a', extra = {}, metadata = {}) {
   return manifest;
 }
 
-async function fixture(t, enabled = true, launch) {
+async function fixture(t, enabled = true, launch, dependencies = {}) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-contour-store-'));
   const root = path.join(dir, 'contours');
   const config = { dataDir: dir, root: path.resolve(__dirname, '..'), nswContoursDir: root,
     nswContoursEnabled: enabled, nswContoursThreads: 2, nswContoursRetryMs: 60_000,
     nswContoursCatalog: path.join(dir, 'catalog.json'), cacheMinFreeBytes: 0 };
   let launches = 0;
-  const warnings = [];
-  const store = createNswContours(config, { warn: (...args) => warnings.push(args) }, {
+  const warnings = [], logs = [];
+  const store = createNswContours(config, { warn: (...args) => warnings.push(args), log: (...args) => logs.push(args) }, {
+    ...dependencies,
     spawn(...args) { launches++; if (launch) return launch(...args); throw new Error('A read-only fixture must not launch an importer'); },
   });
   t.after(async () => { await store.close(); await fs.rm(dir, { recursive: true, force: true }); });
@@ -48,7 +49,7 @@ async function fixture(t, enabled = true, launch) {
     await fs.writeFile(path.join(root, 'current.json'), JSON.stringify(manifest));
     await store.refresh(true);
   }
-  return { dir, root, config, store, publish, warnings, launches: () => launches };
+  return { dir, root, config, store, publish, warnings, logs, launches: () => launches };
 }
 
 async function until(predicate) {
@@ -224,6 +225,53 @@ test('a failed importer launch schedules another attempt without requiring the r
   await until(() => f.launches() === 2);
   assert.doesNotMatch(JSON.stringify(f.store.status()), /temporary process launch failure/);
   await f.store.close();
+});
+
+test('background preparation logs stage changes and periodic progress without flooding logs or leaking raw status', async t => {
+  let clock = 1_000_000, child;
+  const f = await fixture(t, true, () => {
+    child = new EventEmitter();
+    child.kill = () => { child.emit('exit', 0); return true; };
+    return child;
+  }, { now: () => clock });
+  await fs.mkdir(f.root, { recursive: true });
+  await fs.writeFile(f.config.nswContoursCatalog, JSON.stringify({ sheets: [{ bytes: 2e9 }] }));
+  const progress = { phase: 'downloading', totalSheets: 1, completedSheets: 0,
+    downloadedBytes: 1e9, totalBytes: 2e9, currentSheet: 'Katoomba', message: '/private/secret' };
+  const save = () => fs.writeFile(path.join(f.root, 'status.json'), JSON.stringify(progress));
+  const lines = () => f.logs.filter(([, message]) => message.startsWith('NSW 2 m:')).map(([, message]) => message);
+  await save();
+  await f.store.refresh(true);
+  assert.equal(lines().length, 0, 'read-only inspection must not start progress logging');
+  await f.store.start();
+  assert.match(lines()[0], /downloading; 0\/1 sheets prepared; 1\.00\/2\.00 GB downloaded; sheet Katoomba/);
+  progress.downloadedBytes = 1.5e9;
+  await save();
+  clock += 29_999;
+  await f.store.refresh(true);
+  assert.equal(lines().length, 1, 'byte updates must not produce a log for every status poll');
+  clock += 1;
+  await f.store.refresh(true);
+  assert.match(lines()[1], /1\.50\/2\.00 GB downloaded; sheet Katoomba; 0m 30s since start/);
+  Object.assign(progress, { phase: 'preparing', featuresPrepared: 1234 });
+  await save();
+  await f.store.refresh(true);
+  assert.match(lines()[2], /preparing.*1234 contour lines read/);
+  clock += 30_000;
+  await f.store.refresh(true);
+  assert.equal(lines().length, 4, 'long-running tile assembly must still emit a heartbeat when the status file is unchanged');
+  assert.doesNotMatch(lines().join('\n'), /private|secret/);
+  Object.assign(progress, { phase: 'ready', completedSheets: 1, currentSheet: null });
+  await save();
+  await f.publish(await publication(f.root));
+  child.emit('exit', 0);
+  await until(() => f.store.status().phase === 'ready');
+  await f.store.refresh(true);
+  const readyCount = lines().length;
+  assert.match(lines().at(-1), /ready; 1\/1 sheets prepared/);
+  clock += 60_000;
+  await f.store.refresh(true);
+  assert.equal(lines().length, readyCount, 'completed preparation must not keep generating heartbeat logs');
 });
 
 test('publication validation rejects unsafe paths, mismatched revisions and invalid geographic extents', () => {
