@@ -16,6 +16,17 @@
       <summary><strong>QTopo</strong><span>Queensland & New South Wales · <b id="mode-label">Vector</b></span></summary>
       <div class="controls">
         <p class="hint">One tile source for Gaia and other GPS apps. QLD and NSW maps are selected automatically by location.</p>
+        <form id="map-search" role="search">
+          <label for="map-search-input">Find a place or coordinates</label>
+          <div class="map-search-fields">
+            <input id="map-search-input" type="search" placeholder="Place or latitude, longitude" maxlength="160" autocomplete="off" spellcheck="false" required>
+            <button type="submit">Find</button>
+          </div>
+          <ol id="map-search-results" aria-label="Place search results" hidden></ol>
+          <p id="map-search-message" class="hint" role="status" aria-live="polite" hidden></p>
+          <button id="map-search-clear" type="button" hidden>Clear pin</button>
+          <p class="map-search-credit">Place search: <a href="https://photon.komoot.io/" target="_blank" rel="noopener noreferrer">Photon</a> · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a></p>
+        </form>
         <label for="mode">Map view</label>
         <select id="mode"><option value="vector">Vector · interactive map</option><option value="raster">Raster · GPS preview</option></select>
         <label for="profile">Appearance</label><select id="profile" aria-label="Map appearance"></select>

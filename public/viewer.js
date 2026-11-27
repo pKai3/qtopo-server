@@ -1,5 +1,6 @@
 import * as maplibregl from '/vendor/maplibre/maplibre-gl.mjs';
 import { createStateSelector, selectPreview } from './preview.mjs';
+import { attachMapSearch } from './map-search.mjs';
 (async () => {
   const $ = id => document.getElementById(id);
   const params = new URLSearchParams(location.search);
@@ -39,6 +40,7 @@ import { createStateSelector, selectPreview } from './preview.mjs';
     map.addControl(new maplibregl.NavigationControl(), 'top-right');
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-right');
     map.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }), 'top-right');
+    attachMapSearch({ map, Marker: maplibregl.Marker });
     const visibility = Object.fromEntries(Object.keys(groups).map(k => [k, true]));
     for (const name of Object.keys(groups)) {
       const label = document.createElement('label'); label.className = 'check';
