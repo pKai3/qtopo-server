@@ -12,7 +12,7 @@ RUN curl --fail --location --retry 5 --retry-all-errors --connect-timeout 20 --m
     && tar -xzf /tmp/tippecanoe.tar.gz -C /tmp \
     && make -C /tmp/tippecanoe-2.78.0 -j2 tippecanoe tile-join \
     && install -m755 /tmp/tippecanoe-2.78.0/tippecanoe /tmp/tippecanoe-2.78.0/tile-join /usr/local/bin/ \
-    && install -D -m644 /tmp/tippecanoe-2.78.0/LICENSE /usr/local/share/doc/tippecanoe/LICENSE
+    && install -D -m644 /tmp/tippecanoe-2.78.0/LICENSE.md /usr/local/share/doc/tippecanoe/LICENSE.md
 
 # MapLibre's Linux native binary targets Ubuntu and requires libjpeg.so.8.
 FROM ubuntu:24.04 AS base
