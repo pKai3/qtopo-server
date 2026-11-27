@@ -148,6 +148,61 @@ test('2 m export edits survive sync and re-export while rendering uses the curre
   assert.deepEqual(await main(['export', 'nsw-2m', '-'], config), editable, 'the new active dataset never enters the editable document');
 });
 
+test('2 m appearance follows live Readable styles and revisions in catalog, rendering and export', async t => {
+  const { config } = await setup(t), catalog = createProfileCatalog(config), providers = createProviders(config), cache = createStyleCache(config);
+  await catalog.refresh(true);
+  const builtin = catalog.get('nsw-2m');
+  await syncProfile(config, document('readable', '#246810')); await catalog.refresh(true);
+  const inherited = catalog.get('nsw-2m');
+  assert.equal(inherited.name, builtin.name);
+  assert.equal(inherited.id, 'nsw-2m');
+  assert.equal(inherited.styles, catalog.get('readable').styles);
+  assert.equal(catalog.list().find(profile => profile.id === 'nsw-2m'), inherited);
+  assert.notEqual(inherited.token, builtin.token);
+  const withDataset = profile => ({ ...profile, contourDataset: {
+    revision: 'a'.repeat(64), tiles: `/contours/nsw/${'a'.repeat(64)}/{z}/{x}/{y}.pbf`,
+    bounds: [140.99, -37.6, 159.3, -28.15], minzoom: 10, maxzoom: 16, attribution: 'NSW Spatial Services',
+  } });
+  const before = await cache.get(providers.nsw, withDataset(inherited));
+  assert.equal(before.style.layers.find(layer => layer.id === 'roads').paint['line-color'], '#246810');
+  await syncProfile(config, document('readable', '#abcdef')); await catalog.refresh(true);
+  const current = catalog.get('nsw-2m'), after = await cache.get(providers.nsw, withDataset(current));
+  assert.notEqual(current.token, inherited.token, 'live base edits invalidate inherited prefetch work');
+  assert.notEqual(after.revision, before.revision, 'live base edits invalidate inherited PNGs');
+  assert.equal(after.style.layers.find(layer => layer.id === 'roads').paint['line-color'], '#abcdef');
+  assert.equal(inherited.styles.nsw.layers[0].paint['line-color'], '#246810', 'earlier profile snapshots keep their base');
+  assert.equal(before.style.layers.find(layer => layer.id === 'roads').paint['line-color'], '#246810');
+  await catalog.refresh(true);
+  assert.equal(catalog.get('nsw-2m').token, current.token, 'unchanged scans keep the same cache token');
+  assert.equal(catalog.list().find(profile => profile.id === 'nsw-2m'), catalog.get('nsw-2m'));
+  assert.equal(await cache.get(providers.nsw, withDataset(catalog.get('nsw-2m'))), after);
+  const exported = await main(['export', 'nsw-2m', '-'], config);
+  assert.equal(exported.id, 'nsw-2m');
+  for (const id of ['qld', 'nsw']) assert.deepEqual(exported.styles[id], (await cache.get(providers[id], catalog.get('readable'))).style);
+  assert.ok(!Object.hasOwn(exported.styles.nsw.sources, NSW_CONTOUR_SOURCE));
+});
+
+test('an explicit 2 m override wins over Readable until removed, then resumes the current fallback', async t => {
+  const { config } = await setup(t), catalog = createProfileCatalog(config);
+  await syncProfile(config, document('readable', '#123456'));
+  const own = document('nsw-2m', '#665544'); own.name = 'My contour appearance';
+  await syncProfile(config, own); await catalog.refresh(true);
+  const override = catalog.get('nsw-2m');
+  assert.equal(override.name, own.name); assert.deepEqual(override.styles, own.styles);
+  await syncProfile(config, document('readable', '#fedcba')); await catalog.refresh(true);
+  assert.equal(catalog.get('nsw-2m'), override, 'changing Readable cannot change an explicit 2 m profile');
+  assert.equal(catalog.list().find(profile => profile.id === 'nsw-2m'), override);
+  await fs.unlink(path.join(config.profileDir, 'nsw-2m.json')); await catalog.refresh(true);
+  const inherited = catalog.get('nsw-2m');
+  assert.equal(inherited.styles, catalog.get('readable').styles);
+  assert.equal(inherited.styles.nsw.layers[0].paint['line-color'], '#fedcba');
+  assert.notEqual(inherited.token, override.token);
+  await fs.unlink(path.join(config.profileDir, 'readable.json')); await catalog.refresh(true);
+  assert.equal(catalog.get('nsw-2m').styles, undefined, 'removing the live base restores the built-in recipe');
+  assert.equal(catalog.get('nsw-2m').token, 'builtin-1');
+  assert.equal(catalog.list().find(profile => profile.id === 'nsw-2m'), catalog.get('nsw-2m'));
+});
+
 test('upgrade moves live profiles and history into styles while preserving render identities and originals', async t => {
   const { config } = await setup(t), legacy = path.join(config.dataDir, 'profiles');
   assert.equal(config.profileDir, config.styleDir);
