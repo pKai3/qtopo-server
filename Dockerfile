@@ -55,7 +55,7 @@ COPY --from=contour-tools /usr/local/share/doc/tippecanoe/ /usr/local/share/doc/
 COPY . .
 COPY --from=dependencies /usr/src/app/assets/sprites ./assets/sprites
 RUN chmod +x start.sh && node -e "require('@maplibre/maplibre-gl-native'); require('canvas'); require('node:sqlite')" \
-    && ogr2ogr --version && tippecanoe --version && tile-join --version
+    && ogr2ogr --version && tippecanoe --version && test -x /usr/local/bin/tile-join
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
