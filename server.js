@@ -28,6 +28,7 @@ const { createRequestFocus } = require('./lib/request-focus');
 const { mergeClientQueues } = require('./lib/client-queues');
 const { createRenderFlyby } = require('./lib/render-flyby');
 const { normalizeVectorValues } = require('./lib/vector-values');
+const { createNswContours } = require('./lib/nsw-contours');
 
 async function createApp(config = loadConfig(), dependencies = {}) {
   const admin = createAdminAccess(config);
@@ -37,6 +38,14 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   const profileCatalog = createProfileCatalog(config, L);
   await profileCatalog.refresh(true);
   if (!profileCatalog.get(config.defaultProfile)) throw new Error(`Unknown DEFAULT_PROFILE: ${config.defaultProfile}`);
+  const contours = dependencies.contours || createNswContours(config, L);
+  await contours.refresh();
+  function currentProfile(id) {
+    const profile = profileCatalog.get(id);
+    if (profile?.id !== 'nsw-2m') return profile;
+    const contourDataset = contours.dataset;
+    return contourDataset ? { ...profile, contourDataset, token: hash(`${profile.token}/${contourDataset.revision}`) } : undefined;
+  }
   const styles = createStyleCache(config), requests = createRequestMetrics();
   const startedAt = new Date().toISOString();
   for (const dir of [config.vectorDir, config.rasterDir, config.resourceDir]) await fs.mkdir(path.join(dir, 'v2'), { recursive: true });
@@ -85,7 +94,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     render: async (source, tile, priority, rank, interest) => {
       const [key, id] = source.split(':');
       const [profileId, token] = key.split('@');
-      const profile = profileCatalog.get(profileId);
+      const profile = currentProfile(profileId);
       if (!profile || profile.token !== token) return; // Superseded speculative work.
       await withFiles(async () => {
         const result = await (id === 'auto' ? automaticRasterFile(tile, priority, rank, interest, profile) : rasterFile(providers[id], tile, priority, rank, interest, profile));
@@ -104,7 +113,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   const profileTile = /^\/([a-z][a-z0-9-]*)\/(\d+)\/(\d+)\/(\d+)\.png$/;
   // Public map data can be used directly by Gaia and other browser clients.
   // Keep status/log endpoints outside this policy, and never enable credentials.
-  app.use(['/raster', '/vector', '/tiles_raster', '/tiles_vector', '/styles', '/style.json', '/fonts', '/resources', '/assets', '/api/providers', shortTile, profileTile], (req, res, next) => {
+  app.use(['/raster', '/vector', '/contours', '/tiles_raster', '/tiles_vector', '/styles', '/style.json', '/fonts', '/resources', '/assets', '/api/providers', '/api/contours', shortTile, profileTile], (req, res, next) => {
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Expose-Headers', 'ETag, Retry-After, X-QTopo-Profile');
     if (req.method === 'OPTIONS') {
@@ -139,9 +148,11 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     return p;
   }
   async function profileFor(req) {
-    await profileCatalog.refresh();
-    const id = req.params.profile || config.defaultProfile;
-    const profile = profileCatalog.get(id);
+    await Promise.all([profileCatalog.refresh(), contours.refresh()]);
+    const defaultId = config.defaultProfile === 'nsw-2m' && !contours.dataset ? 'readable' : config.defaultProfile;
+    const id = req.params.profile || defaultId;
+    const profile = currentProfile(id);
+    if (id === 'nsw-2m' && !profile) throw httpError('NSW 2 m contours are still being prepared', 503);
     if (!profile) throw httpError('Unknown map profile', 404);
     return profile;
   }
@@ -287,11 +298,11 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   }
 
   app.get('/api/providers', async (req, res) => {
-    await profileCatalog.refresh();
-    const available = profileCatalog.list();
+    await Promise.all([profileCatalog.refresh(), contours.refresh()]);
+    const available = profileCatalog.list().map(p => currentProfile(p.id)).filter(Boolean);
     const hidden = new Set(['classic', 'size-2x', 'size-3x', 'mobile-2x']);
     res.set('Cache-Control', 'no-cache').json({
-      defaultProvider: config.defaultProvider, defaultProfile: config.defaultProfile,
+      defaultProvider: config.defaultProvider, defaultProfile: config.defaultProfile === 'nsw-2m' && !contours.dataset ? 'readable' : config.defaultProfile,
       profiles: available.filter(p => p.id !== 'mobile-3x' || !available.some(other => other.id === 'mobile')).map(p => {
         const id = p.id === 'mobile-3x' ? 'mobile' : p.id;
         return { id, name: id === 'mobile' ? 'Mobile' : p.name, aliases: p.id === 'mobile-3x' ? ['mobile-3x'] : [],
@@ -306,6 +317,10 @@ async function createApp(config = loadConfig(), dependencies = {}) {
       })),
     });
   });
+  app.get('/api/contours', async (_req, res) => {
+    await contours.refresh();
+    res.set('Cache-Control', 'no-store').json(contours.status());
+  });
   async function style(req, res) {
     const p = providerFor(req);
     const browserStyle = absoluteStyle((await styles.get(p, await profileFor(req))).style, origin(req));
@@ -318,6 +333,16 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   app.get('/style.json', style);
   app.get('/styles/:provider.json', style);
   app.get('/styles/:profile/:provider.json', style);
+  app.get('/contours/nsw/:revision/:z/:x/:y.pbf', async (req, res) => {
+    const tile = parseTile(req.params, 22);
+    if (!tile) throw httpError('Invalid contour tile coordinates', 400);
+    const data = await contours.readTile(req.params.revision, tile);
+    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    if (!data) return res.status(204).end();
+    res.type('application/x-protobuf');
+    if (data[0] === 0x1f && data[1] === 0x8b) res.set('Content-Encoding', 'gzip');
+    res.send(data);
+  });
   app.get('/vector/:provider/:z/:x/:y.pbf', vector);
   app.get('/vector/:z/:x/:y.pbf', vector);
   app.get('/raster/:profile/:provider/:z/:x/:y.png', raster);
@@ -384,7 +409,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
         requestTimeoutSeconds: config.requestTimeoutMs / 1000, cacheMaxBytes: config.cacheMaxBytes, cacheMinFreeBytes: config.cacheMinFreeBytes,
         upstreamConcurrency: config.upstreamConcurrency, prefetchConcurrency: config.prefetchConcurrency, prefetchQueueLimit: config.prefetchQueueLimit, prefetchRadius: config.prefetchRadius, prefetchZoom: config.prefetchZoom },
       providers: Object.keys(providers), renderer: renderStats, cache: cacheStats, prefetch: prefetch.stats,
-      requests: requests.stats, styles: styles.stats,
+      requests: requests.stats, styles: styles.stats, contours: contours.status(),
     };
   }
   app.use(['/status', '/status.html', '/status.js', '/status.css', '/readyz'], (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
@@ -428,9 +453,9 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     res.status(status).json({ error: status === 400 || status === 404 ? err.message : 'Map service temporarily unavailable; please retry.' });
   });
   const healthTimer = setInterval(status, 5000); healthTimer.unref();
-  return { app, providers, actions, storage, close() {
+  return { app, providers, actions, storage, start: () => contours.start(), close() {
     stopping = true; clearInterval(healthTimer); actions.close(); prefetch.close(); renderer.close(); cache.close?.();
-    return storage.close();
+    return Promise.all([storage.close(), contours.close()]);
   } };
 }
 async function main() {
@@ -439,6 +464,7 @@ async function main() {
   const control = await listenControl(instance.actions, socketPath(config.port));
   const server = instance.app.listen(config.port, '0.0.0.0', () => {
     instance.app.locals.internalOrigin = `http://127.0.0.1:${server.address().port}`;
+    instance.start().catch(error => L.err('CONTOURS', `Background preparation could not start: ${error.message}`));
     L.sys(`Listening on port ${server.address().port}; /raster/{z}/{x}/{y}.png serves QLD + NSW vectors automatically (${config.tilePx}px)`);
     L.sys(`Render concurrency ${config.renderConcurrency}; prefetch ${config.prefetchRadius ? `up to ${config.prefetchConcurrency} tiles, radius ${config.prefetchRadius}, zoom ${config.prefetchZoom ? '±1' : 'off'}` : 'off'}`);
     L.sys(`Vector renders ${config.metatileSize}×${config.metatileSize} tiles with ${config.renderBufferPx}px logical padding; each output remains ${config.tilePx}px`);
@@ -447,7 +473,8 @@ async function main() {
   let stopping = false;
   const stop = () => {
     if (stopping) return; stopping = true;
-    instance.close(); control.close(); server.close(() => process.exit(0));
+    Promise.all([instance.close(), new Promise(resolve => control.close(resolve)), new Promise(resolve => server.close(resolve))])
+      .then(() => process.exit(0), error => { L.err('STOP', error.message); process.exit(1); });
     setTimeout(() => process.exit(1), 10000).unref();
   };
   process.once('SIGTERM', stop); process.once('SIGINT', stop);

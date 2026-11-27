@@ -44,7 +44,11 @@ if (role === 'timeout') {
 } else if (role === 'node') {
   fs.writeFileSync(root + '/app.pid', String(process.pid));
   fs.writeFileSync(root + '/display', process.env.DISPLAY);
-  process.on('SIGTERM', () => { fs.writeFileSync(root + '/app-stopped', 'yes'); process.exit(0); });
+  process.on('SIGTERM', () => {
+    const stop = () => { fs.writeFileSync(root + '/app-stopped', 'yes'); process.exit(0); };
+    if (mode === 'graceful-stop') setTimeout(stop, 350);
+    else stop();
+  });
   if (mode === 'app-failure') setTimeout(() => process.exit(7), 20);
   setInterval(() => {}, 1000);
 }
@@ -97,6 +101,13 @@ for (const [mode, diagnostic] of [
   assert.match(s.output, diagnostic);
   assert.doesNotMatch(s.output, /check failed \(2\/3\)/, 'startup must fail without runtime retries');
   await assert.rejects(fs.access(s.root + '/app.pid'), { code: 'ENOENT' });
+});
+test('container shutdown waits for the application to flush retained preparation state', { timeout: 10000 }, async t => {
+  const s = await start(t, 'graceful-stop');
+  await s.waitFor('display');
+  s.child.kill('SIGTERM');
+  assert.equal((await s.done)[0], 0);
+  assert.equal(await fs.readFile(s.root + '/app-stopped', 'utf8'), 'yes');
 });
 test('stop the server immediately when the running display process exits', { timeout: 10000 }, async t => {
   const s = await start(t, 'healthy');

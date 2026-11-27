@@ -42,6 +42,17 @@ jobs:
           build-args: BUILD_REVISION=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Verify retained contour downloads and preparation without external data
+        run: docker run --rm --entrypoint python3 qtopo:test test/nsw-contours-import.test.py
+      - name: Exercise contour preparation at boot, native output and restart reuse
+        run: |
+          docker run -d --name qtopo-contours --entrypoint /bin/bash -e NSW_CONTOURS_ENABLED=1 -e CACHE_MIN_FREE_GIB=0 -e PREFETCH_RADIUS=0 -e RENDER_TIMEOUT_SECONDS=90 qtopo:test -c 'python3 test/fixtures/prepare-contours.py --data-dir /data/contours/nsw --catalog assets/nsw-contours-catalog.json && exec /usr/bin/tini -g -- ./start.sh'
+          docker exec qtopo-contours node scripts/smoke-contours.js
+          docker restart qtopo-contours
+          docker exec qtopo-contours node scripts/smoke-contours.js
+          mkdir -p test-results
+          docker cp qtopo-contours:/tmp/smoke/. test-results/
+          docker stop qtopo-contours
       - name: Load the deployed styles for sustained-panning validation
         uses: actions/checkout@v7.0.1
         with:
@@ -50,7 +61,7 @@ jobs:
       - name: Exercise sustained panning with twenty-four workers under a four GiB cap
         run: |
           mkdir -p test-results
-          docker run -d --name qtopo-memory --cpus=4 --memory=4g --memory-swap=4g --pids-limit=1024 -e RENDER_CONCURRENCY=24 -e RENDER_TIMEOUT_SECONDS=90 -e PREFETCH_RADIUS=2 qtopo:test
+          docker run -d -e NSW_CONTOURS_ENABLED=0 --name qtopo-memory --cpus=4 --memory=4g --memory-swap=4g --pids-limit=1024 -e RENDER_CONCURRENCY=24 -e RENDER_TIMEOUT_SECONDS=90 -e PREFETCH_RADIUS=2 qtopo:test
           for profile in readable mobile-3x mobile-light; do
             docker cp "memory-styles/styles/$profile.json" "qtopo-memory:/tmp/$profile.json"
             docker exec qtopo-memory node scripts/profiles.js sync "/tmp/$profile.json"
@@ -64,7 +75,7 @@ jobs:
           for pixels in 1024 512 256; do
             compression=3
             if [ "$pixels" = 256 ]; then compression=6; fi
-            docker run -d --name qtopo-smoke-$pixels -e ADMIN_ALLOWED_NETWORKS=127.0.0.1/32 -e TILE_PX=$pixels -e PNG_COMPRESSION_LEVEL=$compression -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 -e PREFETCH_RADIUS=0 qtopo:test
+            docker run -d -e NSW_CONTOURS_ENABLED=0 --name qtopo-smoke-$pixels -e ADMIN_ALLOWED_NETWORKS=127.0.0.1/32 -e TILE_PX=$pixels -e PNG_COMPRESSION_LEVEL=$compression -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 -e PREFETCH_RADIUS=0 qtopo:test
             docker exec qtopo-smoke-$pixels node scripts/smoke.js
             docker exec qtopo-smoke-$pixels node scripts/smoke-png.js
             if [ "$pixels" = 1024 ]; then
@@ -76,7 +87,7 @@ jobs:
             docker cp qtopo-smoke-$pixels:/tmp/smoke/. test-results/
             docker stop qtopo-smoke-$pixels
           done
-          docker run -d --name qtopo-prefetch -e ADMIN_ALLOWED_NETWORKS=127.0.0.1/32 -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 -e RENDER_CONCURRENCY=4 qtopo:test
+          docker run -d -e NSW_CONTOURS_ENABLED=0 --name qtopo-prefetch -e ADMIN_ALLOWED_NETWORKS=127.0.0.1/32 -e PUID=99 -e PGID=100 -e RENDER_TIMEOUT_SECONDS=90 -e RENDER_CONCURRENCY=4 qtopo:test
           docker exec qtopo-prefetch node scripts/smoke-prefetch.js
           docker cp qtopo-prefetch:/tmp/smoke/. test-results/
           docker stop qtopo-prefetch
@@ -89,6 +100,7 @@ jobs:
             docker logs qtopo-smoke-$pixels > test-results/container-$pixels.log 2>&1 || true
           done
           docker logs qtopo-prefetch > test-results/prefetch.log 2>&1 || true
+          docker logs qtopo-contours > test-results/contours.log 2>&1 || true
           docker cp qtopo-memory:/tmp/smoke/. test-results/ 2>/dev/null || true
           docker logs qtopo-memory > test-results/memory.log 2>&1 || true
       - uses: actions/upload-artifact@v7.0.1

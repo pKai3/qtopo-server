@@ -18,7 +18,7 @@ async function readInput(input, stdin) {
 async function main(args = process.argv.slice(2), config = loadConfig(), stdin = process.stdin) {
   const [command, input, output] = args;
   if (!command || command === '--help') {
-    console.log('Run inside the container:\n  node scripts/profiles.js list\n  node scripts/profiles.js export mobile-3x /tmp/mobile-3x.json\n  node scripts/profiles.js validate /tmp/mobile-3x.json\n  node scripts/profiles.js sync /tmp/mobile-3x.json\n\nUse - instead of a filename to read stdin or export JSON to stdout. Edit the exported JSON before syncing. Sync validates both states and atomically installs one file under /data/styles. Previous files are kept in its history directory. The server reloads within 250 ms of the next profile request; no restart or cache clearing is needed.');
+    console.log('Run inside the container:\n  node scripts/profiles.js list\n  node scripts/profiles.js export mobile-3x /tmp/mobile-3x.json\n  node scripts/profiles.js validate /tmp/mobile-3x.json\n  node scripts/profiles.js sync /tmp/mobile-3x.json\n\nUse - instead of a filename to read stdin or export JSON to stdout. Edit the exported JSON before syncing. Sync validates both states and atomically installs one file under /data/styles. Previous files are kept in its history directory. The server reloads within 250 ms of the next profile request; no restart or cache clearing is needed.\n\nExporting nsw-2m saves its editable base styles, even while contours are preparing. Keep that profile ID when syncing: the server replaces the original NSW contour layers with the current prepared 2 m dataset at render time. Generated contour sources and layers are not included in exports.');
     return;
   }
   if (command === 'validate' && args.length === 2) return { id: (await readInput(input, stdin)).id, valid: true };
@@ -31,7 +31,10 @@ async function main(args = process.argv.slice(2), config = loadConfig(), stdin =
     if (!profile) throw new Error('Unknown profile');
     if (input === 'classic') throw new Error('Classic is protected. Export another profile as a starting point.');
     const providers = createProviders(config), cache = createStyleCache(config), styles = {};
-    for (const id of ['qld', 'nsw']) styles[id] = (await cache.get(providers[id], profile)).style;
+    // Export the editable base, not a snapshot of generated contours or their
+    // dataset revision. The original ID below restores composition on import.
+    const appearance = profile.id === 'nsw-2m' ? { ...profile, id: 'readable' } : profile;
+    for (const id of ['qld', 'nsw']) styles[id] = (await cache.get(providers[id], appearance)).style;
     const document = validateProfile({ format: 1, id: profile.id, name: profile.name, styles });
     if (output === '-') return document;
     await fs.writeFile(output, formatStyleJson(document), { flag: 'wx' });
