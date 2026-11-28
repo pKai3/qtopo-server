@@ -5,6 +5,7 @@ const fs = require('node:fs'), path = require('node:path');
 const { formatStyleJson } = require('../lib/style-format');
 const directory = path.resolve(__dirname, '../styles');
 const ROAD_WIDTH_FACTOR = 2;
+const WIDER_ROAD_GAP_FACTOR = 0.6;
 const categories = {
   Motorway: 'Highway/Motorway', PrimaryRoad: 'Highway/Motorway',
   'RTA State Highway': 'Highway/Motorway', 'RTA Motorway': 'Highway/Motorway',
@@ -49,13 +50,22 @@ function matchNswRoadWidths(nsw, qld) {
   const widths = new Map([...new Set(Object.values(categories))].map(category => [category, {
     surface: roadCurve(qld, category, false), casing: roadCurve(qld, category, true),
   }]));
+  const local = widths.get('Local');
+  // Compress the gaps between road classes against the approved local width.
+  // A uniform blend maintains their order through every interpolation stop.
+  const narrow = (ordinary, wider) => ordinary + (wider - ordinary) * WIDER_ROAD_GAP_FACTOR;
+  const narrowerWidths = new Map(['Connector', 'Secondary', 'Highway/Motorway'].map(category => [category, {
+    surface: combine(local.surface, widths.get(category).surface, narrow),
+    casing: combine(local.casing, widths.get(category).casing, narrow),
+  }]));
   let changed = 0;
   for (const layer of nsw.layers) {
     const source = layer['source-layer'] || '';
     if (layer.type !== 'line' || !/^(RoadAgg|RoadSegment|AggregatedWay)/.test(source)) continue;
     const kind = layer.id.split('/')[1]?.replace(/_\d+$/, ''), category = categories[kind];
     if (!category) continue; // Preserve paths, vehicle tracks, access ways and other transport.
-    let { surface, casing } = widths.get(category);
+    const narrower = kind !== 'DedicatedBusWay' && narrowerWidths.get(category);
+    let { surface, casing } = narrower || widths.get(category);
     if (kind === 'UrbanServiceLane') {
       surface = curve(stops(surface).map(([z, width]) => [z, width * 0.75]));
       casing = curve(stops(casing).map(([z, width]) => [z, width * 0.75]));

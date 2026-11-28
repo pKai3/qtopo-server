@@ -40,6 +40,9 @@ test('maintained roads keep moderate widths, hierarchy and continuous NSW zoom s
       assert.ok(widths.every((width, i) => !i || width > widths[i - 1]), `${id}: lost road hierarchy at z${z}`);
     }
   }
+  const mobile = read('mobile-3x').styles.nsw;
+  assert.ok(Math.abs(extent(ordinary(mobile, 'LocalRoad'), 16) - 8.8) < 0.02);
+  assert.ok(Math.abs(extent(ordinary(mobile, 'PrimaryRoad'), 16) - 14.7) < 0.1);
 });
 
 test('bridge surfaces and tunnel edges meet their adjoining roads', () => {

@@ -93,19 +93,20 @@ editing a detailed QLD palette; it also regenerates both Light styles. It only
 writes the five named style files. See [NSW palette mapping](NSW-palette.md) for
 the layer mapping and the cases that intentionally retain their NSW treatment.
 
-NSW paved roads use the corresponding QLD width curves at twice their weight,
-independently of label sizing, to distinguish streets from parcel boundaries.
-Local roads remain narrower than connectors, secondary roads and
-highways. The same continuous curve spans NSW's zoom-specific layer switches,
-removing the sudden increase at z16. In Mobile at z16, local-road outer widths
-are about 8.8 style pixels and highway widths about 18.6, instead of 52 for both.
-The first correction (4.4 and 9.3 pixels) was too thin in the phone comparison.
-Tunnel edges meet the running surface, and bridge outlines stay outside their
-separation strokes. Service lanes stay narrower than local roads. NSW paths,
-vehicle tracks and access ways retain their widths from before the road-width
-correction, including their bridge and tunnel strokes. The road-width recipe
-does not resize trails. Dash patterns, colors, labels, source detail and Classic
-are unchanged.
+NSW local roads use the corresponding QLD widths at twice their weight, so
+white streets stay clear of the parcel grid. Connectors, secondary roads and
+highways keep 60% of their width difference above the doubled local reference.
+In Mobile at z16, the outer widths are about 8.8 style pixels for local roads
+and 14.7 for highways. Continuous curves carry the same hierarchy across NSW
+zoom-specific layer switches. Bridge and tunnel strokes still meet their
+adjoining roads, and service lanes stay narrower than local roads. NSW paths,
+vehicle tracks and access ways retain their earlier widths and dash patterns.
+
+The detailed NSW styles shade Property_M parcels from z14, above contour
+strokes and beneath buildings and roads. The shade uses a single source so
+overlapping lots do not stack a second fill. The Light styles omit parcel
+shading. Mobile and Hiking Light show smaller NSW gate icons at their original
+locations.
 
 Run `node scripts/match-nsw-road-widths.js` after changing the maintained QLD
 road widths. It updates Readable, Mobile 2x and Mobile 3x and regenerates both
