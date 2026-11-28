@@ -9,6 +9,7 @@ const { gzipSync } = require('node:zlib');
 const { createApp } = require('../server');
 const { createNswContours } = require('../lib/nsw-contours');
 const { loadConfig } = require('../lib/config');
+const { syncProfile } = require('../lib/profile-files');
 const { atomicWrite } = require('../lib/utils');
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/YYbL4QAAAAASUVORK5CYII=', 'base64');
@@ -34,7 +35,7 @@ async function publish(root, digit = 'a') {
   return manifest;
 }
 
-async function server(t, { ready = false, enabled = true, defaultProfile = 'nsw-2m', status } = {}) {
+async function server(t, { ready = false, enabled = true, defaultProfile = 'nsw-2m', status, profiles = [] } = {}) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'qtopo-contour-http-'));
   let instance, listener, contours;
   t.after(async () => {
@@ -45,6 +46,7 @@ async function server(t, { ready = false, enabled = true, defaultProfile = 'nsw-
   const config = loadConfig({ DATA_DIR: dir, PORT: '0', CLEANUP_INTERVAL_MINUTES: '0', CACHE_MAX_GIB: '0', CACHE_MIN_FREE_GIB: '0',
     PREFETCH_RADIUS: '0', PREFETCH_ZOOM: '0', DEFAULT_PROFILE: defaultProfile, NSW_CONTOURS_ENABLED: enabled ? '1' : '0' });
   const root = config.nswContoursDir;
+  for (const profile of profiles) await syncProfile(config, profile);
   if (ready) await publish(root);
   if (status) { await fs.mkdir(root, { recursive: true }); await fs.writeFile(path.join(root, 'status.json'), JSON.stringify(status)); }
   let launches = 0;
@@ -132,7 +134,6 @@ test('Readable automatically adopts completed contours in default browser and GP
   const nswRoute = '/raster/nsw/15/30065/19647.png', qldRoute = '/raster/qld/15/30258/19054.png';
   const before = await (await fetch(s.url + '/styles/nsw.json')).json();
   const qld = await (await fetch(s.url + '/styles/qld.json')).json();
-  const mobile = await (await fetch(s.url + '/styles/mobile/nsw.json')).json();
   const fallback = await fetch(s.url + nswRoute);
   assert.equal(fallback.status, 200);
   assert.equal(fallback.headers.get('cache-control'), 'public, max-age=0');
@@ -150,7 +151,6 @@ test('Readable automatically adopts completed contours in default browser and GP
   assert.deepEqual(after.layers.filter(layer => layer.source !== SOURCE),
     before.layers.filter(layer => !['Contours', 'Contours/label'].includes(layer['source-layer'])), 'other Readable map detail is retained');
   assert.deepEqual(await (await fetch(s.url + '/styles/qld.json')).json(), qld);
-  assert.deepEqual(await (await fetch(s.url + '/styles/mobile/nsw.json')).json(), mobile);
   assert.equal((await fetch(s.url + qldRoute)).status, 200);
   assert.equal(s.jobs.length, 2, 'QLD keeps its existing rendered cache');
   for (const route of [nswRoute, '/raster/readable/nsw/15/30065/19647.png', '/15/30065/19647.png']) {
@@ -166,6 +166,62 @@ test('Readable automatically adopts completed contours in default browser and GP
   assert.equal((await fetch(s.url + nswRoute)).status, 200);
   assert.notEqual(s.jobs.at(-1).outPath, readyNsw.outPath);
   assert.match(s.jobs.at(-1).style.sources[SOURCE].tiles[0], new RegExp('b'.repeat(64)));
+});
+
+test('maintained Mobile and Light styles adopt new contour revisions, including stored label sizes', async t => {
+  const source = {
+    qld: require('../styles/style.json'),
+    nsw: structuredClone(require('../styles/nsw.style.json')),
+  };
+  for (const layer of source.nsw.layers.filter(layer => layer['source-layer'] === 'Contours/label')) {
+    layer.layout['text-size'] = 24;
+    layer.layout['symbol-spacing'] = 1800;
+    layer.paint['text-halo-width'] = 3;
+  }
+  const profileIds = ['readable-light', 'mobile-light'];
+  const s = await server(t, { defaultProfile: 'mobile', profiles: profileIds.map(id => ({ format: 1, id, name: id, styles: source })) });
+  const nsw = '15/30065/19647.png', qld = '15/30258/19054.png';
+  const ids = ['mobile', 'mobile-2x', ...profileIds];
+  const style = async (id, provider) => (await fetch(`${s.url}/styles/${id}/${provider}.json`)).json();
+  const raster = (id, provider, tile) => fetch(`${s.url}/raster/${id}/${provider}/${tile}`);
+  const before = new Map();
+  for (const id of ids) {
+    const nswStyle = await style(id, 'nsw');
+    assert.equal(nswStyle.sources[SOURCE], undefined, id);
+    assert.ok(nswStyle.layers.some(layer => layer['source-layer'] === 'Contours/label'), id);
+    const response = await raster(id, 'nsw', nsw);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'public, max-age=0');
+    before.set(id, { path: s.jobs.at(-1).outPath, style: nswStyle, qldStyle: await style(id, 'qld') });
+    assert.equal((await raster(id, 'qld', qld)).status, 200);
+  }
+  const classic = await style('classic', 'nsw');
+  await publish(s.root); await s.contours.refresh(true);
+  const catalog = await (await fetch(s.url + '/api/providers')).json();
+  for (const id of ids) {
+    assert.equal(catalog.profiles.find(profile => profile.id === id).contourRevision, 'a'.repeat(64));
+    const nswStyle = await style(id, 'nsw');
+    assert.equal(nswStyle.sources[SOURCE].maxzoom, 16);
+    assert.deepEqual(nswStyle.layers.filter(layer => layer.source !== SOURCE),
+      before.get(id).style.layers.filter(layer => !['Contours', 'Contours/label'].includes(layer['source-layer'])));
+    const label = nswStyle.layers.find(layer => layer.id === SOURCE + '-10m-label');
+    const legacy = before.get(id).style.layers.find(layer => layer.id === 'Contours/label/Contour 10m');
+    assert.equal(label.layout['text-size'], id === 'readable-light' ? 9.33333 : legacy.layout['text-size']);
+    assert.equal(label.layout['symbol-spacing'], id === 'readable-light' ? 1000 : legacy.layout['symbol-spacing']);
+    assert.equal(nswStyle.layers.find(layer => layer.id === SOURCE + '-2m').paint['line-width'], 0.5);
+    assert.deepEqual(await style(id, 'qld'), before.get(id).qldStyle);
+    const count = s.jobs.length;
+    assert.equal((await raster(id, 'qld', qld)).status, 200);
+    assert.equal(s.jobs.length, count, 'QLD tile remains cached');
+    assert.equal((await raster(id, 'nsw', nsw)).status, 200);
+    assert.notEqual(s.jobs.at(-1).outPath, before.get(id).path);
+    assert.equal(s.jobs.at(-1).style.sources[SOURCE].maxzoom, 16);
+  }
+  assert.deepEqual(await style('classic', 'nsw'), classic);
+  assert.deepEqual(await style('mobile-3x', 'nsw'), await style('mobile', 'nsw'));
+  const count = s.jobs.length;
+  assert.equal((await raster('mobile-3x', 'nsw', nsw)).headers.get('x-qtopo-profile'), 'mobile-3x');
+  assert.equal(s.jobs.length, count, 'the Mobile alias shares the raster cache');
 });
 
 test('contour tile HTTP routes preserve gzip, cache immutable revisions and distinguish empty from invalid requests', async t => {
