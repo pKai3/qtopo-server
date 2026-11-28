@@ -2,6 +2,7 @@ import * as maplibregl from '/vendor/maplibre/maplibre-gl.mjs';
 import { createStateSelector, selectPreview } from './preview.mjs';
 import { attachMapSearch } from './map-search.mjs';
 import { attachContourStatus, addAvailableProfiles } from './contour-status.mjs';
+import { attachMapCoordinates } from './map-coordinates.mjs';
 (async () => {
   const $ = id => document.getElementById(id);
   const params = new URLSearchParams(location.search);
@@ -28,7 +29,8 @@ import { attachContourStatus, addAvailableProfiles } from './contour-status.mjs'
     $('mode-label').textContent = $('mode').value === 'raster' ? 'Raster' : 'Vector';
     function previewStyle({ provider: selected, mode }) {
       if (mode === 'vector') return `/styles/${profile.id}/${selected.id}.json`;
-      const rasterURL = selected.id === 'auto' ? profile.raster : `${location.origin}/raster/${profile.id}/${selected.id}/{z}/{x}/{y}.png`;
+      let rasterURL = selected.id === 'auto' ? profile.raster : `${location.origin}/raster/${profile.id}/${selected.id}/{z}/{x}/{y}.png`;
+      if (profile.contourRevision && ['auto', 'nsw'].includes(selected.id)) rasterURL += `?contours=${profile.contourRevision}`;
       return {
         version: 8, glyphs: location.origin + '/fonts/{fontstack}/{range}.pbf',
         sources: { topo: { type: 'raster', tiles: [rasterURL], tileSize: selected.id === 'nsw-topo' ? 256 : 512, bounds: selected.bounds, maxzoom: selected.maxzoom, attribution: selected.attribution } },
@@ -37,7 +39,7 @@ import { attachContourStatus, addAvailableProfiles } from './contour-status.mjs'
     }
     // Resolve the actual camera after MapLibre restores the shared URL hash.
     // Start empty so automatic vector mode never briefly requests PNG tiles.
-    const map = new maplibregl.Map({ container: 'map', style: { version: 8, sources: {}, layers: [] }, center: provider.center, zoom: provider.zoom, hash: true, maxZoom: 22 });
+    const map = new maplibregl.Map({ container: 'map', style: { version: 8, sources: {}, layers: [] }, center: provider.center, zoom: provider.zoom, hash: true, maxZoom: catalog.automatic.maxzoom });
     map.addControl(new maplibregl.NavigationControl(), 'top-right');
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-right');
     map.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }), 'top-right');
@@ -92,7 +94,8 @@ import { attachContourStatus, addAvailableProfiles } from './contour-status.mjs'
         }
         if (request !== revision) return;
         selection = selectPreview(selected, mode, catalog.providers, center, selectState);
-        const key = `${selection.provider.id}/${selection.mode}/${profile.id}`;
+        const contours = ['auto', 'nsw'].includes(selection.provider.id) ? profile.contourRevision || '' : '';
+        const key = `${selection.provider.id}/${selection.mode}/${profile.id}/${contours}`;
         if (key === currentStyle) { syncUI(); return; }
         syncUI();
         // Keep the camera and layer preferences when the selected state changes.
@@ -105,7 +108,7 @@ import { attachContourStatus, addAvailableProfiles } from './contour-status.mjs'
     }
     map.on('style.load', () => { applyLayers(); showRegions(); });
     map.on('error', e => { console.error(e.error); $('status').textContent = 'Some map data could not load. Please try again shortly.'; $('status').className = 'error'; });
-    map.on('mousemove', e => { $('coordinates').textContent = `${e.lngLat.lat.toFixed(5)}, ${e.lngLat.lng.toFixed(5)} · zoom ${map.getZoom().toFixed(1)}`; });
+    attachMapCoordinates({ map, element: $('coordinates') });
     map.on('moveend', () => { if (provider.id === 'auto' && $('mode').value === 'vector') switchStyle(); });
     $('provider').addEventListener('change', () => {
       provider = catalog.providers.find(p => p.id === $('provider').value); switchStyle();
@@ -123,7 +126,12 @@ import { attachContourStatus, addAvailableProfiles } from './contour-status.mjs'
     if (innerWidth < 600) $('map-controls').open = false;
     attachContourStatus({ element: $('contour-status'), panel: $('map-controls'),
       available: catalog.profiles.some(p => p.id === 'nsw-2m'),
-      onProfiles: available => { catalog.profiles = addAvailableProfiles($('profile'), catalog.profiles, available); },
+      revision: catalog.profiles.find(p => p.id === 'nsw-2m')?.contourRevision,
+      onProfiles: available => {
+        catalog.profiles = addAvailableProfiles($('profile'), catalog.profiles, available);
+        profile = catalog.profiles.find(p => p.id === profile.id);
+        switchStyle();
+      },
     });
   } catch (err) { $('status').textContent = err.message; $('status').className = 'error'; }
 })();

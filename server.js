@@ -6,7 +6,7 @@ const { AsyncLocalStorage } = require('node:async_hooks');
 const L = require('./lib/logger');
 const { loadConfig } = require('./lib/config');
 const { createProfileCatalog } = require('./lib/profile-files');
-const { createProviders, tileURL, parseTile, hash } = require('./lib/providers');
+const { createProviders, tileURL, parseTile, hash, MAX_MAP_ZOOM } = require('./lib/providers');
 const { createCache } = require('./lib/cache');
 const { cachedRaster, httpError } = require('./lib/utils');
 const { seedStyles, createStyleCache, absoluteStyle, renderStyle } = require('./lib/styles');
@@ -42,9 +42,10 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   await contours.refresh();
   function currentProfile(id) {
     const profile = profileCatalog.get(id);
-    if (profile?.id !== 'nsw-2m') return profile;
+    if (!['readable', 'nsw-2m'].includes(profile?.id)) return profile;
     const contourDataset = contours.dataset;
-    return contourDataset ? { ...profile, contourDataset, token: hash(`${profile.token}/${contourDataset.revision}`) } : undefined;
+    return contourDataset ? { ...profile, contourDataset, token: hash(`${profile.token}/${contourDataset.revision}`) }
+      : profile.id === 'readable' ? profile : undefined;
   }
   const styles = createStyleCache(config), requests = createRequestMetrics();
   const startedAt = new Date().toISOString();
@@ -81,7 +82,8 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     limit: config.prefetchQueueLimit, logger: L,
     zoomRange: source => {
       const [, id] = source.split(':');
-      return id === 'auto' ? { minzoom: 0, maxzoom: providers.qld.maxzoom } : providers[id];
+      const p = id === 'auto' ? { minzoom: 0, maxzoom: providers.qld.maxzoom } : providers[id];
+      return { minzoom: p.minzoom, maxzoom: Math.min(MAX_MAP_ZOOM, p.maxzoom) };
     },
     groupKey: (source, tile) => {
       const [profile, id] = source.split(':');
@@ -103,7 +105,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     },
   });
   const actions = createStatusActions({
-    origin: () => app.locals.internalOrigin, rasterDir: path.join(config.rasterDir, 'v2'), maxzoom: providers.qld.maxzoom,
+    origin: () => app.locals.internalOrigin, rasterDir: path.join(config.rasterDir, 'v2'), maxzoom: MAX_MAP_ZOOM,
     busy: () => { const render = renderer.stats; return activeRasterRequests || render?.active || render?.queued || prefetch.stats.active; },
     pause: () => prefetch.pause(), resume: () => { prefetch.resume(); storage.check?.(); }, logger: L,
     readStatus: () => status(),
@@ -173,6 +175,17 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   const vector = fileRequest(async (req, res, signal) => {
     const p = providerFor(req, 'vector');
     const { z, x, y } = coordinates(req, p);
+    if (p.tileMap && req.query.sparse === '1') {
+      const availableZoom = await nativeZoom(p, { z, x, y });
+      signal.throwIfAborted();
+      if (availableZoom === null || availableZoom < z) {
+        headers(res, Math.floor(config.emptyTTL / 1000));
+        // MapLibre 6.19's sparse source uses 404 to fetch and correctly slice an
+        // ancestor. A truly empty branch must stay empty, without that fallback.
+        // NSW returns 500 for missing descendants, so consult its index first.
+        return res.status(availableZoom === null ? 204 : 404).end();
+      }
+    }
     const file = path.join(config.vectorDir, 'v2', p.id, p.cacheId, String(z), String(x), `${y}.pbf`);
     await holdFile(file);
     const result = await cache.get({ file, provider: p.id,
@@ -236,7 +249,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   }
   async function deliverRaster(res, result, profile) {
     if (result.empty) L.log('RDR', `Empty tile: ${result.path}`);
-    headers(res, profile.styles ? 0 : result.empty ? Math.floor(config.emptyTTL / 1000) : 3600);
+    headers(res, profile.styles || ['readable', 'nsw-2m'].includes(profile.id) ? 0 : result.empty ? Math.floor(config.emptyTTL / 1000) : 3600);
     res.set('X-QTopo-Profile', profile.id);
     await sendFile(res, result.path, 'image/png');
   }
@@ -306,12 +319,13 @@ async function createApp(config = loadConfig(), dependencies = {}) {
       profiles: available.filter(p => p.id !== 'mobile-3x' || !available.some(other => other.id === 'mobile')).map(p => {
         const id = p.id === 'mobile-3x' ? 'mobile' : p.id;
         return { id, name: id === 'mobile' ? 'Mobile' : p.name, aliases: p.id === 'mobile-3x' ? ['mobile-3x'] : [],
-          hidden: hidden.has(id), factor: p.factor, refined: p.refined, raster: `${origin(req)}/${id}/{z}/{x}/{y}.png` };
+          hidden: hidden.has(id), factor: p.factor, refined: p.refined, raster: `${origin(req)}/${id}/{z}/{x}/{y}.png`,
+          ...(p.contourDataset ? { contourRevision: p.contourDataset.revision } : {}) };
       }),
-      automatic: { raster: `${origin(req)}/raster/{z}/{x}/{y}.png`, tileSize: config.tilePx, maxzoom: providers.qld.maxzoom, bounds: [137.8, -37.6, 162.7, -9], attribution: `${providers.qld.attribution}; ${providers.nsw.attribution}` },
+      automatic: { raster: `${origin(req)}/raster/{z}/{x}/{y}.png`, tileSize: config.tilePx, maxzoom: Math.min(MAX_MAP_ZOOM, providers.qld.maxzoom), bounds: [137.8, -37.6, 162.7, -9], attribution: `${providers.qld.attribution}; ${providers.nsw.attribution}` },
       providers: Object.values(providers).map(p => ({
         id: p.id, name: p.name, type: p.type, bounds: p.bounds, center: p.center, zoom: p.zoom,
-        minzoom: p.minzoom, maxzoom: p.maxzoom, tileSize: p.type === 'raster' ? 256 : config.tilePx,
+        minzoom: p.minzoom, maxzoom: Math.min(MAX_MAP_ZOOM, p.maxzoom), tileSize: p.type === 'raster' ? 256 : config.tilePx,
         attribution: p.attribution, style: `/styles/${p.id}.json`,
         raster: `${origin(req)}/raster/${p.id}/{z}/{x}/{y}.png`,
       })),
@@ -327,6 +341,16 @@ async function createApp(config = loadConfig(), dependencies = {}) {
     // Bypass previously cached raw Esri tiles without invalidating PNG caches.
     if (p.id === 'qld') for (const source of Object.values(browserStyle.sources || {})) {
       if (source.type === 'vector') source.tiles = source.tiles.map(url => `${url}?values=2`);
+    }
+    if (p.tileMap) for (const source of Object.values(browserStyle.sources || {})) {
+      // Only the provider's base tiles are sparse; prepared 2 m contours have
+      // their own complete pyramid. Keep this browser option out of native
+      // rendering styles and their existing cache revisions.
+      const tiles = `${origin(req)}/vector/${p.id}/{z}/{x}/{y}.pbf`;
+      if (source.type === 'vector' && source.tiles?.length === 1 && source.tiles[0] === tiles) {
+        source.sparse = true;
+        source.tiles = [`${tiles}?sparse=1`];
+      }
     }
     res.set('Cache-Control', 'no-cache').json(browserStyle);
   }

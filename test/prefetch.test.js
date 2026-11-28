@@ -104,6 +104,26 @@ test('zoom prefetch covers one parent and four children within provider limits',
   assert.equal(zoomNeighbours({ z: 0, x: 0, y: 0 }).length, 4);
   assert.equal(zoomNeighbours({ z: 19, x: 1, y: 1 }).length, 1);
   assert.equal(zoomNeighbours(tile, { minzoom: 13, maxzoom: 13 }).length, 0);
+  assert.equal(zoomNeighbours({ z: 20, x: 1, y: 1 }, { maxzoom: 18 }).length, 0);
+  assert.equal(zoomNeighbours({ z: 0, x: 0, y: 0 }, { minzoom: 3 }).length, 0);
+});
+
+test('all speculative work respects the map range even after a legacy high-zoom request', async t => {
+  for (const z of [18, 19, 20]) {
+    const seen = [], prefetch = createPrefetch({ delayMs: 1, zoomRange: () => ({ maxzoom: 18 }),
+      render: async (_provider, tile, priority) => seen.push({ tile, priority }) });
+    t.after(() => prefetch.close());
+    prefetch.begin('nsw', { z, x: 100, y: 100 })(true);
+    assert.equal(prefetch.stats.queued, z === 18 ? 9 : z === 19 ? 1 : 0);
+    for (let i = 0; i < 100 && (prefetch.stats.queued || prefetch.stats.active); i++) await wait(5);
+    assert.ok(seen.every(({ tile }) => tile.z <= 18));
+    if (z === 18) {
+      assert.equal(seen.filter(({ priority }) => priority === 1).length, 8);
+      assert.deepEqual(seen.filter(({ priority }) => priority === 2).map(({ tile }) => tile.z), [17]);
+    }
+    if (z === 19) assert.deepEqual(seen.map(({ tile }) => tile), [{ z: 18, x: 50, y: 50 }]);
+    if (z === 20) assert.deepEqual(seen, []);
+  }
 });
 
 test('newest requests win even when old requests finish last; zoom remains lowest', async t => {

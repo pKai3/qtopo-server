@@ -4,12 +4,14 @@ FROM node:24-bookworm-slim AS node
 # Compile the same pinned tiler on amd64 and arm64; Ubuntu does not supply it.
 FROM ubuntu:24.04 AS contour-tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl build-essential libsqlite3-dev zlib1g-dev \
+    ca-certificates curl patch build-essential libsqlite3-dev zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
+COPY patches/tile-join-progress.patch /tmp/tile-join-progress.patch
 RUN curl --fail --location --retry 5 --retry-all-errors --connect-timeout 20 --max-time 600 \
       https://codeload.github.com/felt/tippecanoe/tar.gz/refs/tags/2.78.0 -o /tmp/tippecanoe.tar.gz \
     && echo 'da628c5fa1aec3aba318f6096d2f60d8b4cc78043e1c25e18a4d0975c8262f00  /tmp/tippecanoe.tar.gz' | sha256sum --check --status \
     && tar -xzf /tmp/tippecanoe.tar.gz -C /tmp \
+    && patch --batch --fuzz=0 -d /tmp/tippecanoe-2.78.0 -p1 < /tmp/tile-join-progress.patch \
     && make -C /tmp/tippecanoe-2.78.0 -j2 tippecanoe tile-join \
     && install -m755 /tmp/tippecanoe-2.78.0/tippecanoe /tmp/tippecanoe-2.78.0/tile-join /usr/local/bin/ \
     && install -D -m644 /tmp/tippecanoe-2.78.0/LICENSE.md /usr/local/share/doc/tippecanoe/LICENSE.md

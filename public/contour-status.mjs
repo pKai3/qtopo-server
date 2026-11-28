@@ -18,24 +18,37 @@ export function formatContourStatus(data) {
   const labels = {
     starting: 'starting preparation', downloading: `downloading${bytes ? ' ' + bytes : ''}`,
     preparing: 'preparing contours', assembling: 'assembling map',
-    ready: data.available ? 'ready in Appearance' : 'finishing preparation',
+    ready: data.available ? 'ready · used by Readable' : 'finishing preparation',
     error: data.nextRetryAt ? 'preparation paused · retrying automatically' : 'preparation paused',
     'waiting-space': 'waiting for free space',
   };
   const prefix = data.available && data.phase !== 'ready' ? 'NSW 2 m update' : 'NSW 2 m';
-  const detail = !['ready', 'error', 'waiting-space'].includes(data.phase) && sheets ? ` · ${sheets}` : '';
+  let detail = !['ready', 'error', 'waiting-space'].includes(data.phase) && sheets ? ` · ${sheets}` : '';
+  if (data.phase === 'assembling' && data.assembly) {
+    const a = data.assembly, totalTiles = count(a.totalInputTiles), processed = count(a.inputTiles);
+    const stages = { 'checking-inputs': 'checking assembly inputs', merging: 'merging map tiles', validating: 'validating merged map',
+      hashing: 'checking map checksum', publishing: 'publishing map' };
+    if (Object.hasOwn(stages, a.stage)) {
+      labels.assembling = stages[a.stage];
+      detail = '';
+      if (a.stage === 'checking-inputs' && count(a.totalFiles)) detail = ` · ${Math.min(count(a.checkedFiles), count(a.totalFiles))}/${count(a.totalFiles)}`;
+      else if (a.stage === 'merging' && a.countersAvailable === true && totalTiles && processed <= totalTiles) detail = ` · ${(100 * processed / totalTiles).toFixed(1)}%`;
+      else if (count(a.outputBytes)) detail = ` · ${(a.outputBytes / 1e9).toFixed(1)} GB`;
+    }
+  }
   return { text: `${prefix}: ${labels[data.phase]}${detail}`, hidden: false,
     state: ['error', 'waiting-space'].includes(data.phase) ? 'paused' : '' };
 }
 
-// Append newly published choices only. Changing the selected option here would
-// unexpectedly replace the map a person is reading.
+// Refresh profile metadata and append published choices without changing the
+// selected appearance. Its contour revision lets the viewer refresh in place.
 export function addAvailableProfiles(select, current, incoming) {
-  const selected = select.value, merged = [...current], known = new Set(current.map(profile => profile.id));
+  const selected = select.value, merged = [...current], known = new Map(current.map((profile, index) => [profile.id, index]));
   for (const profile of incoming) {
     if (!profile || typeof profile.id !== 'string' || !/^[a-z][a-z0-9-]{0,47}$/.test(profile.id)
-        || typeof profile.name !== 'string' || !profile.name.trim() || known.has(profile.id)) continue;
-    merged.push(profile); known.add(profile.id);
+        || typeof profile.name !== 'string' || !profile.name.trim()) continue;
+    if (known.has(profile.id)) { merged[known.get(profile.id)] = { ...profile }; continue; }
+    known.set(profile.id, merged.length); merged.push(profile);
     if (profile.hidden) continue;
     const option = select.ownerDocument.createElement('option');
     option.value = profile.id; option.textContent = profile.name; select.add(option);
@@ -45,10 +58,11 @@ export function addAvailableProfiles(select, current, incoming) {
 }
 
 export function attachContourStatus({ element, panel, document: doc = globalThis.document, fetchImpl = globalThis.fetch,
-  available = false, onProfiles = () => {}, setTimer = globalThis.setTimeout, clearTimer = globalThis.clearTimeout } = {}) {
+  available = false, revision, onProfiles = () => {}, setTimer = globalThis.setTimeout, clearTimer = globalThis.clearTimeout } = {}) {
   if (!element || !doc) return { destroy() {} };
-  let timer, controller, stopped = false, catalogReady = available;
-  const visible = () => !stopped && !doc.hidden && (!panel || panel.open);
+  let timer, controller, stopped = false, catalogReady = available, catalogRevision = revision;
+  // Readable must adopt a publication even with its controls collapsed.
+  const visible = () => !stopped && !doc.hidden;
   function draw(value) {
     if (element.textContent !== value.text) element.textContent = value.text;
     element.hidden = value.hidden; element.dataset.state = value.state;
@@ -66,14 +80,14 @@ export function attachContourStatus({ element, panel, document: doc = globalThis
       if (!visible() || request.signal.aborted) return;
       draw(formatted);
       if (!data.available || !data.enabled) catalogReady = false;
-      if (data.enabled && data.phase !== 'disabled' && data.available && !catalogReady) {
+      if (data.enabled && data.phase !== 'disabled' && data.available && (!catalogReady || data.revision !== catalogRevision)) {
         try {
           const result = await fetchImpl('/api/providers', { cache: 'no-store', signal: request.signal });
           if (!result.ok) throw new Error('Appearance list unavailable');
           const catalog = await result.json();
           if (!Array.isArray(catalog.profiles) || !catalog.profiles.some(profile => profile?.id === 'nsw-2m')) throw new Error('Appearance list is not ready');
           if (!visible() || request.signal.aborted) return;
-          onProfiles(catalog.profiles); catalogReady = true;
+          onProfiles(catalog.profiles); catalogReady = true; catalogRevision = data.revision;
         } catch {
           if (visible() && (!request.signal.aborted || timedOut)) draw({ text: 'NSW 2 m: ready · updating Appearance…', hidden: false, state: '' });
         }

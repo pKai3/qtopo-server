@@ -134,6 +134,84 @@ test('browser vector tiles repair empty values while native rendering retains ra
   const browserStyle = await (await fetch(s.url + '/styles/qld.json')).json();
   assert.ok(Object.values(browserStyle.sources).every(src => src.tiles.every(url => url.endsWith('?values=2'))));
 });
+test('sparse browser requests use NSW coverage without losing native high zooms or fetching missing descendants', async t => {
+  const raw = Buffer.from([26, 5, 10, 1, 97, 120, 2]);
+  const downloaded = [], indexed = [];
+  let indexFailed = false;
+  const s = await server(t, {
+    nativeZoom: async (_provider, tile) => {
+      indexed.push(tile);
+      if (indexFailed) throw new Error('Index unavailable');
+      if (tile.x === 0) return null;
+      // Katoomba stops at 16; parts of NSW have native data through 22.
+      return tile.x === 3885674 ? tile.z : Math.min(tile.z, 16);
+    },
+    cache: { stats: {}, async get({ file, url }) {
+      downloaded.push(url); await atomicWrite(file, raw); return { path: file };
+    } },
+  });
+  const missing = await fetch(s.url + '/vector/nsw/17/120262/78590.pbf?sparse=1');
+  assert.equal(missing.status, 404, '404 triggers MapLibre ancestor slicing');
+  assert.equal((await missing.arrayBuffer()).byteLength, 0);
+  assert.match(missing.headers.get('cache-control'), /public, max-age=/);
+  assert.equal((await fetch(s.url + '/vector/nsw/22/0/0.pbf?sparse=1')).status, 204, 'empty branches do not fall back');
+  assert.equal(downloaded.length, 0, 'known missing tiles never reach the failing upstream');
+  for (const tile of ['16/60131/39295', '22/3885674/2440082']) {
+    const response = await fetch(s.url + '/vector/nsw/' + tile + '.pbf?sparse=1');
+    assert.equal(response.status, 200);
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), raw);
+  }
+  assert.equal(downloaded.length, 2);
+  assert.match(downloaded[1], /tile\/22\/2440082\/3885674\.pbf$/);
+  const indexCalls = indexed.length;
+  assert.equal((await fetch(s.url + '/vector/nsw/17/120262/78590.pbf')).status, 200);
+  assert.equal((await fetch(s.url + '/vector/qld/17/121026/76203.pbf?sparse=1')).status, 200);
+  assert.equal(indexed.length, indexCalls, 'native requests and QLD retain their existing behavior');
+  indexFailed = true;
+  const failed = await fetch(s.url + '/vector/nsw/17/120262/78590.pbf?sparse=1');
+  assert.equal(failed.status, 502, 'an unavailable index cannot masquerade as missing coverage');
+  assert.equal(failed.headers.get('cache-control'), 'no-store');
+  assert.equal(downloaded.length, 4);
+});
+test('browser sparse overzoom is limited to NSW base sources and leaves contour and raster styles independent', async t => {
+  const revision = 'a'.repeat(64), jobs = [];
+  const dataset = { revision, tiles: `/contours/nsw/${revision}/{z}/{x}/{y}.pbf`,
+    bounds: [140.9, -37.6, 153.7, -28.1], minzoom: 10, maxzoom: 16, attribution: 'NSW' };
+  const s = await server(t, {
+    contours: { dataset, async refresh() {}, status: () => ({ available: true }), async close() {} },
+    nativeZoom: async () => 16,
+    renderer: { close() {}, async render(job) { jobs.push(job); await atomicWrite(job.outPath, PNG); } },
+  });
+  const { syncProfile } = require('../lib/profile-files');
+  const nsw = await getStyle(s.config, s.providers.nsw);
+  nsw.sources.map = nsw.sources.esri; delete nsw.sources.esri;
+  for (const layer of nsw.layers) if (layer.source === 'esri') layer.source = 'map';
+  await syncProfile(s.config, { format: 1, id: 'renamed-base', name: 'Renamed base', styles: {
+    qld: await getStyle(s.config, s.providers.qld), nsw,
+  } });
+  await sleep(270);
+  for (const profile of ['classic', 'readable', 'mobile', 'renamed-base', 'nsw-2m']) {
+    const style = await (await fetch(s.url + `/styles/${profile}/nsw.json`)).json();
+    assert.deepEqual(validateStyleMin(style).map(error => error.message), [], profile);
+    const base = style.sources[profile === 'renamed-base' ? 'map' : 'esri'];
+    assert.equal(base.sparse, true);
+    assert.equal(base.maxzoom, 22, 'keep native high-zoom areas available');
+    assert.deepEqual(base.tiles, [s.url + '/vector/nsw/{z}/{x}/{y}.pbf?sparse=1']);
+    if (profile === 'nsw-2m') {
+      const contours = style.sources['nsw-2m-contours'];
+      assert.equal(contours.maxzoom, 16);
+      assert.equal(contours.sparse, undefined);
+      assert.deepEqual(contours.tiles, [s.url + dataset.tiles]);
+    }
+  }
+  assert.equal((await fetch(s.url + '/raster/classic/nsw/17/120262/78590.png')).status, 200);
+  assert.equal(jobs[0].style.sources.esri.maxzoom, 16);
+  assert.equal(jobs[0].style.sources.esri.sparse, undefined);
+  assert.deepEqual(jobs[0].style.sources.esri.tiles, [s.url + '/vector/nsw/{z}/{x}/{y}.pbf']);
+  const expected = await getStyle(s.config, s.providers.nsw);
+  expected.sources.esri.maxzoom = 16;
+  assert.equal(jobs[0].styleKey, styleRevision(expected, s.config, s.providers.nsw), 'existing raster cache identity is preserved');
+});
 test('public status is read-only: web controls are absent even with spoofed proxy headers', async t => {
   let renders = 0;
   const s = await server(t, { renderer: { stats: { active: 0, lastRender: { z:16, x:60500, y:37950 } }, close() {}, async render(job) { renders++; await atomicWrite(job.outPath, PNG); } } }, { ADMIN_ALLOWED_NETWORKS: '' });
@@ -220,7 +298,7 @@ test('local socket controls run one tile test, reject unsafe inputs and stop wit
   const s = await server(t, { renderer: { close() {}, async render(job) { renders++; await blocked; await atomicWrite(job.outPath, PNG); } } });
   assert.equal((await action(s, 'tile-test/start', { url: 'http://other-server/' })).status, 400);
   assert.equal((await action(s, 'tile-test/start', { width: 1000 })).status, 400);
-  assert.equal((await action(s, 'tile-test/start', { z: 22 })).status, 400);
+  assert.equal((await action(s, 'tile-test/start', { z: 19 })).status, 400);
   assert.equal((await action(s, 'tile-test/start', { width: 3, height: 2, concurrency: 2 })).status, 202);
   assert.equal((await action(s, 'tile-test/start')).status, 409);
   assert.equal((await action(s, 'cache/clear', { confirm: 'clear-rendered-tiles' })).status, 409);
@@ -379,6 +457,36 @@ test('styles resolve provider tiles, fonts, sprites and attribution consistently
   assert.equal((await fetch(s.url + '/api/providers')).status, 200);
   assert.equal((await fetch(s.url + '/healthz')).status, 200);
   assert.equal((await fetch(s.url + '/assets/images/error.png')).status, 200);
+});
+test('discovery and prefetch stop at 18 while explicit legacy raster requests retain compatibility', async t => {
+  const jobs = [];
+  const s = await server(t, {
+    nativeZoom: async () => 16,
+    renderer: { stats: {}, close() {}, async render(job) {
+      jobs.push(job); for (const output of job.outputs || [job]) await atomicWrite(output.outPath, PNG);
+    } },
+  }, { PREFETCH_RADIUS: '1', PREFETCH_ZOOM: '1' });
+  const catalog = await (await fetch(s.url + '/api/providers')).json();
+  assert.equal(catalog.automatic.maxzoom, 18);
+  assert.deepEqual(Object.fromEntries(catalog.providers.map(p => [p.id, p.maxzoom])), { qld: 18, nsw: 18, 'nsw-topo': 16 });
+  assert.equal(s.providers.qld.maxzoom, 19, 'upstream capabilities are independent of the advertised map range');
+  assert.equal(s.providers.nsw.maxzoom, 22);
+  for (const route of ['/raster/qld/19/484992/303744.png', '/raster/19/484992/303744.png',
+    '/raster/nsw/19/481048/314360.png', '/raster/qld/18/242496/151872.png']) {
+    assert.equal((await fetch(s.url + route)).status, 200, route);
+  }
+  let state;
+  for (let i = 0; i < 150; i++) {
+    state = await (await fetch(s.url + '/readyz')).json();
+    if (state.prefetch.completed > 0 && !state.prefetch.queued && !state.prefetch.active) break;
+    await sleep(20);
+  }
+  assert.equal(state.prefetch.queued + state.prefetch.active, 0);
+  const background = jobs.filter(job => job.priority > 0);
+  assert.ok(background.length > 0);
+  assert.ok(background.every(job => job.z <= 18), 'neighbours and zoom prefetch cannot exceed the advertised limit');
+  assert.ok(background.some(job => job.z === 17), 'zooming out remains prefetched at the upper limit');
+  assert.ok(jobs.some(job => job.priority === 0 && job.z === 19), 'legacy explicit requests remain accepted');
 });
 test('NSW source imagery passes through the conversion queue and never the vector downloader', async t => {
   const calls = [], jobs = [];

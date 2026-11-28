@@ -5,6 +5,7 @@ import http.server
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -277,6 +278,68 @@ def tile_elevations(data):
     return result
 
 
+class AssemblyProgressTests(unittest.TestCase):
+    def test_real_counters_stage_changes_rates_stalls_and_final_file_move(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); output = root / 'map.mbtiles'; log = root / 'join.log'
+            clock = [0]
+            progress = mod.AssemblyProgress(output, log, 2, 1000, clock=lambda: clock[0])
+            def write(stage, files, inputs, outputs, size):
+                log.write_text('16/60000/39000\r\nQTOPO_ASSEMBLY ' + json.dumps({
+                    'stage': stage, 'checkedFiles': files, 'inputTiles': inputs, 'outputTiles': outputs,
+                    'privatePath': '/private/not-public'}) + '\n')
+                with output.open('wb') as stream: stream.truncate(size)
+            first = progress.sample(force=True)
+            self.assertEqual(first['stage'], 'checking-inputs')
+            self.assertFalse(first['countersAvailable'])
+            write('checking-inputs', 1, 0, 0, 0)
+            clock[0] = 5
+            self.assertEqual(progress.sample()['checkedFiles'], 1)
+            write('merging', 2, 100, 50, 1000)
+            clock[0] = 10
+            self.assertNotIn('etaSeconds', progress.sample())
+            write('merging', 2, 450, 250, 5000)
+            clock[0] = 45
+            sample = progress.sample()
+            self.assertEqual(sample['inputTiles'], 450)
+            self.assertEqual(sample['outputTiles'], 250, 'overlapping input tiles must not be confused with output tiles')
+            self.assertEqual(sample['tilesPerSecond'], 10)
+            self.assertEqual(sample['etaSeconds'], 55)
+            self.assertNotIn('privatePath', sample)
+            clock[0] = 180
+            stalled = progress.sample()
+            self.assertEqual(stalled['tilesPerSecond'], 0)
+            self.assertNotIn('etaSeconds', stalled, 'a stalled merge must not retain a misleading old ETA')
+            write('merged', 2, 1000, 600, 10000)
+            clock[0] = 185
+            checked = progress.sample(force=True, stage='validating')
+            self.assertEqual(checked['inputTiles'], 1000)
+            self.assertNotIn('etaSeconds', checked)
+            progress.sample(force=True, stage='hashing', hashed_bytes=0)
+            clock[0] = 220
+            hashed = progress.sample(hashed_bytes=3500)
+            self.assertEqual(hashed['hashBytesPerSecond'], 100)
+            self.assertEqual(hashed['etaSeconds'], 65)
+            output.rename(root / 'published.mbtiles')
+            final = progress.sample(force=True, stage='complete', hashed_bytes=10000)
+            self.assertEqual(final['outputBytes'], 10000)
+            self.assertNotIn('etaSeconds', final)
+
+    def test_partial_invalid_and_decreasing_native_records_do_not_replace_progress(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); log = root / 'join.log'
+            progress = mod.AssemblyProgress(root / 'output', log, 2, 1000)
+            good = {'stage': 'merging', 'checkedFiles': 2, 'inputTiles': 500, 'outputTiles': 250}
+            log.write_text('QTOPO_ASSEMBLY ' + json.dumps(good) + '\n')
+            self.assertEqual(progress.sample(force=True)['inputTiles'], 500)
+            for patch in ({'inputTiles': 1001}, {'inputTiles': -1}, {'inputTiles': True}, {'inputTiles': 200}, {'stage': 'secret'}):
+                with log.open('a') as stream: stream.write('QTOPO_ASSEMBLY ' + json.dumps({**good, **patch}) + '\n')
+            with log.open('a') as stream: stream.write('QTOPO_ASSEMBLY {"stage":')
+            sample = progress.sample(force=True)
+            self.assertEqual(sample['inputTiles'], 500)
+            self.assertEqual(sample['stage'], 'merging')
+
+
 @unittest.skipUnless(all(shutil.which(n) for n in ('ogr2ogr', 'tippecanoe', 'tile-join')), 'Native tools are not installed')
 class PipelineTests(unittest.TestCase):
     def setUp(self):
@@ -294,12 +357,23 @@ class PipelineTests(unittest.TestCase):
         self.payload = stream.getvalue(); self.catalog = self.folder / 'catalog.json'; self.store = self.folder / 'store'
     def write_catalog(self, sheets):
         self.catalog.write_text(json.dumps({'format': 1, 'sourceUrl': 'offline fixture', 'checkedAt': '2026-11-27', 'sheets': sheets}))
+    def assert_native_progress(self, result):
+        if os.environ.get('QTOPO_REQUIRE_ASSEMBLY_PROGRESS') != '1':
+            return
+        progress = mod.read_json(self.store / 'status.json')['assembly']
+        self.assertTrue(progress['countersAvailable'], 'Docker must use the instrumented pinned tile-join')
+        self.assertEqual(progress['stage'], 'complete')
+        self.assertEqual(progress['checkedFiles'], result['sheets'])
+        self.assertEqual(progress['inputTiles'], progress['totalInputTiles'])
+        self.assertEqual(progress['outputTiles'], result['tiles'])
+        self.assertEqual(progress['outputBytes'], result['fileBytes'])
     def test_native_zoom_rules_atomic_publish_restart_without_network(self):
         with ArchiveServer(self.payload) as server:
             self.write_catalog([server.sheet()]); first = mod.Importer(self.store, self.catalog, 0, threads=1); result = first.run()
             self.assertEqual(mod.read_json(self.store / 'current.json'), result)
             self.assertEqual(mod.read_json(self.store / 'published' / (result['revision'] + '.json')), result)
             self.assertEqual(mod.read_json(self.store / 'status.json')['phase'], 'ready')
+            self.assert_native_progress(result)
             by_zoom = {}
             with sqlite3.connect(self.store / result['file']) as database:
                 for zoom, tile in database.execute('SELECT zoom_level,tile_data FROM tiles'):
@@ -349,6 +423,7 @@ class PipelineTests(unittest.TestCase):
             first_path, _ = importer.prepared_paths(sheets[0]); stamp = first_path.stat().st_mtime_ns; requests = list(server.ranges)
             result = mod.Importer(self.store, self.catalog, 0, threads=1).run()
             self.assertEqual(result['sheets'], 2)
+            self.assert_native_progress(result)
             self.assertEqual(first_path.stat().st_mtime_ns, stamp)
             self.assertEqual(server.ranges, requests)
             self.assertEqual(mod.read_json(self.store / 'current.json')['revision'], result['revision'])
