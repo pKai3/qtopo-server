@@ -76,11 +76,17 @@ async function main() {
   }
   await fs.writeFile('/tmp/smoke/contact-' + size + '.png', contact.toBuffer('image/png'));
   await fs.writeFile('/tmp/smoke/timings-' + size + '.json', JSON.stringify(timings, null, 2));
-  // A valid tile outside QLD must remain transparent, and have a short cache lifetime.
-  const blank = await fetch(origin + '/raster/qld/5/1/1.png');
+  // Classic keeps the ordinary empty-tile TTL. Mutable Readable revalidates
+  // immediately so a contour publication cannot leave stale client tiles.
+  const blank = await fetch(origin + '/raster/classic/qld/5/1/1.png');
   assert.equal(blank.status, 200);
   assert.equal(blank.headers.get('cache-control'), 'public, max-age=1800');
-  const blankImage = await loadImage(Buffer.from(await blank.arrayBuffer()));
+  const readableBlank = await fetch(origin + '/raster/readable/qld/5/1/1.png');
+  assert.equal(readableBlank.status, 200);
+  assert.equal(readableBlank.headers.get('cache-control'), 'public, max-age=0');
+  const blankPng = Buffer.from(await blank.arrayBuffer());
+  assert.deepEqual(Buffer.from(await readableBlank.arrayBuffer()), blankPng);
+  const blankImage = await loadImage(blankPng);
   const blankCanvas = createCanvas(size, size), blankContext = blankCanvas.getContext('2d');
   blankContext.drawImage(blankImage, 0, 0);
   const blankPixels = blankContext.getImageData(0, 0, size, size).data;
