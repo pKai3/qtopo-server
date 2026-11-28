@@ -127,6 +127,47 @@ test('published contours appear in browser and native styles without inheriting 
   assert.equal(s.launches(), 0);
 });
 
+test('Readable automatically adopts completed contours in default browser and GPS routes with fresh cache identities', async t => {
+  const s = await server(t, { defaultProfile: 'readable' });
+  const nswRoute = '/raster/nsw/15/30065/19647.png', qldRoute = '/raster/qld/15/30258/19054.png';
+  const before = await (await fetch(s.url + '/styles/nsw.json')).json();
+  const qld = await (await fetch(s.url + '/styles/qld.json')).json();
+  const mobile = await (await fetch(s.url + '/styles/mobile/nsw.json')).json();
+  const fallback = await fetch(s.url + nswRoute);
+  assert.equal(fallback.status, 200);
+  assert.equal(fallback.headers.get('cache-control'), 'public, max-age=0');
+  assert.equal(before.sources[SOURCE], undefined);
+  assert.equal((await fetch(s.url + qldRoute)).status, 200);
+  const oldNsw = s.jobs[0];
+  await publish(s.root); await s.contours.refresh(true);
+  const catalog = await (await fetch(s.url + '/api/providers')).json();
+  assert.equal(catalog.defaultProfile, 'readable');
+  assert.equal(catalog.profiles.find(p => p.id === 'readable').contourRevision, 'a'.repeat(64));
+  const after = await (await fetch(s.url + '/styles/nsw.json')).json();
+  assert.deepEqual(after, await (await fetch(s.url + '/styles/readable/nsw.json')).json());
+  assert.equal(after.sources[SOURCE].maxzoom, 16);
+  assert.ok(!after.layers.some(layer => ['Contours', 'Contours/label'].includes(layer['source-layer'])));
+  assert.deepEqual(after.layers.filter(layer => layer.source !== SOURCE),
+    before.layers.filter(layer => !['Contours', 'Contours/label'].includes(layer['source-layer'])), 'other Readable map detail is retained');
+  assert.deepEqual(await (await fetch(s.url + '/styles/qld.json')).json(), qld);
+  assert.deepEqual(await (await fetch(s.url + '/styles/mobile/nsw.json')).json(), mobile);
+  assert.equal((await fetch(s.url + qldRoute)).status, 200);
+  assert.equal(s.jobs.length, 2, 'QLD keeps its existing rendered cache');
+  for (const route of [nswRoute, '/raster/readable/nsw/15/30065/19647.png', '/15/30065/19647.png']) {
+    const response = await fetch(s.url + route);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('x-qtopo-profile'), 'readable');
+  }
+  const readyNsw = s.jobs.find(job => job.style.sources[SOURCE]);
+  assert.ok(readyNsw);
+  assert.notEqual(readyNsw.outPath, oldNsw.outPath, 'the original contour tile cannot survive as a cache hit');
+  assert.equal(readyNsw.style.sources[SOURCE].maxzoom, 16);
+  await publish(s.root, 'b'); await s.contours.refresh(true);
+  assert.equal((await fetch(s.url + nswRoute)).status, 200);
+  assert.notEqual(s.jobs.at(-1).outPath, readyNsw.outPath);
+  assert.match(s.jobs.at(-1).style.sources[SOURCE].tiles[0], new RegExp('b'.repeat(64)));
+});
+
 test('contour tile HTTP routes preserve gzip, cache immutable revisions and distinguish empty from invalid requests', async t => {
   const s = await server(t, { ready: true });
   const base = `${s.url}/contours/nsw/${'a'.repeat(64)}`;
@@ -171,6 +212,7 @@ test('disabled startup does not launch preparation and retained data stays unava
   const catalog = await (await fetch(s.url + '/api/providers')).json();
   assert.equal(catalog.defaultProfile, 'readable');
   assert.ok(!catalog.profiles.some(profile => profile.id === 'nsw-2m'));
+  assert.equal((await (await fetch(s.url + '/styles/readable/nsw.json')).json()).sources[SOURCE], undefined);
   assert.equal((await fetch(s.url + `/contours/nsw/${'a'.repeat(64)}/10/5/7.pbf`)).status, 503);
   assert.equal(s.launches(), 0);
 });

@@ -29,7 +29,8 @@ import { attachMapCoordinates } from './map-coordinates.mjs';
     $('mode-label').textContent = $('mode').value === 'raster' ? 'Raster' : 'Vector';
     function previewStyle({ provider: selected, mode }) {
       if (mode === 'vector') return `/styles/${profile.id}/${selected.id}.json`;
-      const rasterURL = selected.id === 'auto' ? profile.raster : `${location.origin}/raster/${profile.id}/${selected.id}/{z}/{x}/{y}.png`;
+      let rasterURL = selected.id === 'auto' ? profile.raster : `${location.origin}/raster/${profile.id}/${selected.id}/{z}/{x}/{y}.png`;
+      if (profile.contourRevision && ['auto', 'nsw'].includes(selected.id)) rasterURL += `?contours=${profile.contourRevision}`;
       return {
         version: 8, glyphs: location.origin + '/fonts/{fontstack}/{range}.pbf',
         sources: { topo: { type: 'raster', tiles: [rasterURL], tileSize: selected.id === 'nsw-topo' ? 256 : 512, bounds: selected.bounds, maxzoom: selected.maxzoom, attribution: selected.attribution } },
@@ -93,7 +94,8 @@ import { attachMapCoordinates } from './map-coordinates.mjs';
         }
         if (request !== revision) return;
         selection = selectPreview(selected, mode, catalog.providers, center, selectState);
-        const key = `${selection.provider.id}/${selection.mode}/${profile.id}`;
+        const contours = ['auto', 'nsw'].includes(selection.provider.id) ? profile.contourRevision || '' : '';
+        const key = `${selection.provider.id}/${selection.mode}/${profile.id}/${contours}`;
         if (key === currentStyle) { syncUI(); return; }
         syncUI();
         // Keep the camera and layer preferences when the selected state changes.
@@ -124,7 +126,12 @@ import { attachMapCoordinates } from './map-coordinates.mjs';
     if (innerWidth < 600) $('map-controls').open = false;
     attachContourStatus({ element: $('contour-status'), panel: $('map-controls'),
       available: catalog.profiles.some(p => p.id === 'nsw-2m'),
-      onProfiles: available => { catalog.profiles = addAvailableProfiles($('profile'), catalog.profiles, available); },
+      revision: catalog.profiles.find(p => p.id === 'nsw-2m')?.contourRevision,
+      onProfiles: available => {
+        catalog.profiles = addAvailableProfiles($('profile'), catalog.profiles, available);
+        profile = catalog.profiles.find(p => p.id === profile.id);
+        switchStyle();
+      },
     });
   } catch (err) { $('status').textContent = err.message; $('status').className = 'error'; }
 })();

@@ -16,9 +16,12 @@ async function main() {
   assert.equal(status.completedSheets, 1);
   assert.equal((await fetch(origin + '/readyz')).status, 200);
   const catalog = await (await fetch(origin + '/api/providers')).json();
+  assert.equal(catalog.defaultProfile, 'readable');
   assert.ok(catalog.profiles.some(profile => profile.id === 'nsw-2m'));
-  const style = await (await fetch(origin + '/styles/nsw-2m/nsw.json')).json();
+  const style = await (await fetch(origin + '/styles/nsw.json')).json();
   const source = style.sources['nsw-2m-contours'];
+  const explicit = await (await fetch(origin + '/styles/nsw-2m/nsw.json')).json();
+  assert.deepEqual(source, explicit.sources['nsw-2m-contours']);
   assert.equal(source.maxzoom, 16);
   assert.ok(style.layers.some(layer => layer.id === 'nsw-2m-contours-2m'));
   assert.ok(!style.layers.some(layer => ['Contours', 'Contours/label'].includes(layer['source-layer'])));
@@ -26,9 +29,10 @@ async function main() {
   for (const zoom of [16, 18]) {
     const n = 2 ** zoom, x = Math.floor((150.314 + 180) / 360 * n);
     const y = Math.floor((1 - Math.asinh(Math.tan(-33.6767 * Math.PI / 180)) / Math.PI) / 2 * n);
-    const route = `/nsw-2m/${zoom}/${x}/${y}.png`;
+    const route = `/${zoom}/${x}/${y}.png`;
     const response = await fetch(origin + route, { signal: AbortSignal.timeout(120000) });
     assert.equal(response.status, 200, await (response.ok ? Promise.resolve('') : response.text()));
+    assert.equal(response.headers.get('x-qtopo-profile'), 'readable');
     const png = Buffer.from(await response.arrayBuffer()), image = await loadImage(png);
     assert.equal(image.width, Number(process.env.TILE_PX || 1024));
     const canvas = createCanvas(image.width, image.height), context = canvas.getContext('2d');

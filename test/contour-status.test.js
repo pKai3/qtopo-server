@@ -38,7 +38,7 @@ test('preparation formatting separates transferred bytes, prepared sheets and fi
   assert.equal(format(status({ phase: 'preparing' })).text, 'NSW 2 m: preparing contours · 42/343 prepared');
   assert.equal(format(status({ phase: 'assembling', completedSheets: 343 })).text, 'NSW 2 m: assembling map · 343/343 prepared');
   assert.equal(format(status({ phase: 'ready', available: false })).text, 'NSW 2 m: finishing preparation');
-  assert.equal(format(status({ phase: 'ready', available: true })).text, 'NSW 2 m: ready in Appearance');
+  assert.equal(format(status({ phase: 'ready', available: true })).text, 'NSW 2 m: ready · used by Readable');
   assert.equal(format(status({ totalBytes: 0, totalSheets: 0 })).text, 'NSW 2 m: downloading 8.1 GB · 42 prepared');
   assert.equal(format(status({ downloadedBytes: 8.1e6, totalBytes: 29.2e6 })).text, 'NSW 2 m: downloading 8.1 / 29.2 MB · 42/343 prepared');
   assert.equal(format(status({ available: true, phase: 'preparing' })).text, 'NSW 2 m update: preparing contours · 42/343 prepared');
@@ -67,12 +67,14 @@ test('assembly formatting reports merge progress separately from validation and 
   assert.equal(value({ stage: '__proto__', message: 'private file' }), 'NSW 2 m: assembling map · 343/343 prepared');
 });
 
-test('new appearance options preserve selection, do not fire change and are not duplicated', async () => {
+test('updated appearance metadata preserves selection, does not fire change and does not duplicate choices', async () => {
   const { addAvailableProfiles } = await modulePromise, select = new Select();
   let changes = 0; select.addEventListener('change', () => changes++);
   const current = [readable, mobile];
-  const merged = addAvailableProfiles(select, current, [readable, mobile, contours, contours, { id: '../bad', name: 'Invalid' }, { id: 'hidden', name: 'Hidden', hidden: true }]);
+  const updated = { ...readable, contourRevision: 'a'.repeat(64) };
+  const merged = addAvailableProfiles(select, current, [updated, mobile, contours, contours, { id: '../bad', name: 'Invalid' }, { id: 'hidden', name: 'Hidden', hidden: true }]);
   assert.deepEqual(current, [readable, mobile], 'the original catalog snapshot is not mutated');
+  assert.deepEqual(merged[0], updated);
   assert.deepEqual(select.options.map(option => option.value), ['readable', 'mobile', 'nsw-2m']);
   assert.equal(select.value, 'mobile'); assert.equal(changes, 0);
   assert.equal(addAvailableProfiles(select, merged, [contours]).length, merged.length);
@@ -97,7 +99,9 @@ test('visible progress polls every five seconds and publishes the new choice wit
   assert.equal(select.options.at(-1).value, 'nsw-2m');
   await view.tick(); assert.equal(calls.filter(url => url === '/api/providers').length, 1);
   view.panel.open = false; view.panel.dispatchEvent(new Event('toggle'));
-  assert.equal(view.timers.size, 0);
+  await flush();
+  assert.deepEqual([...view.timers.values()].map(timer => timer.delay), [5000], 'collapsed controls must still detect a new contour publication');
+  await view.tick();
   const previous = calls.length;
   view.panel.open = true; view.panel.dispatchEvent(new Event('toggle')); await flush();
   assert.equal(calls.length, previous + 1, 'reopening controls refreshes status immediately');
@@ -114,7 +118,24 @@ test('a failed appearance refresh is retried while preparation remains ready', a
   assert.equal(view.element.textContent, 'NSW 2 m: ready · updating Appearance…');
   assert.equal(accepted, 0); await view.tick();
   assert.equal(attempts, 2); assert.equal(accepted, 1);
-  assert.equal(view.element.textContent, 'NSW 2 m: ready in Appearance');
+  assert.equal(view.element.textContent, 'NSW 2 m: ready · used by Readable');
+});
+
+test('a newly published revision refreshes the selected profile metadata once even when an older dataset was ready', async t => {
+  const previous = 'a'.repeat(64), next = 'b'.repeat(64);
+  let revision = previous, catalogs = 0;
+  const updates = [];
+  const view = await harness(async url => {
+    if (url === '/api/contours') return response(status({ phase: 'ready', available: true, revision }));
+    catalogs++;
+    return response({ profiles: [{ ...readable, contourRevision: revision }, { ...contours, contourRevision: revision }] });
+  }, { available: true, revision: previous, onProfiles: profiles => updates.push(profiles) });
+  t.after(() => view.control.destroy()); await flush();
+  assert.equal(catalogs, 0);
+  revision = next; await view.tick();
+  assert.equal(catalogs, 1);
+  assert.equal(updates[0].find(p => p.id === 'readable').contourRevision, next);
+  await view.tick(); assert.equal(catalogs, 1, 'an unchanged dataset must not repeatedly reset the map');
 });
 
 test('hidden pages abort pending work and ignore late responses before resuming', async t => {
