@@ -25,14 +25,18 @@ async function main() {
   assert.equal(source.maxzoom, 16);
   assert.ok(style.layers.some(layer => layer.id === 'nsw-2m-contours-2m'));
   assert.ok(!style.layers.some(layer => ['Contours', 'Contours/label'].includes(layer['source-layer'])));
+  const mobile = await (await fetch(origin + '/styles/mobile/nsw.json')).json();
+  assert.deepEqual(mobile.sources['nsw-2m-contours'], source);
+  const contourLabel = layer => layer.id === 'nsw-2m-contours-10m-label';
+  assert.ok(mobile.layers.find(contourLabel).layout['text-size'] > style.layers.find(contourLabel).layout['text-size']);
   await fs.mkdir('/tmp/smoke', { recursive: true });
-  for (const zoom of [16, 18]) {
+  for (const [profile, zoom] of [['readable', 16], ['readable', 18], ['mobile', 16], ['mobile', 18]]) {
     const n = 2 ** zoom, x = Math.floor((150.314 + 180) / 360 * n);
     const y = Math.floor((1 - Math.asinh(Math.tan(-33.6767 * Math.PI / 180)) / Math.PI) / 2 * n);
-    const route = `/${zoom}/${x}/${y}.png`;
+    const route = `${profile === 'mobile' ? '/mobile' : ''}/${zoom}/${x}/${y}.png`;
     const response = await fetch(origin + route, { signal: AbortSignal.timeout(120000) });
     assert.equal(response.status, 200, await (response.ok ? Promise.resolve('') : response.text()));
-    assert.equal(response.headers.get('x-qtopo-profile'), 'readable');
+    assert.equal(response.headers.get('x-qtopo-profile'), profile === 'mobile' ? 'mobile-3x' : 'readable');
     const png = Buffer.from(await response.arrayBuffer()), image = await loadImage(png);
     assert.equal(image.width, Number(process.env.TILE_PX || 1024));
     const canvas = createCanvas(image.width, image.height), context = canvas.getContext('2d');
@@ -44,10 +48,11 @@ async function main() {
       // light background alone cannot satisfy this check in the small fixture.
       if (pixels[i] > pixels[i + 1] + 15 && pixels[i + 1] > pixels[i + 2] + 10 && pixels[i + 3] === 255) brown++;
     }
-    assert.ok(brown > 30, `Prepared contours missing from native z${zoom} output (${brown} pixels)`);
+    assert.ok(brown > 30, `Prepared contours missing from ${profile} native z${zoom} output (${brown} pixels)`);
     assert.deepEqual(Buffer.from(await (await fetch(origin + route)).arrayBuffer()), png);
-    await fs.writeFile(`/tmp/smoke/contours-z${zoom}.png`, png);
-    console.log(`Prepared 2 m contours rendered at z${zoom}: ${brown} contour-coloured pixels`);
+    const filename = profile === 'mobile' ? 'contours-mobile' : 'contours';
+    await fs.writeFile(`/tmp/smoke/${filename}-z${zoom}.png`, png);
+    console.log(`Prepared 2 m contours rendered for ${profile} at z${zoom}: ${brown} contour-coloured pixels`);
   }
   const current = JSON.parse(await fs.readFile(path.join(root, 'current.json')));
   const stamp = { revision: current.revision, modified: (await fs.stat(path.join(root, current.file))).mtimeMs };

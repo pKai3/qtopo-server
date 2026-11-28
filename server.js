@@ -6,6 +6,7 @@ const { AsyncLocalStorage } = require('node:async_hooks');
 const L = require('./lib/logger');
 const { loadConfig } = require('./lib/config');
 const { createProfileCatalog } = require('./lib/profile-files');
+const { usesNswContours } = require('./lib/profiles');
 const { createProviders, tileURL, parseTile, hash, MAX_MAP_ZOOM } = require('./lib/providers');
 const { createCache } = require('./lib/cache');
 const { cachedRaster, httpError } = require('./lib/utils');
@@ -42,10 +43,10 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   await contours.refresh();
   function currentProfile(id) {
     const profile = profileCatalog.get(id);
-    if (!['readable', 'nsw-2m'].includes(profile?.id)) return profile;
+    if (!usesNswContours(profile?.id)) return profile;
     const contourDataset = contours.dataset;
     return contourDataset ? { ...profile, contourDataset, token: hash(`${profile.token}/${contourDataset.revision}`) }
-      : profile.id === 'readable' ? profile : undefined;
+      : profile.id === 'nsw-2m' ? undefined : profile;
   }
   const styles = createStyleCache(config), requests = createRequestMetrics();
   const startedAt = new Date().toISOString();
@@ -249,7 +250,7 @@ async function createApp(config = loadConfig(), dependencies = {}) {
   }
   async function deliverRaster(res, result, profile) {
     if (result.empty) L.log('RDR', `Empty tile: ${result.path}`);
-    headers(res, profile.styles || ['readable', 'nsw-2m'].includes(profile.id) ? 0 : result.empty ? Math.floor(config.emptyTTL / 1000) : 3600);
+    headers(res, profile.styles || usesNswContours(profile.id) ? 0 : result.empty ? Math.floor(config.emptyTTL / 1000) : 3600);
     res.set('X-QTopo-Profile', profile.id);
     await sendFile(res, result.path, 'image/png');
   }
