@@ -93,15 +93,19 @@ editing a detailed QLD palette; it also regenerates both Light styles. It only
 writes the five named style files. See [NSW palette mapping](NSW-palette.md) for
 the layer mapping and the cases that intentionally retain their NSW treatment.
 
-NSW paved roads now use the corresponding QLD width curves, independently of
-label sizing. Local roads remain narrower than connectors, secondary roads and
+NSW paved roads use the corresponding QLD width curves at twice their weight,
+independently of label sizing, to distinguish streets from parcel boundaries.
+Local roads remain narrower than connectors, secondary roads and
 highways. The same continuous curve spans NSW's zoom-specific layer switches,
 removing the sudden increase at z16. In Mobile at z16, local-road outer widths
-are about 4.4 style pixels and highway widths about 9.3, instead of 52 for both.
+are about 8.8 style pixels and highway widths about 18.6, instead of 52 for both.
+The first correction (4.4 and 9.3 pixels) was too thin in the phone comparison.
 Tunnel edges meet the running surface, and bridge outlines stay outside their
-separation strokes. Service lanes, vehicle tracks and access ways stay narrower
-than local roads; path strokes match QLD's path sizing. Existing track/path dash
-patterns, colors, labels, source detail and Classic are unchanged.
+separation strokes. Service lanes stay narrower than local roads. NSW paths,
+vehicle tracks and access ways retain their widths from before the road-width
+correction, including their bridge and tunnel strokes. The road-width recipe
+does not resize trails. Dash patterns, colors, labels, source detail and Classic
+are unchanged.
 
 Run `node scripts/match-nsw-road-widths.js` after changing the maintained QLD
 road widths. It updates Readable, Mobile 2x and Mobile 3x and regenerates both

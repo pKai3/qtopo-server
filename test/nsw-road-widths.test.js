@@ -24,7 +24,7 @@ function extent(layers, zoom) {
 const ordinary = (style, kind) => style.layers.filter(l => l.type === 'line' && l['source-layer'] === 'RoadAgg_M'
   && new RegExp(`^RoadAgg_M/${kind}(?:_\\d+)?/`).test(l.id));
 
-test('maintained roads stay narrow, ordered and continuous across the NSW zoom switches', () => {
+test('maintained roads keep moderate widths, hierarchy and continuous NSW zoom switches', () => {
   for (const id of ['readable', 'mobile-2x', 'mobile-3x', 'readable-light', 'mobile-light']) {
     const style = read(id).styles.nsw;
     assert.deepEqual(validateStyleMin(style), [], id);
@@ -33,7 +33,7 @@ test('maintained roads stay narrow, ordered and continuous across the NSW zoom s
       for (const z of [13, 14, 16]) {
         assert.ok(Math.abs(extent(layers, z - 1e-5) - extent(layers, z)) < 0.001, `${id}/${kind}: jump at z${z}`);
       }
-      for (const z of [14, 15, 16, 17, 18, 22]) assert.ok(extent(layers, z) < 12, `${id}/${kind}: excessive width at z${z}`);
+      for (const z of [14, 15, 16, 17, 18, 22]) assert.ok(extent(layers, z) < 24, `${id}/${kind}: excessive width at z${z}`);
     }
     for (const z of [14, 15, 16, 17, 18, 22]) {
       const widths = ['LocalRoad', 'DistributorRoad', 'ArterialRoad', 'PrimaryRoad'].map(kind => extent(ordinary(style, kind), z));
@@ -68,7 +68,7 @@ test('bridge surfaces and tunnel edges meet their adjoining roads', () => {
   }
 });
 
-test('rebuilding widths is idempotent and only changes road and path dimensions', () => {
+test('rebuilding widths is idempotent and only changes paved road dimensions', () => {
   for (const id of ['readable', 'mobile-2x', 'mobile-3x']) {
     const doc = read(id), original = read('nsw.style');
     const before = structuredClone(original);
@@ -79,7 +79,7 @@ test('rebuilding widths is idempotent and only changes road and path dimensions'
         if (prior.paint && key in prior.paint) after.paint[key] = prior.paint[key];
       }
       assert.deepEqual(after, prior, `non-dimension change in ${prior.id}`);
-      if (!/^(RoadAgg|RoadSegment|AggregatedWay)/.test(prior['source-layer'] || '') || /UnderConstruction/.test(prior.id)) {
+      if (!/^(RoadAgg|RoadSegment|AggregatedWay)/.test(prior['source-layer'] || '') || /Path|Track-Vehicular|AccessWay|UnderConstruction/.test(prior.id)) {
         assert.deepEqual(original.layers[i], prior, `unrelated feature changed: ${prior.id}`);
       }
     }
@@ -92,17 +92,20 @@ test('rebuilding widths is idempotent and only changes road and path dimensions'
   }
 });
 
-test('minor lanes, tracks and paths do not become wider than local streets', () => {
-  for (const id of ['readable', 'mobile-2x', 'mobile-3x']) {
-    const style = read(id).styles.nsw;
-    for (const z of [16, 17, 18, 22]) {
-      const local = extent(ordinary(style, 'LocalRoad'), z);
-      for (const kind of ['UrbanServiceLane', 'Track-Vehicular', 'AccessWay']) {
-        assert.ok(extent(ordinary(style, kind), z) < local, `${id}/${kind} wider than a local road`);
-      }
-      const footpath = style.layers.find(l => l.id === 'RoadAgg_M/Path');
-      assert.ok(value(footpath, 'line-width', z) < local);
+test('trail widths retain the earlier NSW sizing and are not changed by the road recipe', () => {
+  const original = new Map(read('nsw.style').layers.map(layer => [layer.id, layer]));
+  for (const [id, factor] of [['readable', 1], ['mobile-2x', 2], ['mobile-3x', 3], ['readable-light', 1], ['mobile-light', 3]]) {
+    const doc = read(id), style = doc.styles.nsw;
+    const trails = style.layers.filter(layer => layer.type === 'line' && /^(RoadAgg|RoadSegment)/.test(layer['source-layer'] || '')
+      && /\/(?:Path|Track-Vehicular|AccessWay)(?:_|\/|$)/.test(layer.id));
+    assert.ok(trails.length > 0);
+    const before = structuredClone(trails);
+    for (const trail of trails) {
+      const reference = original.get(trail.id);
+      assert.equal(trail.paint['line-width'], reference.paint['line-width'] * factor, `${id}/${trail.id}: earlier trail width lost`);
+      assert.deepEqual(trail.paint['line-dasharray'], reference.paint['line-dasharray']);
     }
-    for (const z of [16]) assert.ok(Math.abs(extent(ordinary(style, 'Track-Vehicular'), z - 1e-5) - extent(ordinary(style, 'Track-Vehicular'), z)) < 0.001);
+    matchNswRoadWidths(style, doc.styles.qld);
+    assert.deepEqual(trails, before, `${id}: paved-road adjustment changed trails`);
   }
 });

@@ -1,16 +1,16 @@
 #!/usr/bin/env node
-// Use the maintained QLD road hierarchy, whose stroke sizing is independent
-// of label sizing. NSW's original z16 widths were tripled with the text.
+// Use the maintained QLD road hierarchy with extra NSW road weight so streets
+// stay distinct from parcel boundaries. Trail widths are managed separately.
 const fs = require('node:fs'), path = require('node:path');
 const { formatStyleJson } = require('../lib/style-format');
 const directory = path.resolve(__dirname, '../styles');
+const ROAD_WIDTH_FACTOR = 2;
 const categories = {
   Motorway: 'Highway/Motorway', PrimaryRoad: 'Highway/Motorway',
   'RTA State Highway': 'Highway/Motorway', 'RTA Motorway': 'Highway/Motorway',
   ArterialRoad: 'Secondary', SubArterialRoad: 'Secondary',
   DistributorRoad: 'Connector', DedicatedBusWay: 'Connector',
   LocalRoad: 'Local', UrbanServiceLane: 'Local',
-  'Track-Vehicular': 'Local', AccessWay: 'Local', Path: 'Local',
 };
 const round = value => Math.round(value * 1e6) / 1e6;
 function stops(expression) {
@@ -42,11 +42,11 @@ function roadCurve(qld, category, casing) {
   const lowStops = stops(medium.paint['line-width']), highStops = stops(high.paint['line-width']);
   const join = lowStops.at(-1), start = highStops[0];
   if (join[0] !== start[0] || Math.abs(join[1] - start[1]) > 1e-6) throw new Error(`Discontinuous QLD road reference: ${category}`);
-  return curve([...lowStops, ...highStops.slice(1)]);
+  return curve([...lowStops, ...highStops.slice(1)].map(([z, width]) => [z, width * ROAD_WIDTH_FACTOR]));
 }
 
 function matchNswRoadWidths(nsw, qld) {
-  const widths = new Map(Object.values(categories).map(category => [category, {
+  const widths = new Map([...new Set(Object.values(categories))].map(category => [category, {
     surface: roadCurve(qld, category, false), casing: roadCurve(qld, category, true),
   }]));
   let changed = 0;
@@ -54,18 +54,11 @@ function matchNswRoadWidths(nsw, qld) {
     const source = layer['source-layer'] || '';
     if (layer.type !== 'line' || !/^(RoadAgg|RoadSegment|AggregatedWay)/.test(source)) continue;
     const kind = layer.id.split('/')[1]?.replace(/_\d+$/, ''), category = categories[kind];
-    if (!category) continue; // Keep unrelated transport and construction markings.
+    if (!category) continue; // Preserve paths, vehicle tracks, access ways and other transport.
     let { surface, casing } = widths.get(category);
-    const minorScale = { UrbanServiceLane: 0.75, 'Track-Vehicular': 0.65, AccessWay: 0.55 }[kind];
-    if (minorScale) {
-      surface = curve(stops(surface).map(([z, width]) => [z, width * minorScale]));
-      casing = curve(stops(casing).map(([z, width]) => [z, width * minorScale]));
-    } else if (kind === 'Path') {
-      const width = qld.layers.find(l => l.type === 'line' && l['source-layer'] === 'Paths')?.paint['line-width'];
-      if (!Number.isFinite(width) || width <= 0) throw new Error('Missing QLD path width');
-      const border = combine(casing, surface, (outer, inner) => outer - inner);
-      surface = curve(stops(surface).map(([z]) => [z, width]));
-      casing = combine(surface, border, (inner, edge) => inner + edge);
+    if (kind === 'UrbanServiceLane') {
+      surface = curve(stops(surface).map(([z, width]) => [z, width * 0.75]));
+      casing = curve(stops(casing).map(([z, width]) => [z, width * 0.75]));
     }
     const part = layer.id.match(/\/(\d+)$/)?.[1], paint = layer.paint;
     const before = JSON.stringify(paint);
